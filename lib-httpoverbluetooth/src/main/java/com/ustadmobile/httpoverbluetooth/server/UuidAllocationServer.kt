@@ -30,18 +30,26 @@ import kotlin.concurrent.withLock
  * finished the UUID is de-allocated.
  */
 class UuidAllocationServer(
-    private val appContext: Context,
-    private val allocationServiceUuid: UUID,
+    appContext: Context,
+    allocationServiceUuid: UUID,
     private val allocationCharacteristicUuid: UUID,
     private val maxSimultaneousClients: Int = 4,
     private val onUuidAllocated: OnUuidAllocatedListener,
 ) : Closeable {
 
+    private val service = BluetoothGattService(allocationServiceUuid,
+        BluetoothGattService.SERVICE_TYPE_PRIMARY)
+
+    private val characteristic = BluetoothGattCharacteristic(
+        allocationCharacteristicUuid,
+        BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE,
+        BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE,
+    )
+
+
     private val bluetoothManager: BluetoothManager = appContext.getSystemService(
         BluetoothManager::class.java
     )
-
-    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
 
     private val allocatedUuids = ConcurrentHashMap<UUID, BluetoothDevice>()
 
@@ -135,14 +143,6 @@ class UuidAllocationServer(
     }
 
     init {
-        val service = BluetoothGattService(allocationServiceUuid,
-            BluetoothGattService.SERVICE_TYPE_PRIMARY)
-
-        val characteristic = BluetoothGattCharacteristic(
-            allocationCharacteristicUuid,
-            BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE,
-            BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE,
-        )
 
         try {
             gattServer = bluetoothManager.openGattServer(appContext, gattServerCallback)

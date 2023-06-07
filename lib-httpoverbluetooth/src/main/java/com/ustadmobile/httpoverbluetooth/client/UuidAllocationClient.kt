@@ -53,7 +53,7 @@ class UuidAllocationClient(
         private val remoteServiceUuid: UUID,
         private val remoteCharacteristicUuid: UUID,
         coroutineScope: CoroutineScope,
-        private val timeout: Long = 5000,
+        private val timeout: Long = DEFAULT_TIMEOUT,
     ) : BluetoothGattCallback() {
 
         val dataPortUuid = CompletableDeferred<UUID>()
@@ -79,6 +79,11 @@ class UuidAllocationClient(
             super.onConnectionStateChange(gatt, status, newState)
             Log.i(LOG_TAG, "onConnectionStateChange state=$newState status=$status")
             if(newState == BluetoothGatt.STATE_CONNECTED) {
+                if(timeoutJob.isCancelled) {
+                    Log.d(LOG_TAG, "onConnectionStateChange: already cancelled")
+                    return
+                }
+
                 try {
                     if(gatt?.discoverServices() != true)
                         disconnectIfRequired(gatt, IllegalStateException("Failed to submit discover services request"))
@@ -92,6 +97,11 @@ class UuidAllocationClient(
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
             if(gatt == null)
                 return
+
+            if(timeoutJob.isCancelled) {
+                Log.d(LOG_TAG, "onServicesDiscovered: already cancelled")
+                return
+            }
 
             val services = gatt.services
             Log.d(LOG_TAG, "services discovered: ${gatt.services.size}")
@@ -134,7 +144,8 @@ class UuidAllocationClient(
                 if(value != null && status == BluetoothGatt.GATT_SUCCESS) {
                     try {
                         val uuid = UuidUtil.uuidFromBytes(value)
-                        Log.i(LOG_TAG, "Got UID: $uuid")
+                        Log.i(LOG_TAG, "Got allocated uuid: $uuid")
+                        timeoutJob.cancel()
                         dataPortUuid.complete(uuid)
                         disconnectIfRequired(gatt)
                     }catch(e: Exception) {
@@ -236,6 +247,12 @@ class UuidAllocationClient(
     }
 
     override fun close() {
+
+    }
+
+    companion object {
+
+        const val DEFAULT_TIMEOUT = 12000L
 
     }
 

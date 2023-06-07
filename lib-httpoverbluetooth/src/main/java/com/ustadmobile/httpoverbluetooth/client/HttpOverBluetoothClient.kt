@@ -6,11 +6,11 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
+import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.UUID_BUSY
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpRequest
-import rawhttp.core.RawHttpResponse
 import rawhttp.core.body.StringBody
 import java.io.InputStream
 import java.io.OutputStream
@@ -42,21 +42,21 @@ class HttpOverBluetoothClient(
         statusCode: Int,
         responseLine: String,
         text: String,
-    ): RawHttpResponse<*> {
-        return rawHttp.parseResponse(
-            "HTTP/1.1 $statusCode $responseLine\n" +
-                    "Content-Type: text/plain\n"
-        ).withBody(StringBody(text))
+    ) : BluetoothHttpResponse {
+        return BluetoothHttpResponse(
+            response = rawHttp.parseResponse(
+                "HTTP/1.1 $statusCode $responseLine\n" +
+                        "Content-Type: text/plain\n"
+            ).withBody(StringBody(text)),
+            onClose = { }
+        )
     }
 
     private fun newInternalErrorResponse(message: String): BluetoothHttpResponse {
-        return BluetoothHttpResponse(
-            response = newTextResponse(
-                statusCode = 500,
-                responseLine = "Internal Server Error",
-                text = message,
-            ),
-            onClose = { },
+        return newTextResponse(
+            statusCode = 500,
+            responseLine = "Internal Server Error",
+            text = message,
         )
     }
 
@@ -81,6 +81,11 @@ class HttpOverBluetoothClient(
             remoteCharacteristicUuid = remoteUuidAllocationCharacteristicUuid,
         )
 
+        if(dataUuid == UUID_BUSY) {
+            return newTextResponse(503, "Service Unavailable",
+                "Server UUID port not allocated: busy")
+        }
+
         val remoteDevice = adapter.getRemoteDevice(remoteAddress)
 
         return withContext(Dispatchers.IO) {
@@ -89,7 +94,6 @@ class HttpOverBluetoothClient(
             var outStream: OutputStream? = null
 
             try {
-                val startTime = System.currentTimeMillis()
                 socket = remoteDevice.createInsecureRfcommSocketToServiceRecord(
                     dataUuid
                 ) ?: throw IllegalStateException()

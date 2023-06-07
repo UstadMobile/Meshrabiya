@@ -6,7 +6,6 @@ import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
-import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpRequest
@@ -19,10 +18,10 @@ import java.util.concurrent.Executors
 abstract class AbstractHttpOverBluetoothServer(
     protected val appContext: Context,
     protected val rawHttp: RawHttp,
-    private val allocationServiceUuid: UUID,
-    private val allocationCharacteristicUuid: UUID,
-    private val maxClients: Int,
-    private val uuidAllocationServerFactory: (
+    allocationServiceUuid: UUID,
+    allocationCharacteristicUuid: UUID,
+    maxClients: Int,
+    uuidAllocationServerFactory: (
         appContext: Context,
         allocationServiceUuid: UUID,
         allocationCharacteristicUuid: UUID,
@@ -46,14 +45,14 @@ abstract class AbstractHttpOverBluetoothServer(
 
         val clientSocket: BluetoothSocket? = try {
             Log.d(LOG_TAG, "Listening for data request on $uuid")
-            serverSocket?.accept() //Can add timeout here
+            serverSocket?.accept(SOCKET_ACCEPT_TIMEOUT) //Can add timeout here
         }catch (e: IOException) {
             Log.e(LOG_TAG, "Exception accepting socket", e)
             null
         }
 
         clientSocket?.also { socket ->
-            Log.i(LOG_TAG, "client connected")
+            Log.d(LOG_TAG, "client connected to $uuid")
             try {
                 val inStream = socket.inputStream
                 val outStream = socket.outputStream
@@ -62,14 +61,12 @@ abstract class AbstractHttpOverBluetoothServer(
                 response.writeTo(outStream)
                 outStream.flush()
             }catch(e: Exception) {
-                e.printStackTrace()
+                Log.w(LOG_TAG, "Exception handling socket $uuid", e)
+            } finally {
+                Log.d(LOG_TAG, "Closing server socket on $uuid")
+                serverSocket?.close()
             }
         }
-
-        //client should close socket on its end...
-        // TODO: Make sure it is 100% closed
-        //we need to close the server socket.
-        // however we must not close the socket before the client is done
     }
 
     private val uuidAllocationServer = uuidAllocationServerFactory(
@@ -96,4 +93,9 @@ abstract class AbstractHttpOverBluetoothServer(
 
     abstract fun handleRequest(request: RawHttpRequest): RawHttpResponse<*>
 
+    companion object {
+
+        const val SOCKET_ACCEPT_TIMEOUT = 12000
+
+    }
 }

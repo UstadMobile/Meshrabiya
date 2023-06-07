@@ -90,16 +90,19 @@ class MainActivity : ComponentActivity() {
                     "Host: www.example.com\r\n"
             )
 
-            bluetothClient.sendRequest(
-                remoteAddress = device.address,
-                remoteUuidAllocationUuid = UUID.fromString(EchoBluetoothHttpServer.SERVICE_UUID),
-                remoteUuidAllocationCharacteristicUuid = UUID.fromString(
-                    EchoBluetoothHttpServer.CHARACTERISTIC_UUID),
-                request = request
-            ).use { response ->
-                Log.i(LOG_TAG, "Received response ${response.response.body.get().decodeBodyToString(Charsets.UTF_8)}")
+            try {
+                bluetothClient.sendRequest(
+                    remoteAddress = device.address,
+                    remoteUuidAllocationUuid = UUID.fromString(EchoBluetoothHttpServer.SERVICE_UUID),
+                    remoteUuidAllocationCharacteristicUuid = UUID.fromString(
+                        EchoBluetoothHttpServer.CHARACTERISTIC_UUID),
+                    request = request
+                ).use { response ->
+                    Log.i(LOG_TAG, "Received response ${response.response.body.get().decodeBodyToString(Charsets.UTF_8)}")
+                }
+            }catch(e: Exception) {
+                Log.e(LOG_TAG, "Exception sending request", e)
             }
-
         }
     }
 
