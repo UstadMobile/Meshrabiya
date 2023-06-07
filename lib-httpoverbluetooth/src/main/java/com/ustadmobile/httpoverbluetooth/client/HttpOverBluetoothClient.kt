@@ -8,7 +8,10 @@ import android.util.Log
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
+import rawhttp.core.RawHttp
+import rawhttp.core.RawHttpRequest
+import rawhttp.core.RawHttpResponse
+import rawhttp.core.body.StringBody
 import java.io.InputStream
 import java.io.OutputStream
 import java.lang.Exception
@@ -25,8 +28,8 @@ import java.util.UUID
  */
 class HttpOverBluetoothClient(
     private val appContext: Context,
+    private val rawHttp: RawHttp,
     private val uuidAllocationClient: UuidAllocationClient = UuidAllocationClient(appContext),
-    //private val rawHttp: RawHttp,
 ) {
 
     private val bluetoothManager: BluetoothManager = appContext.getSystemService(
@@ -35,6 +38,27 @@ class HttpOverBluetoothClient(
 
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
 
+    private fun newTextResponse(
+        statusCode: Int,
+        responseLine: String,
+        text: String,
+    ): RawHttpResponse<*> {
+        return rawHttp.parseResponse(
+            "HTTP/1.1 $statusCode $responseLine\n" +
+                    "Content-Type: text/plain\n"
+        ).withBody(StringBody(text))
+    }
+
+    private fun newInternalErrorResponse(message: String): BluetoothHttpResponse {
+        return BluetoothHttpResponse(
+            response = newTextResponse(
+                statusCode = 500,
+                responseLine = "Internal Server Error",
+                text = message,
+            ),
+            onClose = { },
+        )
+    }
 
     /**
      * @param remoteAddress the real bluetooth mac address of the remote device
@@ -47,12 +71,9 @@ class HttpOverBluetoothClient(
         remoteAddress: String,
         remoteUuidAllocationUuid: UUID,
         remoteUuidAllocationCharacteristicUuid: UUID,
-//        request: RawHttpRequest
-    )  {
-        val adapter = bluetoothAdapter ?: return /*rawHttp.parseResponse(
-            "HTTP/1.1 500 Internal Server Error\n" +
-                    "Content-Type: text/plain\n"
-        ).withBody(StringBody("HttpOverBluetooth: No  bluetooth adapter"))*/
+        request: RawHttpRequest
+    ) : BluetoothHttpResponse {
+        val adapter = bluetoothAdapter ?: return newInternalErrorResponse("No bluetooth adapter")
 
         val dataUuid = uuidAllocationClient.requestUuidAllocation(
             remoteAddress = remoteAddress,
@@ -62,33 +83,42 @@ class HttpOverBluetoothClient(
 
         val remoteDevice = adapter.getRemoteDevice(remoteAddress)
 
-        withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             var socket: BluetoothSocket? = null
             var inStream: InputStream? = null
             var outStream: OutputStream? = null
 
             try {
                 val startTime = System.currentTimeMillis()
-                try {
-                    socket = remoteDevice.createInsecureRfcommSocketToServiceRecord(
-                        dataUuid
-                    )
-                    Log.i("HttpOverBluetoothTag", "Connecting to server on $dataUuid")
-                    socket.connect()
-                    Log.i("HttpOverBluetoothTag", "Socket connected $dataUuid")
+                socket = remoteDevice.createInsecureRfcommSocketToServiceRecord(
+                    dataUuid
+                ) ?: throw IllegalStateException()
+                Log.i(LOG_TAG, "Connecting to server on $dataUuid")
+                socket.connect()
+                Log.i(LOG_TAG, "Socket connected on $dataUuid : sending request ${request.method} ${request.uri}")
 
-                    inStream = socket.inputStream
-                    outStream = socket.outputStream
-                    val inReader = BufferedReader(inStream.reader())
-                    val serverSays = inReader.readLine()
-                    Log.i(LOG_TAG, "Got message from server: $serverSays")
-                }catch(e: SecurityException) {
-                    e.printStackTrace()
-                }
+                inStream = socket.inputStream
+                outStream = socket.outputStream
+                request.writeTo(outStream)
+                val httpResponse = rawHttp.parseResponse(inStream)
+                Log.i(LOG_TAG, "Received response: ${httpResponse.statusCode} ${httpResponse.startLine.reason}")
+
+                return@withContext BluetoothHttpResponse(
+                    response = httpResponse,
+                    onClose = {
+                        Log.i(LOG_TAG, "Closing response/socket for $dataUuid")
+                        //if keep-alive is used, we could send additional requests here.
+                        socket.close()
+                    }
+                )
+            }catch(e: SecurityException) {
+                e.printStackTrace()
+                socket?.close()
+                return@withContext newInternalErrorResponse(e.toString())
             }catch(e: Exception) {
                 e.printStackTrace()
-            } finally {
                 socket?.close()
+                return@withContext newInternalErrorResponse(e.toString())
             }
         }
     }

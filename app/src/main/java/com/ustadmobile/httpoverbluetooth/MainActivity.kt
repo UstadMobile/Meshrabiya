@@ -40,12 +40,12 @@ import androidx.lifecycle.lifecycleScope
 import com.ustadmobile.httpoverbluetooth.MainActivity.Companion.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.client.HttpOverBluetoothClient
 import com.ustadmobile.httpoverbluetooth.server.AbstractHttpOverBluetoothServer
-import com.ustadmobile.httpoverbluetooth.server.AbstractHttpOverBluetoothServer.Companion.DEFAULT_CHARACTERISTIC_UUID
 import com.ustadmobile.httpoverbluetooth.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import rawhttp.core.RawHttp
 import java.util.UUID
 
 data class MainUiState(
@@ -58,17 +58,20 @@ class MainActivity : ComponentActivity() {
 
     var uiState = MutableStateFlow(MainUiState())
 
+    private val rawHttp = RawHttp()
+
     private val bluetothClient: HttpOverBluetoothClient by lazy {
-        HttpOverBluetoothClient(applicationContext)
+        HttpOverBluetoothClient(
+            appContext = applicationContext,
+            rawHttp = rawHttp
+        )
     }
 
     fun onSetServerEnabled(enabled: Boolean) {
         if(enabled) {
-            httpOverBluetothServer = AbstractHttpOverBluetoothServer(
+            httpOverBluetothServer = EchoBluetoothHttpServer(
                 appContext = applicationContext,
-                allocationServiceUuid = UUID.fromString(CONTROL_UUID),
-                allocationCharacteristicUuid = DEFAULT_CHARACTERISTIC_UUID,
-                maxClients = 4,
+                rawHttp = rawHttp,
             )
         }else {
             httpOverBluetothServer?.close()
@@ -82,11 +85,21 @@ class MainActivity : ComponentActivity() {
 
     fun onServerSelected(device: BluetoothDevice) {
         lifecycleScope.launch {
+            val request = rawHttp.parseRequest(
+                "GET /hello.txt HTTP/1.1\r\n" +
+                    "Host: www.example.com\r\n"
+            )
+
             bluetothClient.sendRequest(
                 remoteAddress = device.address,
-                remoteUuidAllocationUuid = UUID.fromString(CONTROL_UUID),
-                remoteUuidAllocationCharacteristicUuid = DEFAULT_CHARACTERISTIC_UUID
-            )
+                remoteUuidAllocationUuid = UUID.fromString(EchoBluetoothHttpServer.SERVICE_UUID),
+                remoteUuidAllocationCharacteristicUuid = UUID.fromString(
+                    EchoBluetoothHttpServer.CHARACTERISTIC_UUID),
+                request = request
+            ).use { response ->
+                Log.i(LOG_TAG, "Received response ${response.response.body.get().decodeBodyToString(Charsets.UTF_8)}")
+            }
+
         }
     }
 

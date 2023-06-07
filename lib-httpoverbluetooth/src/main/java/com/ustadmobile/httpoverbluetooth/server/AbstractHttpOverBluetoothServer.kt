@@ -8,13 +8,17 @@ import android.content.Context
 import android.util.Log
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
+import rawhttp.core.RawHttp
+import rawhttp.core.RawHttpRequest
+import rawhttp.core.RawHttpResponse
 import java.io.IOException
 import java.lang.Exception
 import java.util.UUID
 import java.util.concurrent.Executors
 
-class AbstractHttpOverBluetoothServer(
-    private val appContext: Context,
+abstract class AbstractHttpOverBluetoothServer(
+    protected val appContext: Context,
+    protected val rawHttp: RawHttp,
     private val allocationServiceUuid: UUID,
     private val allocationCharacteristicUuid: UUID,
     private val maxClients: Int,
@@ -53,8 +57,9 @@ class AbstractHttpOverBluetoothServer(
             try {
                 val inStream = socket.inputStream
                 val outStream = socket.outputStream
-
-                outStream.write("Hello World\n".toByteArray())
+                val request = rawHttp.parseRequest(inStream)
+                val response = handleRequest(request)
+                response.writeTo(outStream)
                 outStream.flush()
             }catch(e: Exception) {
                 e.printStackTrace()
@@ -64,6 +69,7 @@ class AbstractHttpOverBluetoothServer(
         //client should close socket on its end...
         // TODO: Make sure it is 100% closed
         //we need to close the server socket.
+        // however we must not close the socket before the client is done
     }
 
     private val uuidAllocationServer = uuidAllocationServerFactory(
@@ -88,8 +94,6 @@ class AbstractHttpOverBluetoothServer(
         uuidAllocationServer.close()
     }
 
-    companion object {
-        val DEFAULT_ALLOCATION_SERVICE_UUID = UUID.fromString("0661d55f-bc07-4996-b9a6-303d453a8a20")
-        val DEFAULT_CHARACTERISTIC_UUID = UUID.fromString("0661d55f-bc07-4996-b9a6-303d453a8a19")
-    }
+    abstract fun handleRequest(request: RawHttpRequest): RawHttpResponse<*>
+
 }

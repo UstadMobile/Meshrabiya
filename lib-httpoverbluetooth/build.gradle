@@ -36,7 +36,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
     implementation "com.athaydes.rawhttp:rawhttp-core:2.5.2"
-    implementation 'no.nordicsemi.android:ble:2.6.1'
+
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
