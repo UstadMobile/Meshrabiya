@@ -40,6 +40,7 @@ import androidx.lifecycle.lifecycleScope
 import com.ustadmobile.httpoverbluetooth.MainActivity.Companion.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.client.HttpOverBluetoothClient
 import com.ustadmobile.httpoverbluetooth.server.AbstractHttpOverBluetoothServer
+import com.ustadmobile.httpoverbluetooth.server.AbstractHttpOverBluetoothServer.Companion.DEFAULT_CHARACTERISTIC_UUID
 import com.ustadmobile.httpoverbluetooth.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,9 +65,10 @@ class MainActivity : ComponentActivity() {
     fun onSetServerEnabled(enabled: Boolean) {
         if(enabled) {
             httpOverBluetothServer = AbstractHttpOverBluetoothServer(
-                applicationContext,
-                UUID.fromString(CONTROL_UUID),
-                //UUID.fromString(BLE_UUID),
+                appContext = applicationContext,
+                allocationServiceUuid = UUID.fromString(CONTROL_UUID),
+                allocationCharacteristicUuid = DEFAULT_CHARACTERISTIC_UUID,
+                maxClients = 4,
             )
         }else {
             httpOverBluetothServer?.close()
@@ -81,8 +83,9 @@ class MainActivity : ComponentActivity() {
     fun onServerSelected(device: BluetoothDevice) {
         lifecycleScope.launch {
             bluetothClient.sendRequest(
-                device.address,
-                UUID.fromString(CONTROL_UUID),
+                remoteAddress = device.address,
+                remoteUuidAllocationUuid = UUID.fromString(CONTROL_UUID),
+                remoteUuidAllocationCharacteristicUuid = DEFAULT_CHARACTERISTIC_UUID
             )
         }
     }
@@ -112,8 +115,6 @@ class MainActivity : ComponentActivity() {
         const val LOG_TAG = "HttpOverBluetoothTag"
 
         const val CONTROL_UUID = "066cbe21-8a51-49e0-8551-7c13d8ff6084"
-
-        const val BLE_UUID = "066cbe21-8a51-49e0-8551-7c13d8ff7085"
 
     }
 }
