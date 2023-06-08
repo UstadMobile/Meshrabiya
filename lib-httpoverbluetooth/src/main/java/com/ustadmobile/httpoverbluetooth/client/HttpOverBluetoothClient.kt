@@ -12,10 +12,8 @@ import kotlinx.coroutines.withContext
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.body.StringBody
-import java.io.InputStream
-import java.io.OutputStream
-import java.lang.Exception
 import java.util.UUID
+import kotlin.Exception
 
 /**
  * As per https://developer.android.com/guide/topics/connectivity/bluetooth/connect-bluetooth-devices#connect-server
@@ -29,7 +27,11 @@ import java.util.UUID
 class HttpOverBluetoothClient(
     private val appContext: Context,
     private val rawHttp: RawHttp,
-    private val uuidAllocationClient: UuidAllocationClient = UuidAllocationClient(appContext),
+    private val onLogError: (message: String, exception: Exception?) -> Unit = { _, _ -> },
+    private val uuidAllocationClient: UuidAllocationClient = UuidAllocationClient(
+        appContext = appContext,
+        onLogError = onLogError,
+    ),
 ) {
 
     private val bluetoothManager: BluetoothManager = appContext.getSystemService(

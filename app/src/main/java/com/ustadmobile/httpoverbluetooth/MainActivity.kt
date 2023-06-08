@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
@@ -87,6 +88,7 @@ class MainActivity : ComponentActivity() {
             appContext = applicationContext,
             rawHttp = rawHttp,
         ).also {
+            it.message = "Hello Bluetooth World"
             it.listener = MessageReplyBluetoothHttpServer.ServerListener { fromDevice, reply ->
                 onLogLine("Respond to $fromDevice w/message $reply")
             }
@@ -111,7 +113,10 @@ class MainActivity : ComponentActivity() {
     private val bluetothClient: HttpOverBluetoothClient by lazy {
         HttpOverBluetoothClient(
             appContext = applicationContext,
-            rawHttp = rawHttp
+            rawHttp = rawHttp,
+            onLogError = { message, exception ->
+                onLogLine("CLIENT ERROR: $message $exception")
+            }
         )
     }
 
@@ -369,6 +374,13 @@ fun MainScreen(
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
+        Text(
+            "HTTP Over Bluetooth 0.1",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally),
+        )
+
         Text(
             text = "Server",
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
