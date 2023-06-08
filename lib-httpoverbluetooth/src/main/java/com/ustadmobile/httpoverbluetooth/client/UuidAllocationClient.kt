@@ -181,10 +181,16 @@ class UuidAllocationClient(
         }
 
         private fun disconnectIfRequired(gatt: BluetoothGatt?, exception: Exception? = null) {
+            if(gatt == null) {
+                Log.w(LOG_TAG, "UuidAllocationClient: NULL DISCONNECT")
+                return //nothing we can do
+            }
+
             if(!disconnected.getAndSet(true)) {
                 timeoutJob.cancel()
                 try {
-                    gatt?.disconnect()
+                    gatt.disconnect()
+                    Log.d(LOG_TAG, "UuidAllocationClient: submitted GATT disconnect request")
                 }catch(e: SecurityException){
                     e.printStackTrace()
                 }
