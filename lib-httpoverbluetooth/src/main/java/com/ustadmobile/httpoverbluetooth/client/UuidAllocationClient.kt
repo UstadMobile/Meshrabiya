@@ -215,6 +215,9 @@ class UuidAllocationClient(
     ) : UUID {
         val bluetoothAdapterVal = bluetoothAdapter
             ?: throw IllegalStateException("Bluetooth not supported")
+        if(!bluetoothAdapterVal.isEnabled)
+            throw IOException("requestUuidAllocation: bluetooth is not enabled")
+
         val remoteDevice = bluetoothAdapterVal.getRemoteDevice(remoteAddress)
         val getDataPortMutex = mapLock.withLock {
             lockByRemote.getOrPut(

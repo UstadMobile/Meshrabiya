@@ -1,5 +1,6 @@
 package com.ustadmobile.httpoverbluetooth.server
 
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
@@ -7,7 +8,10 @@ import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.util.Log
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.UUID_BUSY
@@ -16,6 +20,7 @@ import java.io.Closeable
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -28,12 +33,14 @@ import kotlin.concurrent.withLock
  * finished the UUID is de-allocated.
  */
 class UuidAllocationServer(
-    appContext: Context,
+    private val appContext: Context,
     allocationServiceUuid: UUID,
     private val allocationCharacteristicUuid: UUID,
     private val maxSimultaneousClients: Int = 4,
     private val onUuidAllocated: OnUuidAllocatedListener,
 ) : Closeable {
+
+    private val isClosed = AtomicBoolean(false)
 
     private val service = BluetoothGattService(allocationServiceUuid,
         BluetoothGattService.SERVICE_TYPE_PRIMARY)
@@ -49,6 +56,8 @@ class UuidAllocationServer(
         BluetoothManager::class.java
     )
 
+    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
+
     private val allocatedUuids = ConcurrentHashMap<UUID, BluetoothDevice>()
 
     private val allocatedUuidLock = ReentrantLock()
@@ -57,6 +66,15 @@ class UuidAllocationServer(
     private var gattServer: BluetoothGattServer? = null
 
     private val useUuidExecutor = Executors.newFixedThreadPool(maxSimultaneousClients)
+
+    /**
+     * Started will track calls to start/stop. The Gatt server won't open if bluetooth is
+     * not enabled. If start is called and bluetooth is enabled later, then the gatt server will
+     * open automatically.
+     */
+    private var started: Boolean = false
+
+    private var receiverRegistered: Boolean = false
 
     private val gattServerCallback = object: BluetoothGattServerCallback() {
         override fun onServiceAdded(status: Int, service: BluetoothGattService?) {
@@ -126,6 +144,26 @@ class UuidAllocationServer(
         }
     }
 
+    private val broadcastReceiver: BroadcastReceiver = object: BroadcastReceiver() {
+
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if(intent != null && intent.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                when(state) {
+                    BluetoothAdapter.STATE_ON -> {
+                        if(started)
+                            openGattServer()
+                    }
+                    BluetoothAdapter.STATE_OFF -> {
+                        if(started)
+                            closeGattServer()
+                    }
+                }
+            }
+        }
+    }
+
+
     private inner class DataAcceptRunnable(
         private val allocatedUuid: UUID,
         private val useUuid: OnUuidAllocatedListener,
@@ -141,22 +179,78 @@ class UuidAllocationServer(
     }
 
     init {
+        service.addCharacteristic(characteristic)
+    }
 
-        try {
-            gattServer = bluetoothManager.openGattServer(appContext, gattServerCallback)
-            service.addCharacteristic(characteristic)
 
-            gattServer?.addService(service)
-            Log.i(LOG_TAG, "Opened Gatt server")
-            Log.i(LOG_TAG, "Opened Gatt server manager")
+    fun start() {
+        started = true
+        openGattServer()
+        appContext.takeIf { !receiverRegistered }?.registerReceiver(
+            broadcastReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        )
+        receiverRegistered = true
+    }
 
-        }catch(e: SecurityException) {
-            e.printStackTrace()
+    /**
+     * Open the Gatt server if not already open. If the server is already open, this will have no
+     * effect. If the adapter is not enabled, it will also have no effect.
+     */
+    private fun openGattServer() {
+        if(isClosed.get())
+            throw IllegalStateException("Cannot start/open gatt server: UuidAllocationServer closed!")
+
+        if(gattServer == null && bluetoothAdapter?.isEnabled == true) {
+            try {
+                bluetoothManager.openGattServer(appContext, gattServerCallback).also {
+                    Log.d(LOG_TAG, "Opened Gatt server")
+                    if(it.addService(service)) {
+                        gattServer = it
+                        Log.d(LOG_TAG, "Add service request submitted")
+                    }else {
+                        Log.e(LOG_TAG, "Add service request submission failed, close")
+                        it.close()
+                    }
+                }
+            }catch(e: SecurityException) {
+                Log.e(LOG_TAG, "Security exception opening gatt server. No permission?", e)
+            }catch(e: Exception) {
+                Log.e(LOG_TAG, "Other exception opening gatt server.", e)
+            }
         }
     }
 
-    override fun close() {
+    /**
+     * Close the gatt server. If the server is not running, it will have no effect
+     */
+    private fun closeGattServer() {
+        gattServer?.also { server ->
+            try {
+                server.close()
+                Log.d(LOG_TAG, "Uuid Allocation gatt server closed")
+                allocatedUuids.clear()
+            }catch(e: SecurityException) {
+                Log.e(LOG_TAG, "Security exception closing gatt server. No permission?", e)
+            }catch(e: Exception) {
+                Log.e(LOG_TAG, "Other exception closing gatt server.", e)
+            }finally {
+                gattServer = null
+            }
+        }
+    }
 
+    fun stop() {
+        started = false
+        closeGattServer()
+        appContext.takeIf { receiverRegistered }?.unregisterReceiver(broadcastReceiver)
+        receiverRegistered = false
+    }
+
+    override fun close() {
+        if(!isClosed.getAndSet(true)) {
+            stop()
+            useUuidExecutor.shutdown()
+        }
     }
 
 }

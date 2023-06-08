@@ -61,11 +61,18 @@ class HttpOverBluetoothClient(
     }
 
     /**
+     * Send an HTTP request over bluetooth. You *MUST* close the response when finished with it
+     * to release the underlying bluetooth socket.
+     *
      * @param remoteAddress the real bluetooth mac address of the remote device
      * @param remoteUuidAllocationUuid the uuid of the GATT service running the UUID allocation on
      * the remote device
      * @param remoteUuidAllocationCharacteristicUuid the uuid of the gatt characteristic that is usedd
      * to issue uuids for data transfer
+     * @param request the http request to send.
+     *
+     * @return BluetoothHttpResponse containing the response. The body will not be eagerly read. The
+     * response MUST be closed.
      */
     suspend fun sendRequest(
         remoteAddress: String,
@@ -74,6 +81,9 @@ class HttpOverBluetoothClient(
         request: RawHttpRequest
     ) : BluetoothHttpResponse {
         val adapter = bluetoothAdapter ?: return newInternalErrorResponse("No bluetooth adapter")
+        if(!adapter.isEnabled)
+            return newTextResponse(statusCode = 503, responseLine = "Service Unavailable",
+                text = "Bluetooth not enabled")
 
         val dataUuid = uuidAllocationClient.requestUuidAllocation(
             remoteAddress = remoteAddress,
@@ -90,29 +100,28 @@ class HttpOverBluetoothClient(
 
         return withContext(Dispatchers.IO) {
             var socket: BluetoothSocket? = null
-            var inStream: InputStream? = null
-            var outStream: OutputStream? = null
 
             try {
                 socket = remoteDevice.createInsecureRfcommSocketToServiceRecord(
                     dataUuid
                 ) ?: throw IllegalStateException()
-                Log.i(LOG_TAG, "Connecting to server on $dataUuid")
+                Log.d(LOG_TAG, "Connecting to server on $dataUuid")
                 socket.connect()
-                Log.i(LOG_TAG, "Socket connected on $dataUuid : sending request ${request.method} ${request.uri}")
+                Log.d(LOG_TAG, "Socket connected on $dataUuid : sending request ${request.method} ${request.uri}")
 
-                inStream = socket.inputStream
-                outStream = socket.outputStream
+                //inStream and outStream will be closed when the underlying socket is closed.
+                val inStream = socket.inputStream
+                val outStream = socket.outputStream
                 request.writeTo(outStream)
                 val httpResponse = rawHttp.parseResponse(inStream)
-                Log.i(LOG_TAG, "Received response: ${httpResponse.statusCode} ${httpResponse.startLine.reason}")
+                Log.d(LOG_TAG, "Received response: ${httpResponse.statusCode} ${httpResponse.startLine.reason}")
 
                 return@withContext BluetoothHttpResponse(
                     response = httpResponse,
                     onClose = {
-                        Log.i(LOG_TAG, "Closing response/socket for $dataUuid")
                         //if keep-alive is used, we could send additional requests here.
                         socket.close()
+                        Log.d(LOG_TAG, "Closed response/socket for $dataUuid")
                     }
                 )
             }catch(e: SecurityException) {

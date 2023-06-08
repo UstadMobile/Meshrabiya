@@ -13,7 +13,7 @@ import rawhttp.core.RawHttpResponse
 import java.io.IOException
 import java.lang.Exception
 import java.util.UUID
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 abstract class AbstractHttpOverBluetoothServer(
     protected val appContext: Context,
@@ -29,6 +29,8 @@ abstract class AbstractHttpOverBluetoothServer(
         onUuidAllocated: OnUuidAllocatedListener,
     ) -> UuidAllocationServer = ::UuidAllocationServer,
 ) {
+
+    private val isClosed = AtomicBoolean(false)
 
     private val bluetoothManager: BluetoothManager = appContext.getSystemService(
         BluetoothManager::class.java
@@ -81,14 +83,21 @@ abstract class AbstractHttpOverBluetoothServer(
 
     }
 
-    /**
-     * Separate executor to cancel anything that times out
-     */
-    private val timeoutExecutor = Executors.newScheduledThreadPool(1)
+    fun start() {
+        if(isClosed.get())
+            throw IllegalStateException("HttpOverBluetoothServer is closed.")
+        uuidAllocationServer.start()
+    }
 
+    fun stop() {
+        uuidAllocationServer.stop()
+    }
 
     fun close() {
-        uuidAllocationServer.close()
+        if(!isClosed.getAndSet(true)) {
+            Log.d(LOG_TAG, "Closing BluetoothOverHttpServer")
+            uuidAllocationServer.close()
+        }
     }
 
     abstract fun handleRequest(request: RawHttpRequest): RawHttpResponse<*>

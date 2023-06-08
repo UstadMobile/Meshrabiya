@@ -54,11 +54,17 @@ data class MainUiState(
 
 class MainActivity : ComponentActivity() {
 
-    var httpOverBluetothServer: AbstractHttpOverBluetoothServer? = null
-
     var uiState = MutableStateFlow(MainUiState())
 
     private val rawHttp = RawHttp()
+
+    val httpOverBluetothServer: AbstractHttpOverBluetoothServer by lazy {
+        EchoBluetoothHttpServer(
+            appContext = applicationContext,
+            rawHttp = rawHttp,
+        )
+    }
+
 
     private val bluetothClient: HttpOverBluetoothClient by lazy {
         HttpOverBluetoothClient(
@@ -69,13 +75,9 @@ class MainActivity : ComponentActivity() {
 
     fun onSetServerEnabled(enabled: Boolean) {
         if(enabled) {
-            httpOverBluetothServer = EchoBluetoothHttpServer(
-                appContext = applicationContext,
-                rawHttp = rawHttp,
-            )
+            httpOverBluetothServer.start()
         }else {
-            httpOverBluetothServer?.close()
-            httpOverBluetothServer = null
+            httpOverBluetothServer.stop()
         }
 
         uiState.update { prev ->
@@ -126,11 +128,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        Log.d(LOG_TAG, "MainActivity: onDestroy")
+        httpOverBluetothServer.close()
+
+        super.onDestroy()
+    }
+
     companion object {
 
         const val LOG_TAG = "HttpOverBluetoothTag"
-
-        const val CONTROL_UUID = "066cbe21-8a51-49e0-8551-7c13d8ff6084"
 
     }
 }
