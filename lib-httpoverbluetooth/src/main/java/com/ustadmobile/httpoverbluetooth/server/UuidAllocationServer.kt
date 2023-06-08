@@ -1,10 +1,8 @@
 package com.ustadmobile.httpoverbluetooth.server
 
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
-import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
@@ -55,6 +53,7 @@ class UuidAllocationServer(
 
     private val allocatedUuidLock = ReentrantLock()
 
+    @Volatile
     private var gattServer: BluetoothGattServer? = null
 
     private val useUuidExecutor = Executors.newFixedThreadPool(maxSimultaneousClients)
@@ -62,13 +61,13 @@ class UuidAllocationServer(
     private val gattServerCallback = object: BluetoothGattServerCallback() {
         override fun onServiceAdded(status: Int, service: BluetoothGattService?) {
             super.onServiceAdded(status, service)
-            Log.i(LOG_TAG , "Service added: ${service?.uuid} characteristics " +
+            Log.d(LOG_TAG , "Service added: ${service?.uuid} characteristics " +
                     "= ${service?.characteristics?.joinToString { it.uuid.toString() }}")
         }
 
         override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
             super.onConnectionStateChange(device, status, newState)
-            Log.i(LOG_TAG, "onConnectionChanged: ${device?.address}: status = $newState")
+            Log.d(LOG_TAG, "onConnectionChanged: ${device?.address}: status = $newState")
             if(status == BluetoothGatt.STATE_CONNECTED && device != null) {
                 try {
                     Log.i(LOG_TAG, "onConnectionChanged: connecting to ${device.address}")
@@ -76,17 +75,16 @@ class UuidAllocationServer(
                 }catch(e: SecurityException) {
                     e.printStackTrace()
                 }
+            }else if(status == BluetoothGatt.STATE_DISCONNECTED) {
+                try {
+                    device?.also {
+                        gattServer?.cancelConnection(it)
+                        Log.d(LOG_TAG, "onConnectionChange: disconnected. cancelConnection called.")
+                    }
+                }catch(e: SecurityException) {
+                    Log.e(LOG_TAG, "Security exception on cancelConnection: permission revoked?", e)
+                }
             }
-        }
-
-        override fun onDescriptorReadRequest(
-            device: BluetoothDevice?,
-            requestId: Int,
-            offset: Int,
-            descriptor: BluetoothGattDescriptor?
-        ) {
-            super.onDescriptorReadRequest(device, requestId, offset, descriptor)
-            Log.i(LOG_TAG, "onDescriptorReadRequest")
         }
 
         override fun onCharacteristicReadRequest(
@@ -123,7 +121,7 @@ class UuidAllocationServer(
                     e.printStackTrace()
                 }
             }else {
-                Log.i(LOG_TAG, "onCharacteristicReadRequest: not our service")
+                Log.d(LOG_TAG, "onCharacteristicReadRequest: not our service")
             }
         }
     }
