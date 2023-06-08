@@ -20,11 +20,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -32,24 +43,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import com.ustadmobile.httpoverbluetooth.MainActivity.Companion.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.client.HttpOverBluetoothClient
-import com.ustadmobile.httpoverbluetooth.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.httpoverbluetooth.ui.theme.HttpOverBluetoothTheme
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import rawhttp.core.RawHttp
 import java.util.UUID
+import android.text.format.DateFormat as AndroidDateFormat
 
 data class MainUiState(
     val serverEnabled: Boolean = false,
+    val serverMessage: String = "Hello Bluetooth World",
+    val logLines: List<String> = emptyList(),
+    val selectedServerAddr: String? = null,
+    val selectedServerName: String? = null,
+    val requestFrequency: Int = 10,
+    val sendRequestsEnabled: Boolean = false,
+    val numRequests: Int = 0,
+    val numFailedRequests: Int = 0,
+    val numSuccessfulRequests: Int = 0,
+    val totalRequests: Int = 0,
 )
 
 class MainActivity : ComponentActivity() {
@@ -58,13 +82,31 @@ class MainActivity : ComponentActivity() {
 
     private val rawHttp = RawHttp()
 
-    val httpOverBluetothServer: AbstractHttpOverBluetoothServer by lazy {
-        EchoBluetoothHttpServer(
+    private val httpOverBluetothServer: MessageReplyBluetoothHttpServer by lazy {
+        MessageReplyBluetoothHttpServer(
             appContext = applicationContext,
             rawHttp = rawHttp,
-        )
+        ).also {
+            it.listener = MessageReplyBluetoothHttpServer.ServerListener { fromDevice, reply ->
+                onLogLine("Respond to $fromDevice w/message $reply")
+            }
+        }
     }
 
+    private val dateFormatter by lazy {
+        AndroidDateFormat.getDateFormat(this)
+    }
+
+    private val timeFormatter by lazy {
+        AndroidDateFormat.getTimeFormat(this)
+    }
+
+    private var sendRequestJob: Job? = null
+
+    /**
+     * When in client mode, this is the frequency of requests - 1 request per sendRequestFrequency seconds
+     */
+    private var sendRequestFrequency: Int = 10
 
     private val bluetothClient: HttpOverBluetoothClient by lazy {
         HttpOverBluetoothClient(
@@ -85,26 +127,160 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun onServerSelected(device: BluetoothDevice) {
-        lifecycleScope.launch {
-            val request = rawHttp.parseRequest(
-                "GET /hello.txt HTTP/1.1\r\n" +
-                    "Host: www.example.com\r\n"
-            )
+    private fun <T> List<T>.trimIfExceeds(numItems: Int): List<T> {
+        return if(size > numItems)
+            subList(0, numItems)
+        else
+            this
+    }
 
-            try {
-                bluetothClient.sendRequest(
-                    remoteAddress = device.address,
-                    remoteUuidAllocationUuid = UUID.fromString(EchoBluetoothHttpServer.SERVICE_UUID),
-                    remoteUuidAllocationCharacteristicUuid = UUID.fromString(
-                        EchoBluetoothHttpServer.CHARACTERISTIC_UUID),
-                    request = request
-                ).use { response ->
-                    Log.i(LOG_TAG, "Received response ${response.response.body.get().decodeBodyToString(Charsets.UTF_8)}")
+    fun onLogLine(line: String) {
+        val date = java.util.Date()
+        val timestamp = "${dateFormatter.format(date)} ${timeFormatter.format(date)}"
+        uiState.update { prev ->
+            prev.copy(
+                logLines = buildList {
+                    add("[$timestamp] $line")
+                    addAll(prev.logLines.trimIfExceeds(MAX_LOG_LINES - 1))
                 }
-            }catch(e: Exception) {
-                Log.e(LOG_TAG, "Exception sending request", e)
+            )
+        }
+    }
+
+    fun onChangeServerMessage(text: String) {
+        httpOverBluetothServer.message = text
+        uiState.update { prev ->
+            prev.copy(serverMessage = text)
+        }
+    }
+
+    val launchIntentSender = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(), activityResultRegistry
+    ) { result ->
+        if(result.resultCode == Activity.RESULT_OK) {
+            val device: BluetoothDevice? = result.data?.getParcelableExtra(
+                CompanionDeviceManager.EXTRA_DEVICE
+            )
+            println("Got device: ${device?.address}")
+            onServerSelected(device)
+        }
+    }
+
+    fun onClickSelectServer() {
+        val deviceFilter = BluetoothDeviceFilter.Builder()
+            .build()
+
+        val pairingRequest: AssociationRequest = AssociationRequest.Builder()
+            // Find only devices that match this request filter.
+            .addDeviceFilter(deviceFilter)
+            .setSingleDevice(false)
+            .build()
+
+        val deviceManager : CompanionDeviceManager =
+            getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
+        Log.d(LOG_TAG, "Starting associate request")
+        deviceManager.associate(
+            pairingRequest,
+            object: CompanionDeviceManager.Callback() {
+                @Deprecated("Thank you Google")
+                override fun onDeviceFound(intentSender: IntentSender) {
+                    Log.d(LOG_TAG, "onDeviceFound")
+                    launchIntentSender.launch(
+                        IntentSenderRequest.Builder(intentSender)
+                        .build()
+                    )
+                }
+
+                override fun onFailure(p0: CharSequence?) {
+                    Log.e(LOG_TAG, "FAIL: $p0")
+                }
+            },
+            null
+        )
+    }
+
+    fun onSetSendRequestsEnabled(enabled: Boolean) {
+        uiState.update { prev ->
+            prev.copy(sendRequestsEnabled = enabled)
+        }
+
+        if(enabled) {
+            sendRequestJob?.cancel()
+            sendRequestJob = lifecycleScope.launch {
+                while(coroutineContext.isActive){
+                    lifecycleScope.launch { sendRequest() }
+                    delay(sendRequestFrequency * 1000L)
+                }
             }
+        }else {
+            sendRequestJob?.cancel()
+            sendRequestJob = null
+        }
+
+    }
+
+    suspend fun sendRequest() {
+        val request = rawHttp.parseRequest(
+            "GET /hello.txt HTTP/1.1\r\n" +
+                    "Host: www.example.com\r\n"
+        )
+        val remoteAddress = uiState.value.selectedServerAddr ?: return
+
+        try {
+            bluetothClient.sendRequest(
+                remoteAddress = remoteAddress,
+                remoteUuidAllocationUuid = UUID.fromString(MessageReplyBluetoothHttpServer.SERVICE_UUID),
+                remoteUuidAllocationCharacteristicUuid = UUID.fromString(
+                    MessageReplyBluetoothHttpServer.CHARACTERISTIC_UUID),
+                request = request
+            ).use { response ->
+                val strBody = response.response.body.get().decodeBodyToString(Charsets.UTF_8)
+                Log.i(LOG_TAG, "Received response $strBody")
+                onLogLine("Client: received \"$strBody\"")
+                uiState.update { prev ->
+                    prev.copy(
+                        numRequests = prev.numRequests  + 1,
+                        numSuccessfulRequests =  prev.numSuccessfulRequests + 1,
+                    )
+                }
+            }
+        }catch(e: Exception) {
+            uiState.update { prev ->
+                prev.copy(
+                    numRequests =  prev.numRequests + 1,
+                    numFailedRequests =  prev.numFailedRequests + 1,
+                )
+            }
+
+            onLogLine("Client: exception: $e")
+            Log.e(LOG_TAG, "Exception sending request", e)
+        }
+    }
+
+    fun onServerSelected(device: BluetoothDevice?) {
+        try {
+            uiState.update { prev ->
+                prev.copy(
+                    selectedServerAddr = device?.address,
+                    selectedServerName = device?.name,
+                    numFailedRequests = 0,
+                    numRequests = 0,
+                )
+            }
+        }catch(e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+
+    fun onChangeClientRequestFrequency(requestFrequency: Int) {
+        uiState.update { prev ->
+            prev.copy(
+                requestFrequency = requestFrequency,
+            )
+        }
+
+        if(requestFrequency > 2) {
+            sendRequestFrequency = requestFrequency
         }
     }
 
@@ -121,7 +297,11 @@ class MainActivity : ComponentActivity() {
                     MainScreen(
                         uiStateFlow = uiState,
                         onSetServerEnabled = this::onSetServerEnabled,
-                        onServerSelected = this::onServerSelected
+                        onServerSelected = this::onServerSelected,
+                        onChangeServerMessage = this::onChangeServerMessage,
+                        onClickSelectServer = this::onClickSelectServer,
+                        onSetSendRequestsEnabled = this::onSetSendRequestsEnabled,
+                        onChangeClientRequestFrequency = this::onChangeClientRequestFrequency,
                     )
                 }
             }
@@ -139,44 +319,45 @@ class MainActivity : ComponentActivity() {
 
         const val LOG_TAG = "HttpOverBluetoothTag"
 
+        const val MAX_LOG_LINES = 30
+
     }
 }
 
 @Composable
 fun MainScreen(
     uiStateFlow: Flow<MainUiState>,
-    onServerSelected: (BluetoothDevice) -> Unit = { },
+    onServerSelected: (BluetoothDevice?) -> Unit = { },
     onSetServerEnabled: (Boolean) -> Unit = { },
+    onChangeServerMessage: (String) -> Unit = { },
+    onClickSelectServer: () -> Unit = { },
+    onChangeClientRequestFrequency: (Int) -> Unit = { },
+    onSetSendRequestsEnabled: (Boolean) -> Unit = { },
 ) {
     val uiState by uiStateFlow.collectAsState(MainUiState())
     MainScreen(
         uiState = uiState,
         onServerSelected = onServerSelected,
         onSetServerEnabled =  onSetServerEnabled,
+        onChangeServerMessage = onChangeServerMessage,
+        onClickSelectServer = onClickSelectServer,
+        onChangeClientRequestFrequency = onChangeClientRequestFrequency,
+        onSetSendRequestsEnabled = onSetSendRequestsEnabled,
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     uiState: MainUiState,
     modifier: Modifier = Modifier,
-    onServerSelected: (BluetoothDevice) -> Unit = { },
+    onServerSelected: (BluetoothDevice?) -> Unit = { },
     onSetServerEnabled: (Boolean) -> Unit = { },
+    onChangeServerMessage: (String) -> Unit = { },
+    onClickSelectServer: () -> Unit = { },
+    onChangeClientRequestFrequency: (Int) -> Unit = { },
+    onSetSendRequestsEnabled: (Boolean) -> Unit = { },
 ) {
-    val context = LocalContext.current
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartIntentSenderForResult(),
-        onResult = { result ->
-            if(result.resultCode == Activity.RESULT_OK) {
-                val device: BluetoothDevice? = result.data?.getParcelableExtra(
-                    CompanionDeviceManager.EXTRA_DEVICE
-                )
-                println("Got device: ${device?.address}")
-                device?.also(onServerSelected)
-            }
-        }
-    )
 
     val launchDiscoverable = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -185,27 +366,17 @@ fun MainScreen(
         }
     )
 
-    Column {
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState()),
+    ) {
         Text(
-            text = "Hello!",
-            modifier = modifier
+            text = "Server",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
-
-        Button(
-            modifier = Modifier.padding(16.dp),
-            onClick = {
-                val discoverableIntent: Intent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
-                }
-                launchDiscoverable.launch(discoverableIntent)
-            }
-        ) {
-            Text("Make Discoverable")
-        }
 
         Row(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .toggleable(
                     role = Role.Switch,
                     value = uiState.serverEnabled,
@@ -217,42 +388,118 @@ fun MainScreen(
             Text("Server Enabled")
         }
 
-        Button(
-            onClick = {
-                val deviceFilter = BluetoothDeviceFilter.Builder()
-                    .build()
-
-                val pairingRequest: AssociationRequest = AssociationRequest.Builder()
-                    // Find only devices that match this request filter.
-                    .addDeviceFilter(deviceFilter)
-                    .setSingleDevice(false)
-                    .build()
-
-
-                val deviceManager : CompanionDeviceManager =
-                    context.getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
-                Log.d(LOG_TAG, "Starting associate request")
-                deviceManager.associate(
-                    pairingRequest,
-                    object: CompanionDeviceManager.Callback() {
-                        @Deprecated("Thank you Google")
-                        override fun onDeviceFound(intentSender: IntentSender) {
-                            Log.d(LOG_TAG, "onDeviceFound")
-                            launcher.launch(IntentSenderRequest.Builder(intentSender)
-                                .build())
-                        }
-
-                        override fun onFailure(p0: CharSequence?) {
-                            Log.e(LOG_TAG, "FAIL: $p0")
-                        }
-                    },
-                    null
-                )
+        if(uiState.serverEnabled) {
+            Button(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                onClick = {
+                    val discoverableIntent: Intent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                        putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                    }
+                    launchDiscoverable.launch(discoverableIntent)
+                }
+            ) {
+                Text("Make Discoverable")
             }
-        ) {
-            Text("Select Server")
+
+            OutlinedTextField(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .fillMaxWidth(),
+                value = uiState.serverMessage,
+                onValueChange =onChangeServerMessage,
+                label = { Text("Server message") }
+            )
         }
+
+        Text(
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+            text = "Client"
+        )
+
+        if(uiState.selectedServerAddr != null) {
+            ListItem(
+                headlineText = {
+                    Text("${uiState.selectedServerName} (${uiState.selectedServerAddr})")
+                },
+                supportingText = {
+                    val percentageSuccess = if(uiState.numRequests > 0) {
+                        "(${((uiState.numSuccessfulRequests * 100)/ uiState.numRequests)}%)"
+                    }else {
+                        ""
+                    }
+
+                    Text("${uiState.numSuccessfulRequests}/${uiState.numRequests} " +
+                            "$percentageSuccess requests successful")
+                },
+                trailingContent = {
+                    IconButton(
+                        onClick = {
+                            onServerSelected(null)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                        )
+                    }
+                }
+            )
+
+            OutlinedTextField(
+                value = uiState.requestFrequency.toString(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                label = { Text("Request frequency (seconds)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                onValueChange = {
+                    onChangeClientRequestFrequency(it.trim().toIntOrNull() ?: 0)
+                }
+            )
+
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .toggleable(
+                        role = Role.Switch,
+                        value = uiState.sendRequestsEnabled,
+                        onValueChange = onSetSendRequestsEnabled,
+                    )
+            ) {
+                Switch(checked = uiState.sendRequestsEnabled, onCheckedChange = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Send requests")
+            }
+
+        }else {
+            Button(
+                modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                onClick = onClickSelectServer,
+            ) {
+                Text("Select Server")
+            }
+        }
+
+
+
+        Text(
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+            text = "Logs"
+        )
+
+        uiState.logLines.forEach {
+            Text(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                text = it,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
     }
+
+
 
 }
 

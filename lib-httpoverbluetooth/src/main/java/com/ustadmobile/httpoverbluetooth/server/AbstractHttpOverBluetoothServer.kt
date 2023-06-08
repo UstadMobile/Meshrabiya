@@ -59,7 +59,7 @@ abstract class AbstractHttpOverBluetoothServer(
                 val inStream = socket.inputStream
                 val outStream = socket.outputStream
                 val request = rawHttp.parseRequest(inStream)
-                val response = handleRequest(request)
+                val response = handleRequest(socket.remoteDevice.address, request)
                 response.writeTo(outStream)
                 outStream.flush()
             }catch(e: Exception) {
@@ -100,7 +100,10 @@ abstract class AbstractHttpOverBluetoothServer(
         }
     }
 
-    abstract fun handleRequest(request: RawHttpRequest): RawHttpResponse<*>
+    abstract fun handleRequest(
+        remoteDeviceAddress: String,
+        request: RawHttpRequest,
+    ): RawHttpResponse<*>
 
     companion object {
 
