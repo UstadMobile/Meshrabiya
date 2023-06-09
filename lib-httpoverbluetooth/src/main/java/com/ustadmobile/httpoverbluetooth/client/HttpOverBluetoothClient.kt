@@ -27,10 +27,10 @@ import kotlin.Exception
 class HttpOverBluetoothClient(
     private val appContext: Context,
     private val rawHttp: RawHttp,
-    private val onLogError: (message: String, exception: Exception?) -> Unit = { _, _ -> },
+    private val onLog: (priority: Int, message: String, exception: Exception?) -> Unit = { _, _, _ -> },
     private val uuidAllocationClient: UuidAllocationClient = UuidAllocationClient(
         appContext = appContext,
-        onLogError = onLogError,
+        onLog = onLog,
     ),
 ) {
 

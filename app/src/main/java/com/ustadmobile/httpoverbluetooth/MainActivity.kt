@@ -1,6 +1,7 @@
 package com.ustadmobile.httpoverbluetooth
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.companion.AssociationRequest
@@ -11,6 +12,7 @@ import android.content.Intent
 import android.content.IntentSender
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -29,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,7 +45,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
@@ -50,15 +52,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.textfield.TextInputEditText
 import com.ustadmobile.httpoverbluetooth.client.HttpOverBluetoothClient
 import com.ustadmobile.httpoverbluetooth.ui.theme.HttpOverBluetoothTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.acra.ACRA
 import rawhttp.core.RawHttp
 import java.util.UUID
 import android.text.format.DateFormat as AndroidDateFormat
@@ -77,6 +83,8 @@ data class MainUiState(
     val totalRequests: Int = 0,
 )
 
+class ManualReportException(message: String): Exception(message)
+
 class MainActivity : ComponentActivity() {
 
     var uiState = MutableStateFlow(MainUiState())
@@ -90,7 +98,7 @@ class MainActivity : ComponentActivity() {
         ).also {
             it.message = "Hello Bluetooth World"
             it.listener = MessageReplyBluetoothHttpServer.ServerListener { fromDevice, reply ->
-                onLogLine("Respond to $fromDevice w/message $reply")
+                onLogLine(Log.INFO, "Server: Respond to $fromDevice w/message $reply")
             }
         }
     }
@@ -114,8 +122,8 @@ class MainActivity : ComponentActivity() {
         HttpOverBluetoothClient(
             appContext = applicationContext,
             rawHttp = rawHttp,
-            onLogError = { message, exception ->
-                onLogLine("CLIENT ERROR: $message $exception")
+            onLog = { priority, message, exception ->
+                onLogLine(priority,"Client: $message", exception)
             }
         )
     }
@@ -130,6 +138,13 @@ class MainActivity : ComponentActivity() {
         uiState.update { prev ->
             prev.copy(serverEnabled = enabled)
         }
+
+        if(enabled) {
+            onLogLine(Log.DEBUG, "Server enabled")
+        }else {
+            onLogLine(Log.DEBUG,"Server disabled")
+        }
+
     }
 
     private fun <T> List<T>.trimIfExceeds(numItems: Int): List<T> {
@@ -139,15 +154,48 @@ class MainActivity : ComponentActivity() {
             this
     }
 
-    fun onLogLine(line: String) {
+    fun onClickShowSendReport() {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Send report")
+        val inflater = layoutInflater
+        val dialogView = inflater.inflate(R.layout.view_feedback_layout, null)
+        val editText = dialogView.findViewById<TextInputEditText>(R.id.feedback_edit_comment)
+        builder.setView(dialogView)
+        builder.setPositiveButton("Send") { dialogInterface, _ ->
+            ACRA.errorReporter.handleSilentException(ManualReportException(editText.text.toString()))
+            Toast.makeText(this, "Thanks, report submitted", Toast.LENGTH_LONG).show()
+            dialogInterface.cancel()
+        }
+        builder.setNegativeButton("Cancel") { dialogInterface, i -> dialogInterface.cancel() }
+        val dialog = builder.create()
+        dialog.show()
+    }
+
+    fun onLogLine(priority: Int, line: String, exception: Exception? = null) {
         val date = java.util.Date()
         val timestamp = "${dateFormatter.format(date)} ${timeFormatter.format(date)}"
-        uiState.update { prev ->
+        when(priority) {
+            Log.DEBUG -> Log.d(LOG_TAG, line, exception)
+            Log.INFO -> Log.i(LOG_TAG, line, exception)
+            Log.WARN -> Log.w(LOG_TAG, line, exception)
+            Log.ERROR -> Log.e(LOG_TAG, line, exception)
+            Log.ASSERT -> Log.wtf(LOG_TAG, line, exception)
+            Log.VERBOSE -> Log.v(LOG_TAG, line, exception)
+        }
+
+        val newUiState = uiState.updateAndGet { prev ->
             prev.copy(
                 logLines = buildList {
                     add("[$timestamp] $line")
                     addAll(prev.logLines.trimIfExceeds(MAX_LOG_LINES - 1))
                 }
+            )
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            ACRA.errorReporter.putCustomData(
+                "httpoverbluetooth-logs",
+                newUiState.logLines.joinToString(separator = ",\n")
             )
         }
     }
@@ -241,7 +289,7 @@ class MainActivity : ComponentActivity() {
             ).use { response ->
                 val strBody = response.response.body.get().decodeBodyToString(Charsets.UTF_8)
                 Log.i(LOG_TAG, "Received response $strBody")
-                onLogLine("Client: received \"$strBody\"")
+                onLogLine(Log.DEBUG,"Client: received \"$strBody\"")
                 uiState.update { prev ->
                     prev.copy(
                         numRequests = prev.numRequests  + 1,
@@ -257,7 +305,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            onLogLine("Client: exception: $e")
+            onLogLine(Log.ERROR, "Client: exception: $e")
             Log.e(LOG_TAG, "Exception sending request", e)
         }
     }
@@ -307,6 +355,7 @@ class MainActivity : ComponentActivity() {
                         onClickSelectServer = this::onClickSelectServer,
                         onSetSendRequestsEnabled = this::onSetSendRequestsEnabled,
                         onChangeClientRequestFrequency = this::onChangeClientRequestFrequency,
+                        onClickSendReport = this::onClickShowSendReport,
                     )
                 }
             }
@@ -338,6 +387,7 @@ fun MainScreen(
     onClickSelectServer: () -> Unit = { },
     onChangeClientRequestFrequency: (Int) -> Unit = { },
     onSetSendRequestsEnabled: (Boolean) -> Unit = { },
+    onClickSendReport: () -> Unit = { },
 ) {
     val uiState by uiStateFlow.collectAsState(MainUiState())
     MainScreen(
@@ -348,6 +398,7 @@ fun MainScreen(
         onClickSelectServer = onClickSelectServer,
         onChangeClientRequestFrequency = onChangeClientRequestFrequency,
         onSetSendRequestsEnabled = onSetSendRequestsEnabled,
+        onClickSendReport = onClickSendReport,
     )
 }
 
@@ -362,6 +413,7 @@ fun MainScreen(
     onClickSelectServer: () -> Unit = { },
     onChangeClientRequestFrequency: (Int) -> Unit = { },
     onSetSendRequestsEnabled: (Boolean) -> Unit = { },
+    onClickSendReport: () -> Unit = { },
 ) {
 
     val launchDiscoverable = rememberLauncherForActivityResult(
@@ -374,12 +426,26 @@ fun MainScreen(
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
-        Text(
-            "HTTP Over Bluetooth 0.1",
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                .fillMaxWidth()
-                .align(Alignment.CenterHorizontally),
-        )
+        Row(
+
+        ) {
+            Text(
+                "HTTP Over Bluetooth 0.1",
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .weight(1.0f)
+            )
+
+            IconButton(
+                onClick = onClickSendReport
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Send report",
+                )
+            }
+        }
+
 
         Text(
             text = "Server",
