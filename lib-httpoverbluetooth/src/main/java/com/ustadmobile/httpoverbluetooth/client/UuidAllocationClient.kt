@@ -97,7 +97,7 @@ class UuidAllocationClient(
             onLog(Log.INFO, "onConnectionStateChange state=$newState status=$status", null)
 
             if(gatt == null) {
-                Log.w(LOG_TAG, "onConnectionStateChange: gatt is null, can't do anything")
+                onLog(Log.WARN, "onConnectionStateChange: gatt is null, can't do anything", null)
                 return
             }
 
@@ -114,7 +114,9 @@ class UuidAllocationClient(
 
                 try {
                     if(!gatt.discoverServices()) {
-                        Log.w(LOG_TAG, "onConnectionStateChange: connected, but failed to submit discover services request")
+                        onLog(Log.WARN,
+                            "onConnectionStateChange: connected, but failed to submit discover services request",
+                        null)
                         disconnectAndCloseIfRequired(gatt, IllegalStateException("Failed to submit discover services request"))
                     }
                 }catch(e: SecurityException) {
@@ -141,7 +143,7 @@ class UuidAllocationClient(
                     "${gatt?.services?.size}", null)
 
             if(gatt == null) {
-                Log.w(LOG_TAG, "onServicesDiscovered: gatt is null, can't do anything")
+                onLog(Log.WARN, "onServicesDiscovered: gatt is null, can't do anything", null)
                 return
             }
 
@@ -165,7 +167,6 @@ class UuidAllocationClient(
                 try {
                     val requestedRead = gatt.readCharacteristic(characteristic)
                     if(!requestedRead) {
-                        Log.w(LOG_TAG, "Found UUID allocation service/characteristic, but request to read submission failed")
                         onLog(Log.WARN, "Found UUID allocation service/characteristic, but request to read submission failed", null)
 
                         disconnectAndCloseIfRequired(gatt,
@@ -179,8 +180,7 @@ class UuidAllocationClient(
                     e.printStackTrace()
                 }
             }else {
-                Log.w(LOG_TAG, "services discovered, but target characteristic not found")
-                onLog(Log.ERROR, "services discovered, but target characteristic not found", null)
+                onLog(Log.WARN, "services discovered, but target characteristic not found", null)
             }
         }
 
@@ -193,7 +193,7 @@ class UuidAllocationClient(
             onLog(Log.DEBUG, "onCharacteristicReadCompat status=$status characteristic " +
                     "uuid=${characteristic?.uuid} value=${value?.size} bytes", null)
             if(gatt == null) {
-                Log.w(LOG_TAG, "onCharacteristicReadCompat: gatt is null, can't do anything")
+                onLog(Log.WARN, "onCharacteristicReadCompat: gatt is null, can't do anything", null)
                 return
             }
 
@@ -269,7 +269,7 @@ class UuidAllocationClient(
                 }
 
                 if(exception != null && !dataPortUuid.isCompleted) {
-                    Log.w(LOG_TAG, "disconnectAndCloseIfRequired: complete exceptionally")
+                    onLog(Log.WARN, "disconnectAndCloseIfRequired: complete exceptionally", exception)
                     dataPortUuid.completeExceptionally(exception)
                 }
             }
