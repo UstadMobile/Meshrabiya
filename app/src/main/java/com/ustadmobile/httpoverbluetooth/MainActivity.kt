@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothDevice
 import android.companion.AssociationRequest
 import android.companion.BluetoothDeviceFilter
 import android.companion.CompanionDeviceManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
@@ -42,6 +44,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -80,8 +83,17 @@ data class MainUiState(
     val numRequests: Int = 0,
     val numFailedRequests: Int = 0,
     val numSuccessfulRequests: Int = 0,
-    val totalRequests: Int = 0,
-)
+) {
+    val numRequestSummaryStr: String
+        get() = "$numSuccessfulRequests/$numRequests $successPercent "
+
+    val successPercent: String
+        get() = if(numRequests > 0) {
+            "(" + (numSuccessfulRequests * 100)/numRequests + "%)"
+        }else {
+            ""
+        }
+}
 
 class ManualReportException(message: String): Exception(message)
 
@@ -308,6 +320,16 @@ class MainActivity : ComponentActivity() {
             onLogLine(Log.ERROR, "Client: exception: $e")
             Log.e(LOG_TAG, "Exception sending request", e)
         }
+
+        val uiStateVal = uiState.value
+        val successPercent = if(uiStateVal.numRequests > 0) {
+            "(" + (uiStateVal.numSuccessfulRequests * 100)/uiStateVal.numRequests + "%)"
+        }else {
+            ""
+        }
+
+        ACRA.errorReporter.putCustomData("httpoverbluetooth_requestcount",
+            "${uiState.value.numSuccessfulRequests}/${uiState.value.numRequests} $successPercent")
     }
 
     fun onServerSelected(device: BluetoothDevice?) {
@@ -337,6 +359,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun onClickLogs() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+        val clip: ClipData = ClipData.newPlainText("Logs",
+            "===HttpOverBluetooth===\n" +
+                    uiState.value.numRequestSummaryStr + "\n" +
+            uiState.value.logLines.joinToString(separator = ",\n")
+        )
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(this, "Copied logs!", Toast.LENGTH_LONG).show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -356,6 +390,7 @@ class MainActivity : ComponentActivity() {
                         onSetSendRequestsEnabled = this::onSetSendRequestsEnabled,
                         onChangeClientRequestFrequency = this::onChangeClientRequestFrequency,
                         onClickSendReport = this::onClickShowSendReport,
+                        onClickLogs = this::onClickLogs,
                     )
                 }
             }
@@ -388,6 +423,7 @@ fun MainScreen(
     onChangeClientRequestFrequency: (Int) -> Unit = { },
     onSetSendRequestsEnabled: (Boolean) -> Unit = { },
     onClickSendReport: () -> Unit = { },
+    onClickLogs: () -> Unit = { },
 ) {
     val uiState by uiStateFlow.collectAsState(MainUiState())
     MainScreen(
@@ -399,6 +435,7 @@ fun MainScreen(
         onChangeClientRequestFrequency = onChangeClientRequestFrequency,
         onSetSendRequestsEnabled = onSetSendRequestsEnabled,
         onClickSendReport = onClickSendReport,
+        onClickLogs = onClickLogs,
     )
 }
 
@@ -414,6 +451,7 @@ fun MainScreen(
     onChangeClientRequestFrequency: (Int) -> Unit = { },
     onSetSendRequestsEnabled: (Boolean) -> Unit = { },
     onClickSendReport: () -> Unit = { },
+    onClickLogs: () -> Unit = { },
 ) {
 
     val launchDiscoverable = rememberLauncherForActivityResult(
@@ -430,7 +468,7 @@ fun MainScreen(
 
         ) {
             Text(
-                "HTTP Over Bluetooth 0.1",
+                "HTTP Over Bluetooth 0.1a",
                 modifier = Modifier
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .weight(1.0f)
@@ -560,10 +598,14 @@ fun MainScreen(
 
 
 
-        Text(
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
-            text = "Logs"
-        )
+        TextButton(
+            onClick = onClickLogs,
+        ) {
+            Text(
+                modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                text = "Logs"
+            )
+        }
 
         uiState.logLines.forEach {
             Text(

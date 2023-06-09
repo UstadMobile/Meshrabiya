@@ -24,6 +24,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.Exception
 import kotlin.concurrent.withLock
@@ -49,6 +50,8 @@ class UuidAllocationClient(
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
 
     private val coroutineScope = CoroutineScope(Dispatchers.Main + Job())
+
+
 
     /**
      * Bluetooth GATT error messages: see
@@ -80,9 +83,20 @@ class UuidAllocationClient(
          */
         private var connectionEstablished = false
 
+        private val startTime = System.currentTimeMillis()
+
+        private val clientId = CALLBACK_ID_ATOMIC.getAndIncrement()
+
+        private val logPrefix: String
+            get() = "UuidAllocationClient #$clientId (t+${System.currentTimeMillis()-startTime}ms)"
+
+        fun callbackLog(priority: Int, message: String, exception: Exception?) {
+            onLog(priority, "$logPrefix: $message", exception)
+        }
+
         val timeoutJob = coroutineScope.launch {
             delay(timeout)
-            onLog(Log.DEBUG, "Timeout after ${timeout}ms: calling disconnectAndCloseIfRequired", null)
+            callbackLog(Log.DEBUG, "Timeout after ${timeout}ms: calling disconnectAndCloseIfRequired", null)
             disconnectAndCloseIfRequired(
                 callbackGatt,
                 TimeoutException("GetDataUuidGattCallback for $remoteServiceUuid/$remoteCharacteristicUuid timed out after ${timeout}ms")
@@ -94,10 +108,10 @@ class UuidAllocationClient(
             status: Int,
             newState: Int
         ) {
-            onLog(Log.INFO, "onConnectionStateChange state=$newState status=$status", null)
+            callbackLog(Log.INFO, "onConnectionStateChange state=$newState status=$status", null)
 
             if(gatt == null) {
-                onLog(Log.WARN, "onConnectionStateChange: gatt is null, can't do anything", null)
+                callbackLog(Log.WARN, "onConnectionStateChange: gatt is null, can't do anything", null)
                 return
             }
 
@@ -108,13 +122,13 @@ class UuidAllocationClient(
             if(status == BluetoothGatt.GATT_SUCCESS && newState == BluetoothGatt.STATE_CONNECTED) {
                 connectionEstablished = true
                 if(timeoutJob.isCancelled) {
-                    onLog(Log.DEBUG, "onConnectionStateChange: already cancelled",null)
+                    callbackLog(Log.DEBUG, "onConnectionStateChange: already cancelled",null)
                     return
                 }
 
                 try {
                     if(!gatt.discoverServices()) {
-                        onLog(Log.WARN,
+                        callbackLog(Log.WARN,
                             "onConnectionStateChange: connected, but failed to submit discover services request",
                         null)
                         disconnectAndCloseIfRequired(gatt, IllegalStateException("Failed to submit discover services request"))
@@ -131,30 +145,30 @@ class UuidAllocationClient(
             ) {
                 try {
                     gatt.close()
-                    onLog(Log.DEBUG, "Closed client Gatt callback.", null)
+                    callbackLog(Log.DEBUG, "Closed client Gatt callback.", null)
                 }catch(e: SecurityException) {
-                    onLog(Log.ERROR, "Security exception closing Gatt", e)
+                    callbackLog(Log.ERROR, "Security exception closing Gatt", e)
                 }
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-            onLog(Log.DEBUG, "onServicesDiscovered: status = $status services discovered: " +
+            callbackLog(Log.DEBUG, "onServicesDiscovered: status = $status services discovered: " +
                     "${gatt?.services?.size}", null)
 
             if(gatt == null) {
-                onLog(Log.WARN, "onServicesDiscovered: gatt is null, can't do anything", null)
+                callbackLog(Log.WARN, "onServicesDiscovered: gatt is null, can't do anything", null)
                 return
             }
 
             val services = gatt.services
             gatt.services.forEach { service ->
-                onLog(Log.DEBUG, "Service ${service.uuid} characteristics: " +
+                callbackLog(Log.DEBUG, "Service ${service.uuid} characteristics: " +
                         service.characteristics.joinToString { it.uuid.toString() }, null)
             }
 
             if(timeoutJob.isCancelled) {
-                onLog(Log.DEBUG, "onServicesDiscovered: already cancelled", null)
+                callbackLog(Log.DEBUG, "onServicesDiscovered: already cancelled", null)
                 return
             }
 
@@ -163,24 +177,24 @@ class UuidAllocationClient(
                 ?.characteristics?.firstOrNull { it.uuid == remoteCharacteristicUuid }
 
             if(characteristic != null) {
-                onLog(Log.DEBUG, "permissions = ${characteristic.permissions}, properties=${characteristic.properties}", null)
+                callbackLog(Log.DEBUG, "permissions = ${characteristic.permissions}, properties=${characteristic.properties}", null)
                 try {
                     val requestedRead = gatt.readCharacteristic(characteristic)
                     if(!requestedRead) {
-                        onLog(Log.WARN, "Found UUID allocation service/characteristic, but request to read submission failed", null)
+                        callbackLog(Log.WARN, "Found UUID allocation service/characteristic, but request to read submission failed", null)
 
                         disconnectAndCloseIfRequired(gatt,
                             IllegalStateException("Found UUID allocation service/characteristic, but request to read submission failed")
                         )
                     }else {
-                        onLog(Log.DEBUG, "found target characteristic - submitted request to read OK.", null)
+                        callbackLog(Log.DEBUG, "found target characteristic - submitted request to read OK.", null)
                     }
 
                 }catch(e: SecurityException) {
                     e.printStackTrace()
                 }
             }else {
-                onLog(Log.WARN, "services discovered, but target characteristic not found", null)
+                callbackLog(Log.WARN, "services discovered, but target characteristic not found", null)
             }
         }
 
@@ -190,19 +204,19 @@ class UuidAllocationClient(
             value: ByteArray?,
             status: Int
         ) {
-            onLog(Log.DEBUG, "onCharacteristicReadCompat status=$status characteristic " +
+            callbackLog(Log.DEBUG, "onCharacteristicReadCompat status=$status characteristic " +
                     "uuid=${characteristic?.uuid} value=${value?.size} bytes", null)
             if(gatt == null) {
-                onLog(Log.WARN, "onCharacteristicReadCompat: gatt is null, can't do anything", null)
+                callbackLog(Log.WARN, "onCharacteristicReadCompat: gatt is null, can't do anything", null)
                 return
             }
 
             if(characteristic != null && characteristic.uuid == remoteCharacteristicUuid) {
-                onLog(Log.DEBUG, "onCharacteristicReadCompat: for target characteristic", null)
+                callbackLog(Log.DEBUG, "onCharacteristicReadCompat: for target characteristic", null)
                 if(value != null && status == BluetoothGatt.GATT_SUCCESS) {
                     try {
                         val uuid = UuidUtil.uuidFromBytes(value)
-                        onLog(Log.INFO, "Got allocated uuid: $uuid", null)
+                        callbackLog(Log.INFO, "Got allocated uuid: $uuid", null)
                         timeoutJob.cancel()
                         dataPortUuid.complete(uuid)
                         disconnectAndCloseIfRequired(gatt)
@@ -211,7 +225,7 @@ class UuidAllocationClient(
                         disconnectAndCloseIfRequired(gatt, e)
                     }
                 }else {
-                    onLog(Log.ERROR, "onCharacteristicRead: Characteristic is null or status ($status) != GATT_SUCCESS", null)
+                    callbackLog(Log.ERROR, "onCharacteristicRead: Characteristic is null or status ($status) != GATT_SUCCESS", null)
                     disconnectAndCloseIfRequired(gatt, IOException("Characteristic is null or status ($status) != GATT_SUCCESS"))
                 }
             }
@@ -240,10 +254,10 @@ class UuidAllocationClient(
         }
 
         private fun disconnectAndCloseIfRequired(gatt: BluetoothGatt, exception: Exception? = null) {
-            onLog(Log.DEBUG, "disconnectAndCloseIfRequired exception=$exception", null)
+            callbackLog(Log.DEBUG, "disconnectAndCloseIfRequired exception=$exception", null)
 
             if(!disconnectCalled.getAndSet(true)) {
-                onLog(Log.DEBUG,
+                callbackLog(Log.DEBUG,
                     "disconnectAndCloseIfRequired - disconnect not called before - cancel timeout",
                 null
                 )
@@ -252,41 +266,41 @@ class UuidAllocationClient(
                 try {
                     val alreadyDisconnected = connectionState == BluetoothGatt.STATE_DISCONNECTED
                     gatt.disconnect()
-                    onLog(Log.DEBUG, "UuidAllocationClient: submitted GATT disconnect request",
+                    callbackLog(Log.DEBUG, "UuidAllocationClient: submitted GATT disconnect request",
                         null)
 
                     //If we are already disconnected, then we will call close now. Otherwise we will
                     //wait for the onConnectionStateChange callback
                     if(alreadyDisconnected) {
                         //we are already disconnected, so close now.
-                        onLog(Log.DEBUG, "UuidAllocationClient: disconnectAndClose: " +
+                        callbackLog(Log.DEBUG, "UuidAllocationClient: disconnectAndClose: " +
                                 "already disconnected, so will close now", null)
                         closed.set(true)
                         gatt.close()
                     }
                 }catch(e: SecurityException){
-                    onLog(Log.ERROR, "Security exception on disconnect/close", e)
+                    callbackLog(Log.ERROR, "Security exception on disconnect/close", e)
                 }
 
                 if(exception != null && !dataPortUuid.isCompleted) {
-                    onLog(Log.WARN, "disconnectAndCloseIfRequired: complete exceptionally", exception)
+                    callbackLog(Log.WARN, "disconnectAndCloseIfRequired: complete exceptionally", exception)
                     dataPortUuid.completeExceptionally(exception)
                 }
             }
         }
 
         suspend fun getDataPortUuid(gatt: BluetoothGatt): UUID {
-            onLog(Log.DEBUG, "getDataPortUuid", null)
+            callbackLog(Log.DEBUG, "getDataPortUuid", null)
             callbackGatt = gatt
             try {
-                onLog(Log.DEBUG, "getDataPortUid: request connect",null)
+                callbackLog(Log.DEBUG, "getDataPortUid: request connect",null)
 
                 if(!gatt.connect()) {
-                    onLog(Log.ERROR, "getDataPortUid: request to connect not submitted", null)
+                    callbackLog(Log.ERROR, "getDataPortUid: request to connect not submitted", null)
                     dataPortUuid.completeExceptionally(IOException("Failed to submit connect request"))
                 }
             }catch(e: SecurityException) {
-                onLog(Log.ERROR, "SecurityException on GATT connect", e)
+                callbackLog(Log.ERROR, "SecurityException on GATT connect", e)
             }
 
             return dataPortUuid.await()
@@ -343,6 +357,8 @@ class UuidAllocationClient(
     }
 
     companion object {
+
+        val CALLBACK_ID_ATOMIC = AtomicInteger(1)
 
         const val DEFAULT_TIMEOUT = 12000L
 
