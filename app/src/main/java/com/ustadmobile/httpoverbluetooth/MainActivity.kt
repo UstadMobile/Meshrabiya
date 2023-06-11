@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -70,22 +72,28 @@ import kotlinx.coroutines.launch
 import org.acra.ACRA
 import rawhttp.core.RawHttp
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import android.text.format.DateFormat as AndroidDateFormat
+
+val LOG_LINE_ID_ATOMIC = AtomicInteger(0)
+
+data class LogLine(
+    val line: String,
+    val lineId: Int = LOG_LINE_ID_ATOMIC.getAndIncrement(),
+)
 
 data class MainUiState(
     val serverEnabled: Boolean = false,
     val serverMessage: String = "Hello Bluetooth World",
-    val logLines: List<String> = emptyList(),
+    val logLines: List<LogLine> = emptyList(),
     val selectedServerAddr: String? = null,
     val selectedServerName: String? = null,
-    val requestFrequency: Int = 10,
+    val requestFrequency: Int = 60,
     val sendRequestsEnabled: Boolean = false,
     val numRequests: Int = 0,
     val numFailedRequests: Int = 0,
     val numSuccessfulRequests: Int = 0,
 ) {
-    val numRequestSummaryStr: String
-        get() = "$numSuccessfulRequests/$numRequests $successPercent "
 
     val successPercent: String
         get() = if(numRequests > 0) {
@@ -93,6 +101,11 @@ data class MainUiState(
         }else {
             ""
         }
+
+    val numRequestSummaryStr: String
+        get() = "$numSuccessfulRequests/$numRequests $successPercent requests successful"
+
+
 }
 
 class ManualReportException(message: String): Exception(message)
@@ -198,7 +211,7 @@ class MainActivity : ComponentActivity() {
         val newUiState = uiState.updateAndGet { prev ->
             prev.copy(
                 logLines = buildList {
-                    add("[$timestamp] $line")
+                    add(LogLine("[$timestamp] $line"))
                     addAll(prev.logLines.trimIfExceeds(MAX_LOG_LINES - 1))
                 }
             )
@@ -273,7 +286,7 @@ class MainActivity : ComponentActivity() {
             sendRequestJob?.cancel()
             sendRequestJob = lifecycleScope.launch {
                 while(coroutineContext.isActive){
-                    lifecycleScope.launch { sendRequest() }
+                    sendRequest()
                     delay(sendRequestFrequency * 1000L)
                 }
             }
@@ -322,14 +335,9 @@ class MainActivity : ComponentActivity() {
         }
 
         val uiStateVal = uiState.value
-        val successPercent = if(uiStateVal.numRequests > 0) {
-            "(" + (uiStateVal.numSuccessfulRequests * 100)/uiStateVal.numRequests + "%)"
-        }else {
-            ""
-        }
 
         ACRA.errorReporter.putCustomData("httpoverbluetooth_requestcount",
-            "${uiState.value.numSuccessfulRequests}/${uiState.value.numRequests} $successPercent")
+            uiStateVal.numRequestSummaryStr)
     }
 
     fun onServerSelected(device: BluetoothDevice?) {
@@ -460,167 +468,163 @@ fun MainScreen(
             Log.i("MainActivity", "Discoverable")
         }
     )
-
-    Column(
-        modifier = Modifier.verticalScroll(rememberScrollState()),
+    
+    LazyColumn(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Row(
+        item(key = "header") {
+            Column {
+                Row(
 
-        ) {
-            Text(
-                "HTTP Over Bluetooth 0.1a",
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .weight(1.0f)
-            )
+                ) {
+                    Text(
+                        "HTTP Over Bluetooth 0.1b",
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .weight(1.0f)
+                    )
 
-            IconButton(
-                onClick = onClickSendReport
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "Send report",
-                )
-            }
-        }
-
-
-        Text(
-            text = "Server",
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .toggleable(
-                    role = Role.Switch,
-                    value = uiState.serverEnabled,
-                    onValueChange = onSetServerEnabled,
-                )
-        ) {
-            Switch(checked = uiState.serverEnabled, onCheckedChange = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Server Enabled")
-        }
-
-        if(uiState.serverEnabled) {
-            Button(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                onClick = {
-                    val discoverableIntent: Intent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
-                        putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
-                    }
-                    launchDiscoverable.launch(discoverableIntent)
-                }
-            ) {
-                Text("Make Discoverable")
-            }
-
-            OutlinedTextField(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .fillMaxWidth(),
-                value = uiState.serverMessage,
-                onValueChange =onChangeServerMessage,
-                label = { Text("Server message") }
-            )
-        }
-
-        Text(
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
-            text = "Client"
-        )
-
-        if(uiState.selectedServerAddr != null) {
-            ListItem(
-                headlineText = {
-                    Text("${uiState.selectedServerName} (${uiState.selectedServerAddr})")
-                },
-                supportingText = {
-                    val percentageSuccess = if(uiState.numRequests > 0) {
-                        "(${((uiState.numSuccessfulRequests * 100)/ uiState.numRequests)}%)"
-                    }else {
-                        ""
-                    }
-
-                    Text("${uiState.numSuccessfulRequests}/${uiState.numRequests} " +
-                            "$percentageSuccess requests successful")
-                },
-                trailingContent = {
                     IconButton(
-                        onClick = {
-                            onServerSelected(null)
-                        }
+                        onClick = onClickSendReport
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send report",
                         )
                     }
                 }
-            )
 
-            OutlinedTextField(
-                value = uiState.requestFrequency.toString(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                label = { Text("Request frequency (seconds)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                onValueChange = {
-                    onChangeClientRequestFrequency(it.trim().toIntOrNull() ?: 0)
+
+                Text(
+                    text = "Server",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .toggleable(
+                            role = Role.Switch,
+                            value = uiState.serverEnabled,
+                            onValueChange = onSetServerEnabled,
+                        )
+                ) {
+                    Switch(checked = uiState.serverEnabled, onCheckedChange = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Server Enabled")
                 }
-            )
 
-            Row(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .toggleable(
-                        role = Role.Switch,
-                        value = uiState.sendRequestsEnabled,
-                        onValueChange = onSetSendRequestsEnabled,
+                if(uiState.serverEnabled) {
+                    Button(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        onClick = {
+                            val discoverableIntent: Intent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE).apply {
+                                putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                            }
+                            launchDiscoverable.launch(discoverableIntent)
+                        }
+                    ) {
+                        Text("Make Discoverable")
+                    }
+
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .fillMaxWidth(),
+                        value = uiState.serverMessage,
+                        onValueChange =onChangeServerMessage,
+                        label = { Text("Server message") }
                     )
-            ) {
-                Switch(checked = uiState.sendRequestsEnabled, onCheckedChange = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Send requests")
-            }
+                }
 
-        }else {
-            Button(
-                modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
-                onClick = onClickSelectServer,
-            ) {
-                Text("Select Server")
+                Text(
+                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                    text = "Client"
+                )
+
+                if(uiState.selectedServerAddr != null) {
+                    ListItem(
+                        headlineText = {
+                            Text("${uiState.selectedServerName} (${uiState.selectedServerAddr})")
+                        },
+                        supportingText = {
+                            Text(uiState.numRequestSummaryStr)
+                        },
+                        trailingContent = {
+                            IconButton(
+                                onClick = {
+                                    onServerSelected(null)
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close",
+                                )
+                            }
+                        }
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.requestFrequency.toString(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        label = { Text("Request frequency (seconds)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        onValueChange = {
+                            onChangeClientRequestFrequency(it.trim().toIntOrNull() ?: 0)
+                        }
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .toggleable(
+                                role = Role.Switch,
+                                value = uiState.sendRequestsEnabled,
+                                onValueChange = onSetSendRequestsEnabled,
+                            )
+                    ) {
+                        Switch(checked = uiState.sendRequestsEnabled, onCheckedChange = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Send requests")
+                    }
+
+                }else {
+                    Button(
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                        onClick = onClickSelectServer,
+                    ) {
+                        Text("Select Server")
+                    }
+                }
+
+
+
+                TextButton(
+                    onClick = onClickLogs,
+                ) {
+                    Text(
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                        text = "Logs"
+                    )
+                }
             }
         }
 
-
-
-        TextButton(
-            onClick = onClickLogs,
+        items(
+            items = uiState.logLines,
+            key = { it.lineId }
         ) {
-            Text(
-                modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
-                text = "Logs"
-            )
-        }
-
-        uiState.logLines.forEach {
             Text(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.bodySmall,
-                text = it,
+                text = it.line,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-
     }
-
-
-
 }
 
 @Preview(showBackground = true)
