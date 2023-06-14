@@ -15,6 +15,7 @@ import android.content.IntentFilter
 import android.util.Log
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.UUID_BUSY
+import com.ustadmobile.httpoverbluetooth.MNetLogger
 import com.ustadmobile.httpoverbluetooth.toBytes
 import java.io.Closeable
 import java.util.UUID
@@ -36,6 +37,7 @@ class UuidAllocationServer(
     private val appContext: Context,
     allocationServiceUuid: UUID,
     private val allocationCharacteristicUuid: UUID,
+    private val vNetLogger: MNetLogger = MNetLogger { _, _, _ -> },
     private val maxSimultaneousClients: Int = 4,
     private val onUuidAllocated: OnUuidAllocatedListener,
 ) : Closeable {

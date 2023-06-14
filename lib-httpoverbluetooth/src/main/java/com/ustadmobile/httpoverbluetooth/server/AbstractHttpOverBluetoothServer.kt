@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
+import com.ustadmobile.httpoverbluetooth.MNetLogger
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
@@ -25,12 +26,15 @@ abstract class AbstractHttpOverBluetoothServer(
         appContext: Context,
         allocationServiceUuid: UUID,
         allocationCharacteristicUuid: UUID,
+        vnetLogger: MNetLogger,
         maxClients: Int,
         onUuidAllocated: OnUuidAllocatedListener,
     ) -> UuidAllocationServer = ::UuidAllocationServer,
 ) {
 
     private val isClosed = AtomicBoolean(false)
+
+    private val isStarted = AtomicBoolean(false)
 
     private val bluetoothManager: BluetoothManager = appContext.getSystemService(
         BluetoothManager::class.java
@@ -58,10 +62,12 @@ abstract class AbstractHttpOverBluetoothServer(
             try {
                 val inStream = socket.inputStream
                 val outStream = socket.outputStream
-                val request = rawHttp.parseRequest(inStream)
-                val response = handleRequest(socket.remoteDevice.address, request)
-                response.writeTo(outStream)
-                outStream.flush()
+                while(isStarted.get()) {
+                    val request = rawHttp.parseRequest(inStream)
+                    val response = handleRequest(socket.remoteDevice.address, request)
+                    response.writeTo(outStream)
+                    outStream.flush()
+                }
             }catch(e: Exception) {
                 Log.w(LOG_TAG, "Exception handling socket $uuid", e)
             } finally {
@@ -75,6 +81,7 @@ abstract class AbstractHttpOverBluetoothServer(
         appContext,
         allocationServiceUuid,
         allocationCharacteristicUuid,
+        {_, _, _, -> },
         maxClients,
         onUuidAllocatedListener,
     )
@@ -86,10 +93,12 @@ abstract class AbstractHttpOverBluetoothServer(
     fun start() {
         if(isClosed.get())
             throw IllegalStateException("HttpOverBluetoothServer is closed.")
+        isStarted.set(true)
         uuidAllocationServer.start()
     }
 
     fun stop() {
+        isStarted.set(false)
         uuidAllocationServer.stop()
     }
 

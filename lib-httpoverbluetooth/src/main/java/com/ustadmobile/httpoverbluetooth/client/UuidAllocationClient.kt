@@ -7,9 +7,9 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.util.Log
-import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.RemoteEndpoint
 import com.ustadmobile.httpoverbluetooth.UuidUtil
+import com.ustadmobile.httpoverbluetooth.MNetLogger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +36,7 @@ import kotlin.concurrent.withLock
  */
 class UuidAllocationClient(
     private val appContext: Context,
-    private val onLog: (priority: Int, message: String, exception: Exception?) -> Unit,
+    private val onLog: MNetLogger,
 ) : Closeable{
 
     private val lockByRemote = ConcurrentHashMap<RemoteEndpoint, Mutex>()
@@ -62,7 +62,7 @@ class UuidAllocationClient(
         private val remoteCharacteristicUuid: UUID,
         coroutineScope: CoroutineScope,
         private val timeout: Long = DEFAULT_TIMEOUT,
-        private val onLog: (priority: Int, message: String, exception: Exception?) -> Unit
+        private val onLog: MNetLogger
     ) : BluetoothGattCallback() {
 
         val dataPortUuid = CompletableDeferred<UUID>()
