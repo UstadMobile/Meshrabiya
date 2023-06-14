@@ -40,10 +40,6 @@ fun randomApipaAddr(): Int {
     return fixedSection.or(randomSection)
 }
 
-data class RemoteVNode(
-    val otherNodeAddress: String,
-)
-
 /**
  * Mashrabiya Node
  *
@@ -60,7 +56,11 @@ open class MNode(
     val localMNodeAddress: Int = randomApipaAddr(),
 ): RemoteMNodeManager.RemoteMNodeManagerListener {
 
-    private val executor = Executors.newScheduledThreadPool(8)
+    //This executor is used for direct I/O activities
+    private val connectionExecutor = Executors.newCachedThreadPool()
+
+    //This executor is used to schedule maintenance e.g. pings etc.
+    private val scheduledExecutor = Executors.newScheduledThreadPool(2)
 
     //All incoming packets get read and emitted here. - maybe? could be a buffering pain
     private val _incomingPackets = MutableSharedFlow<MNetPacket>()
@@ -148,7 +148,12 @@ open class MNode(
                 remoteAddress.addressToDotNotation(),null)
 
         val newRemoteNodeManager = RemoteMNodeManager(
-            remoteAddress, localMNodeAddress, executor, logger, this
+            remoteAddress = remoteAddress,
+            localMNodeAddress = localMNodeAddress,
+            connectionExecutor = connectionExecutor,
+            scheduledExecutor = scheduledExecutor,
+            logger = logger,
+            listener = this,
         ).also {
             it.addConnection(iSocket)
         }

@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicInteger
 
 data class RemoteMNodeState(
@@ -20,11 +21,13 @@ data class RemoteMNodeState(
  */
 class RemoteMNodeManager(
     val remoteAddress: Int,
+    @Suppress("unused")//Reserved for future use
     val localMNodeAddress: Int,
-    private val executor: ExecutorService,
+    private val connectionExecutor: ExecutorService,
+    private val scheduledExecutor: ScheduledExecutorService,
     private val logger: MNetLogger,
     private val listener: RemoteMNodeManagerListener,
-) {
+): RemoteMNodeConnectionManager.RemoteMNodeConnectionListener {
 
     interface RemoteMNodeManagerListener {
 
@@ -46,18 +49,37 @@ class RemoteMNodeManager(
         logger(Log.DEBUG, "RemoteMNodeManager: addConnection", null)
 
         val newConnectionManager = RemoteMNodeConnectionManager(
-            connectionIdAtomic.getAndIncrement(), iSocket, logger
+            connectionId = connectionIdAtomic.getAndIncrement(),
+            remoteNodeAddr = remoteAddress,
+            socket = iSocket,
+            logger = logger,
+            stateListener = this,
+            executor = connectionExecutor,
+            scheduledExecutor = scheduledExecutor,
         )
 
         connections.add(newConnectionManager)
-
-        executor.submit(newConnectionManager)
 
         val newState = nodeState.updateAndGet { prev ->
             prev.copy(numConnections = prev.numConnections + 1)
         }
 
         listener.onNodeStateChanged(newState)
+    }
+
+    override fun onConnectionStateChanged(connectionState: RemoteMNodeConnectionState) {
+        if(connectionState.connectionState == RemoteMNodeConnectionManager.ConnectionState.DISCONNECTED) {
+            connections.removeIf { it.connectionId == connectionState.connectionId }
+        }else {
+            val newState = nodeState.updateAndGet { prev ->
+                prev.copy(pingTime = connectionState.pingTime)
+            }
+            listener.onNodeStateChanged(newState)
+        }
+    }
+
+    fun close() {
+
     }
 
 }

@@ -34,7 +34,6 @@ import androidx.lifecycle.lifecycleScope
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.MNetLogger
 import com.ustadmobile.httpoverbluetooth.ext.addressToDotNotation
-import com.ustadmobile.httpoverbluetooth.vnet.RemoteMNodeManager
 import com.ustadmobile.httpoverbluetooth.vnet.MNode
 import com.ustadmobile.httpoverbluetooth.vnet.RemoteMNodeState
 import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
@@ -43,11 +42,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
-
-const val STATE_DISABLED = 0
-const val STATE_ENABLING = 1
-const val STATE_ENABLED = 2
-const val STATE_DISABLING = 3
 
 data class TestActivityUiState(
     val localAddress: Int = 0,
@@ -262,7 +256,10 @@ fun TestScreen(
             ListItem(
                 headlineText = {
                     Text(node.remoteAddress.addressToDotNotation())
-                }
+                },
+                supportingText = {
+                    Text("Ping: ${node.pingTime}ms")
+                },
             )
         }
     }
