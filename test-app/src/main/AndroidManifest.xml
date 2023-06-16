@@ -4,9 +4,27 @@
     <uses-feature android:name="android.software.companion_device_setup"/>
 
     <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Required to create local only hotspot, use wifimanager, etc  -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
 
+    <!--
+    Location permissions for use of local hotspot
+    https://developer.android.com/guide/topics/connectivity/localonlyhotspot
+    -->
+
+    <!-- If your app targets Android 13 (API level 33)
+          or higher, you must declare the NEARBY_WIFI_DEVICES permission. -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="32" />
 
     <application
         android:allowBackup="true"

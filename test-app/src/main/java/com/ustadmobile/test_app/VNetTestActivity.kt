@@ -6,36 +6,51 @@ import android.bluetooth.BluetoothDevice
 import android.companion.AssociationRequest
 import android.companion.BluetoothDeviceFilter
 import android.companion.CompanionDeviceManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.httpoverbluetooth.MNetLogger
 import com.ustadmobile.httpoverbluetooth.ext.addressToDotNotation
+import com.ustadmobile.httpoverbluetooth.ext.trimIfExceeds
 import com.ustadmobile.httpoverbluetooth.vnet.MNode
 import com.ustadmobile.httpoverbluetooth.vnet.RemoteMNodeState
+import com.ustadmobile.httpoverbluetooth.vnet.localhotspot.LocalHotspotConfigCompat
+import com.ustadmobile.httpoverbluetooth.vnet.localhotspot.LocalHotspotState
 import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,7 +60,9 @@ import java.util.UUID
 
 data class TestActivityUiState(
     val localAddress: Int = 0,
-    val remoteNodes: List<RemoteMNodeState> = emptyList()
+    val remoteNodes: List<RemoteMNodeState> = emptyList(),
+    val localHotspotState: LocalHotspotState? = null,
+    val logLines: List<LogLine> = emptyList(),
 )
 
 class VNetTestActivity : ComponentActivity() {
@@ -83,6 +100,38 @@ class VNetTestActivity : ComponentActivity() {
             Log.ASSERT -> Log.wtf(LOG_TAG, message, exception)
             Log.VERBOSE -> Log.v(LOG_TAG, message, exception)
         }
+
+        val logDisplay = buildString {
+            append(message)
+            if(exception != null) {
+                append(" Exception: ")
+                append(exception.toString())
+            }
+        }
+
+        activityUiState.update { prev ->
+            prev.copy(
+                logLines = buildList {
+                    add(LogLine(logDisplay))
+                    addAll(prev.logLines.trimIfExceeds(100))
+                }
+            )
+        }
+    }
+
+
+
+    fun onClickLogs() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+        val clip: ClipData = ClipData.newPlainText("Logs",
+            "===Mashrabiya ${activityUiState.value.localAddress}===\n" +
+                activityUiState.value.logLines.joinToString(separator = ",\n") {
+                    "#${it.lineId} ${it.line}"
+                }
+        )
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(this, "Copied logs!", Toast.LENGTH_LONG).show()
     }
 
 
@@ -107,6 +156,15 @@ class VNetTestActivity : ComponentActivity() {
             }
         }
 
+        lifecycleScope.launch {
+            mNetNode.localHotSpotState.collect { hotspotState ->
+                activityUiState.update { prev ->
+                    prev.copy(localHotspotState = hotspotState)
+                }
+            }
+        }
+
+
         setContent {
             HttpOverBluetoothTheme {
                 // A surface container using the 'background' color from the theme
@@ -117,7 +175,9 @@ class VNetTestActivity : ComponentActivity() {
                     TestScreen(
                         uiState = activityUiState,
                         onClickMakeDiscoverable = this::onClickMakeDiscoverable,
-                        onClickAddNode = this::onClickAddNode
+                        onClickAddNode = this::onClickAddNode,
+                        onSetLocalOnlyHotspotEnabled = this::onSetLocalOnlyHotspotEnabled,
+                        onClickLogs = this::onClickLogs,
                     )
                 }
             }
@@ -182,6 +242,15 @@ class VNetTestActivity : ComponentActivity() {
         }
     }
 
+    fun onSetLocalOnlyHotspotEnabled(enabled: Boolean) {
+        if(enabled){
+            lifecycleScope.launch {
+                mNetNode.requestLocalHotspot()
+            }
+        }
+    }
+
+
     companion object {
 
         val SERVICE_UUID = UUID.fromString("db803871-2136-4a7a-8859-6fdc28b567b6")
@@ -205,6 +274,8 @@ fun TestScreen(
     uiState: Flow<TestActivityUiState>,
     onClickAddNode: () -> Unit = { },
     onClickMakeDiscoverable: () -> Unit = { },
+    onSetLocalOnlyHotspotEnabled: (Boolean) -> Unit = { },
+    onClickLogs: () -> Unit = { },
 ) {
     val uiStateVal: TestActivityUiState by uiState.collectAsState(
         TestActivityUiState()
@@ -214,6 +285,8 @@ fun TestScreen(
         uiState = uiStateVal,
         onClickAddNode = onClickAddNode,
         onClickMakeDiscoverable = onClickMakeDiscoverable,
+        onSetLocalOnlyHotspotEnabled = onSetLocalOnlyHotspotEnabled,
+        onClickLogs = onClickLogs,
     )
 
 }
@@ -224,29 +297,66 @@ fun TestScreen(
     uiState: TestActivityUiState,
     onClickAddNode: () -> Unit = { },
     onClickMakeDiscoverable: () -> Unit = { },
+    onSetLocalOnlyHotspotEnabled: (Boolean) -> Unit = { },
+    onClickLogs: () -> Unit = { },
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize()
     ){
         item(key = "header") {
             Text(
-                modifier = Modifier.padding(),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 text = "Mashrabiya - ${uiState.localAddress.addressToDotNotation()}"
             )
         }
 
+        /*
+        item(key = "hotspotswitch") {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .toggleable(
+                        role = Role.Switch,
+                        value = uiState.localHotspotState?.config != null,
+                        onValueChange = onSetLocalOnlyHotspotEnabled,
+                    )
+            ) {
+                Switch(checked = uiState.localHotspotState?.config != null, onCheckedChange = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Local hotspot enabled")
+            }
+        }
+
+        item(key = "hotspotstate") {
+            Text(
+                style = MaterialTheme.typography.bodySmall,
+                text = "Local Hotspot: ${uiState.localHotspotState?.config?.ssid}/${uiState.localHotspotState?.config?.passphrase}"
+            )
+        }*/
+
         item(key = "makediscoverable") {
-            Button(onClick = onClickMakeDiscoverable) {
+            Button(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                onClick = onClickMakeDiscoverable
+            ) {
                 Text("Make discoverable")
             }
         }
 
         item(key = "addnode") {
             Button(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 onClick = onClickAddNode
             ) {
                 Text("Add node")
             }
+        }
+
+        item(key = "nodeheader") {
+            Text(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                text = "Nodes"
+            )
         }
 
         items(
@@ -258,9 +368,34 @@ fun TestScreen(
                     Text(node.remoteAddress.addressToDotNotation())
                 },
                 supportingText = {
-                    Text("Ping: ${node.pingTime}ms")
+                    Text("Ping: ${node.pingTime}ms Received ${node.pingsReceived}/${node.pingsSent}")
                 },
             )
         }
+
+        item(key = "logheader") {
+            TextButton(
+                onClick = onClickLogs,
+            ) {
+                Text(
+                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+                    text = "Logs"
+                )
+            }
+        }
+
+        items(
+            items = uiState.logLines,
+            key = { it.lineId }
+        ){
+            Text(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                text = it.line,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
     }
 }

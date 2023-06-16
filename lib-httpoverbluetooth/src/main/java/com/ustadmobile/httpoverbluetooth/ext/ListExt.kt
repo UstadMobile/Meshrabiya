@@ -16,3 +16,10 @@ inline fun <T> List<T>.appendOrReplace(
         }
     }
 }
+
+fun <T> List<T>.trimIfExceeds(numItems: Int): List<T> {
+    return if(size > numItems)
+        subList(0, numItems)
+    else
+        this
+}

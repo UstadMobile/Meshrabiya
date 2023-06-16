@@ -3,6 +3,7 @@ package com.ustadmobile.httpoverbluetooth.vnet
 import android.util.Log
 import com.ustadmobile.httpoverbluetooth.MNetLogger
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -22,7 +23,9 @@ data class RemoteMNodeConnectionState(
     val remoteNodeAddr: Int,
     val connectionId: Int,
     val pingTime: Int = 0,
-    val connectionState: RemoteMNodeConnectionManager.ConnectionState
+    val connectionState: RemoteMNodeConnectionManager.ConnectionState,
+    val pingsSent: Int = 0,
+    val pingsReceived: Int = 0,
 )
 
 class RemoteMNodeConnectionManager(
@@ -93,7 +96,8 @@ class RemoteMNodeConnectionManager(
                         logger(Log.DEBUG, "PING id $pingIdReceived time: $pingTime ms", null)
                         val newState = _connectionState.updateAndGet { prev ->
                             prev.copy(
-                                pingTime = pingTime.toInt()
+                                pingTime = pingTime.toInt(),
+                                pingsReceived = prev.pingsReceived + 1,
                             )
                         }
                         stateListener.onConnectionStateChanged(newState)
@@ -114,8 +118,17 @@ class RemoteMNodeConnectionManager(
             writeLock.withLock {
                 lastPingId = Random.nextInt(65000)
                 lastPingSentTime = System.currentTimeMillis()
-                outStream.write("PING $lastPingId\n".toByteArray())
-                outStream.flush()
+                _connectionState.update {  prev ->
+                    prev.copy(
+                        pingsSent = prev.pingsSent + 1,
+                    )
+                }
+                try {
+                    outStream.write("PING $lastPingId\n".toByteArray())
+                    outStream.flush()
+                }catch(e: Exception) {
+                    logger(Log.WARN, "Exception trying to send ping", e)
+                }
             }
         }
     }

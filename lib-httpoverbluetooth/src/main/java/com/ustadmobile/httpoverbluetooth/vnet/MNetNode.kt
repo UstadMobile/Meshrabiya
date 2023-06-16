@@ -15,6 +15,8 @@ import com.ustadmobile.httpoverbluetooth.ext.writeAddress
 import com.ustadmobile.httpoverbluetooth.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.httpoverbluetooth.server.OnUuidAllocatedListener
 import com.ustadmobile.httpoverbluetooth.server.UuidAllocationServer
+import com.ustadmobile.httpoverbluetooth.vnet.localhotspot.LocalHotspotManager
+import com.ustadmobile.httpoverbluetooth.vnet.localhotspot.LocalHotspotSubReservation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -45,6 +47,24 @@ fun randomApipaAddr(): Int {
  *
  * Connection refers to the underlying "real" connection to some other device. There may be multiple
  * connections to the same remote node (e.g. Bluetooth, Sockets running over WiFi, etc)
+ *
+ * Streams: use KWIK?
+Open local port on sender,
+
+Each node has a UDP port
+When packet is received: unwrap, check is it
+
+For general forwarding:
+Just wrap/unwrap each packet. Then forward to nexthop.
+
+Accepting (Server):
+1. open local QUIC server on given port
+
+Connecting (client):
+1. Open local port which will rewrite/forward
+
+
+ *
  *
  * Addresses are 32 bit integers in the APIPA range
  */
@@ -84,6 +104,10 @@ open class MNode(
     private val _remoteNodeStates = MutableStateFlow(emptyList<RemoteMNodeState>())
 
     val remoteNodeStates: Flow<List<RemoteMNodeState>> = _remoteNodeStates.asStateFlow()
+
+    private val localHotspotManager = LocalHotspotManager(appContext, logger)
+
+    val localHotSpotState = localHotspotManager.state
 
     /**
      * Listener that opens a bluetooth server socket
@@ -223,6 +247,11 @@ open class MNode(
     suspend fun sendPacket(nextHop: String, packet: MNetPacket) {
         // transportSockets[nextHop].outputStream.write
         // Wait for ACK (if more than one hop)
+    }
+
+
+    suspend fun requestLocalHotspot() : LocalHotspotSubReservation {
+        return localHotspotManager.request()
     }
 
 }

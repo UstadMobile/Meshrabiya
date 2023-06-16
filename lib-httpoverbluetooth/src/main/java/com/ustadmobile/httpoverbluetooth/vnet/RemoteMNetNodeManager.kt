@@ -13,6 +13,8 @@ data class RemoteMNodeState(
     val remoteAddress: Int,
     val numConnections: Int,
     val pingTime: Int,
+    val pingsSent: Int = 0,
+    val pingsReceived: Int = 0,
 )
 
 /**
@@ -72,7 +74,11 @@ class RemoteMNodeManager(
             connections.removeIf { it.connectionId == connectionState.connectionId }
         }else {
             val newState = nodeState.updateAndGet { prev ->
-                prev.copy(pingTime = connectionState.pingTime)
+                prev.copy(
+                    pingTime = connectionState.pingTime,
+                    pingsSent = connectionState.pingsSent,
+                    pingsReceived = connectionState.pingsReceived,
+                )
             }
             listener.onNodeStateChanged(newState)
         }
