@@ -58,8 +58,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
-import com.ustadmobile.httpoverbluetooth.client.HttpOverBluetoothClient
 import com.ustadmobile.httpoverbluetooth.ui.theme.HttpOverBluetoothTheme
+import com.ustadmobile.meshrabiya.client.HttpOverBluetoothClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

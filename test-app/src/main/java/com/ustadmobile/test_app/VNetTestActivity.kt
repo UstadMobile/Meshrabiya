@@ -18,39 +18,31 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import com.ustadmobile.httpoverbluetooth.HttpOverBluetoothConstants.LOG_TAG
-import com.ustadmobile.httpoverbluetooth.MNetLogger
-import com.ustadmobile.httpoverbluetooth.ext.addressToDotNotation
-import com.ustadmobile.httpoverbluetooth.ext.trimIfExceeds
-import com.ustadmobile.httpoverbluetooth.vnet.MNode
-import com.ustadmobile.httpoverbluetooth.vnet.RemoteMNodeState
-import com.ustadmobile.httpoverbluetooth.vnet.localhotspot.LocalHotspotConfigCompat
-import com.ustadmobile.httpoverbluetooth.vnet.localhotspot.LocalHotspotState
+import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.trimIfExceeds
+import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
+import com.ustadmobile.meshrabiya.vnet.VirtualNode
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
 import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,7 +52,7 @@ import java.util.UUID
 
 data class TestActivityUiState(
     val localAddress: Int = 0,
-    val remoteNodes: List<RemoteMNodeState> = emptyList(),
+    val remoteNodes: List<NeighborNodeState> = emptyList(),
     val localHotspotState: LocalHotspotState? = null,
     val logLines: List<LogLine> = emptyList(),
 )
@@ -68,7 +60,7 @@ data class TestActivityUiState(
 class VNetTestActivity : ComponentActivity() {
 
 
-    private lateinit var mNetNode: MNode
+    private lateinit var virtualNode: VirtualNode
 
     private val activityUiState = MutableStateFlow<TestActivityUiState>(TestActivityUiState())
 
@@ -91,8 +83,8 @@ class VNetTestActivity : ComponentActivity() {
     }
 
 
-    private val vNetLogger = MNetLogger { priority, message, exception ->
-        when(priority) {
+    private val vNetLogger = com.ustadmobile.meshrabiya.MNetLogger { priority, message, exception ->
+        when (priority) {
             Log.DEBUG -> Log.d(LOG_TAG, message, exception)
             Log.INFO -> Log.i(LOG_TAG, message, exception)
             Log.WARN -> Log.w(LOG_TAG, message, exception)
@@ -103,7 +95,7 @@ class VNetTestActivity : ComponentActivity() {
 
         val logDisplay = buildString {
             append(message)
-            if(exception != null) {
+            if (exception != null) {
                 append(" Exception: ")
                 append(exception.toString())
             }
@@ -138,18 +130,18 @@ class VNetTestActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        mNetNode = MNode(
+        virtualNode = VirtualNode(
             appContext = applicationContext,
             allocationServiceUuid = SERVICE_UUID,
             allocationCharacteristicUuid = CHARACTERISTIC_UUID,
             logger = vNetLogger,
         )
         activityUiState.update { prev ->
-            prev.copy(localAddress = mNetNode.localMNodeAddress)
+            prev.copy(localAddress = virtualNode.localMNodeAddress)
         }
 
         lifecycleScope.launch {
-            mNetNode.remoteNodeStates.collect {
+            virtualNode.neighborNodesState.collect {
                 activityUiState.update { prev ->
                     prev.copy(remoteNodes = it)
                 }
@@ -157,7 +149,7 @@ class VNetTestActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
-            mNetNode.localHotSpotState.collect { hotspotState ->
+            virtualNode.localHotSpotState.collect { hotspotState ->
                 activityUiState.update { prev ->
                     prev.copy(localHotspotState = hotspotState)
                 }
@@ -230,7 +222,7 @@ class VNetTestActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             try {
-                mNetNode.addBluetoothConnection(
+                virtualNode.addBluetoothConnection(
                     remoteBluetooothAddr = device.address,
                     remoteAllocationServiceUuid = SERVICE_UUID,
                     remoteAllocationCharacteristicUuid = CHARACTERISTIC_UUID,
@@ -245,7 +237,7 @@ class VNetTestActivity : ComponentActivity() {
     fun onSetLocalOnlyHotspotEnabled(enabled: Boolean) {
         if(enabled){
             lifecycleScope.launch {
-                mNetNode.requestLocalHotspot()
+                virtualNode.requestLocalHotspot()
             }
         }
     }
@@ -306,7 +298,7 @@ fun TestScreen(
         item(key = "header") {
             Text(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                text = "Mashrabiya (0.1) - ${uiState.localAddress.addressToDotNotation()}"
+                text = "Mashrabiya (0.1a) - ${uiState.localAddress.addressToDotNotation()}"
             )
         }
 

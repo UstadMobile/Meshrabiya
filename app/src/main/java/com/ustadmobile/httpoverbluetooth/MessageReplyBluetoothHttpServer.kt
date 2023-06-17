@@ -1,7 +1,7 @@
 package com.ustadmobile.httpoverbluetooth
 
 import android.content.Context
-import com.ustadmobile.httpoverbluetooth.server.AbstractHttpOverBluetoothServer
+import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
