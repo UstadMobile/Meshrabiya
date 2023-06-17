@@ -5,9 +5,9 @@ inline fun <T> List<T>.appendOrReplace(
     replace: (T) -> Boolean
 ): List<T> {
     val indexOfItemToReplace = indexOfFirst(replace)
-    return if(indexOfItemToReplace < 0) {
+    return if(indexOfItemToReplace == -1) {
         buildList {
-            addAll(this)
+            addAll(this@appendOrReplace)
             add(item)
         }
     }else {

@@ -4,6 +4,10 @@ plugins {
 }
 
 android {
+    buildFeatures {
+        buildConfig = true
+    }
+
     namespace 'com.ustadmobile.test_app'
     compileSdk 33
 
@@ -18,6 +22,10 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
+
+        buildConfigField "String", "ACRA_HTTP_URI", "\"" + rootProject.ext.buildConfigProperties["android.acra.url"] + "\""
+        buildConfigField "String", "ACRA_BASIC_LOGIN", "\"" + rootProject.ext.buildConfigProperties["android.acra.user"] + "\""
+        buildConfigField "String", "ACRA_BASIC_PASS", "\"" + rootProject.ext.buildConfigProperties["android.acra.auth"] + "\""
     }
 
     buildTypes {
@@ -49,6 +57,9 @@ android {
 dependencies {
 
     implementation project(":lib-httpoverbluetooth")
+
+    implementation "ch.acra:acra-http:5.9.7"
+    implementation "ch.acra:acra-dialog:5.9.7"
 
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.3.1'

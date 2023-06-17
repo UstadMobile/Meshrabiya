@@ -306,7 +306,7 @@ fun TestScreen(
         item(key = "header") {
             Text(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                text = "Mashrabiya - ${uiState.localAddress.addressToDotNotation()}"
+                text = "Mashrabiya (0.1) - ${uiState.localAddress.addressToDotNotation()}"
             )
         }
 
