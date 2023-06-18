@@ -1,5 +1,8 @@
 package com.ustadmobile.meshrabiya.mmcp
 
+import com.ustadmobile.meshrabiya.vnet.VirtualPacket
+import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
+
 /**
  * Meshrabiya Mesh Control Protocol message (MMCP) is like ICMP for the mesh network. Used to send
  * routing info, pings, etc.
@@ -9,6 +12,23 @@ sealed class MmcpMessage(
 ) {
 
     abstract fun toBytes(): ByteArray
+
+    fun toVirtualPacket(toAddr: Int, fromAddr: Int): VirtualPacket {
+        val packetPayload = toBytes()
+        return VirtualPacket(
+            header = VirtualPacketHeader(
+                toAddr = toAddr,
+                toPort = 0,
+                fromAddr = fromAddr,
+                fromPort = 0,
+                hopCount =  0,
+                maxHops = 0,
+                payloadSize = packetPayload.size
+            ),
+            payload = packetPayload
+        )
+    }
+
 
     companion object {
 

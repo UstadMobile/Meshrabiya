@@ -1,12 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothServerSocket
-import android.bluetooth.BluetoothSocket
-import android.content.Context
 import android.util.Log
-import com.ustadmobile.meshrabiya.client.UuidAllocationClient
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.appendOrReplace
 import com.ustadmobile.meshrabiya.ext.readRemoteAddress
@@ -14,23 +8,18 @@ import com.ustadmobile.meshrabiya.ext.writeAddress
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
-import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
-import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
-import com.ustadmobile.meshrabiya.server.UuidAllocationServer
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotStatus
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotSubReservation
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.withContext
-import java.io.IOException
+import java.io.Closeable
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
-import kotlin.Exception
 import kotlin.random.Random
 
 //Generate a random Automatic Private IP Address
@@ -70,24 +59,17 @@ Connecting (client):
  * Addresses are 32 bit integers in the APIPA range
  */
 open class VirtualNode(
-    val appContext: Context,
     val allocationServiceUuid: UUID,
     val allocationCharacteristicUuid: UUID,
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
-    val localMNodeAddress: Int = randomApipaAddr(),
-): NeighborNodeManager.RemoteMNodeManagerListener, IRouter {
+    val localNodeAddress: Int = randomApipaAddr(),
+): NeighborNodeManager.RemoteMNodeManagerListener, IRouter, Closeable {
 
     //This executor is used for direct I/O activities
-    private val connectionExecutor = Executors.newCachedThreadPool()
+    protected val connectionExecutor = Executors.newCachedThreadPool()
 
     //This executor is used to schedule maintenance e.g. pings etc.
-    private val scheduledExecutor = Executors.newScheduledThreadPool(2)
-
-    private val bluetoothManager: BluetoothManager = appContext.getSystemService(
-        BluetoothManager::class.java
-    )
-
-    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
+    protected val scheduledExecutor = Executors.newScheduledThreadPool(2)
 
     private val neighborNodeManagers: MutableMap<Int, NeighborNodeManager> = ConcurrentHashMap()
 
@@ -95,41 +77,15 @@ open class VirtualNode(
 
     val neighborNodesState: Flow<List<NeighborNodeState>> = _neighborNodesState.asStateFlow()
 
-    private val localHotspotManager = LocalHotspotManager(appContext, logger)
-
-    val localHotSpotState = localHotspotManager.state
+    open val localHotSpotState: Flow<LocalHotspotState> = MutableStateFlow(
+        LocalHotspotState(
+            status = LocalHotspotStatus.STOPPED
+        )
+    )
 
     private val pongListeners = CopyOnWriteArrayList<PongListener>()
 
-    /**
-     * Listener that opens a bluetooth server socket
-     */
-    private val onUuidAllocatedListener = OnUuidAllocatedListener { uuid ->
-        val serverSocket: BluetoothServerSocket? = try {
-            bluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord("mnet", uuid)
-        } catch (e: SecurityException) {
-            null
-        }
-
-        val clientSocket: BluetoothSocket? = try {
-            logger(Log.DEBUG, "Waiting for client to connect on bluetooth classic UUID $uuid", null)
-            serverSocket?.accept(AbstractHttpOverBluetoothServer.SOCKET_ACCEPT_TIMEOUT) //Can add timeout here
-        } catch (e: IOException) {
-            logger(Log.ERROR,"Exception accepting socket", e)
-            null
-        }
-
-        clientSocket?.also { socket ->
-            try {
-                val iSocket = socket.asISocket()
-                handleNewBluetoothConnection(iSocket)
-            }catch(e: SecurityException) {
-                logger(Log.ERROR, "Accept new node via Bluetooth: security exception exception", e)
-            }catch(e: Exception) {
-                logger(Log.ERROR, "Accept new node via Bluetooth: connect exception", e)
-            }
-        }
-    }
+    protected val logPrefix: String = "[VirtualNode ${localNodeAddress.addressToDotNotation()}]"
 
     override fun onNodeStateChanged(remoteMNodeState: NeighborNodeState) {
         _neighborNodesState.update { prev ->
@@ -137,91 +93,12 @@ open class VirtualNode(
         }
     }
 
-    private val uuidAllocationServer = UuidAllocationServer(
-        appContext = appContext,
-        allocationServiceUuid = allocationServiceUuid,
-        allocationCharacteristicUuid = allocationCharacteristicUuid,
-        onUuidAllocated = onUuidAllocatedListener,
-    )
-
-    private val uuidAllocationClient = UuidAllocationClient(appContext, onLog = { _, _, _ -> } )
-
-    init {
-        uuidAllocationServer.start()
-    }
-
-    private fun handleNewBluetoothConnection(
-        iSocket: ISocket
-    ) {
-        logger(Log.DEBUG, "MNode.handleNewBluetoothConnection: write address: " +
-                localMNodeAddress.addressToDotNotation(),null)
-
-        iSocket.outputStream.writeAddress(localMNodeAddress)
-        iSocket.outputStream.flush()
-
-        val remoteAddress = iSocket.inStream.readRemoteAddress()
-        logger(Log.DEBUG, "MNode.handleNewBluetoothConnection: read remote address: " +
-                remoteAddress.addressToDotNotation(),null)
-
-        val newRemoteNodeManager = NeighborNodeManager(
-            remoteAddress = remoteAddress,
-            router = this,
-            localNodeAddress = localMNodeAddress,
-            connectionExecutor = connectionExecutor,
-            scheduledExecutor = scheduledExecutor,
-            logger = logger,
-            listener = this,
-        ).also {
-            it.addConnection(iSocket)
-        }
-
-        neighborNodeManagers[remoteAddress] = newRemoteNodeManager
-    }
-
-    suspend fun addBluetoothConnection(
-        remoteBluetooothAddr: String,
-        remoteAllocationServiceUuid: UUID,
-        remoteAllocationCharacteristicUuid: UUID,
-    ) {
-        logger(Log.DEBUG, "AddBluetoothConnection to $remoteBluetooothAddr", null)
-        withContext(Dispatchers.IO) {
-            val dataUuid = uuidAllocationClient.requestUuidAllocation(
-                remoteAddress = remoteBluetooothAddr,
-                remoteServiceUuid = remoteAllocationServiceUuid,
-                remoteCharacteristicUuid = remoteAllocationCharacteristicUuid,
-            )
-
-            val remoteDevice = bluetoothAdapter?.getRemoteDevice(remoteBluetooothAddr)
-
-            var socket: BluetoothSocket? = null
-            try {
-                logger(Log.DEBUG, "AddBluetoothConnection : got data UUID: $dataUuid, " +
-                        "creating rfcomm sockettoservice", null)
-                socket = remoteDevice?.createInsecureRfcommSocketToServiceRecord(
-                    dataUuid
-                )
-
-                socket?.also {
-                    logger(Log.DEBUG, "AddBluetoothConnection: connecting", null)
-                    it.connect()
-                    logger(Log.DEBUG, "AddBluetoothConnection: connected, submit runnable", null)
-                    val iSocket = it.asISocket()
-                    handleNewBluetoothConnection(iSocket)
-                }
-
-            }catch(e:SecurityException){
-                logger(Log.ERROR, "addBluetoothConnection: SecurityException", e)
-            }catch(e: Exception) {
-                logger(Log.ERROR, "addBluetoothConnection: other exception", e)
-            }
-        }
-    }
 
     override fun route(
         from: Int,
         packet: VirtualPacket
     ) {
-        if(packet.header.toAddr == localMNodeAddress) {
+        if(packet.header.toAddr == localNodeAddress) {
             if(packet.header.toPort == 0.toShort()) {
                 //This is an Mmcp message
                 val mmcpMessage = MmcpMessage.fromBytes(packet.payload, packet.payloadOffset,
@@ -229,7 +106,7 @@ open class VirtualNode(
 
                 when(mmcpMessage) {
                     is MmcpPing -> {
-                        logger(Log.DEBUG, "Received ping from ${from.addressToDotNotation()}", null)
+                        logger(Log.DEBUG, "$logPrefix Received ping from ${from.addressToDotNotation()}", null)
                         //send pong
                         val pongMessage = MmcpPong(mmcpMessage.payload)
                         val pongBytes = pongMessage.toBytes()
@@ -237,7 +114,7 @@ open class VirtualNode(
                             header = VirtualPacketHeader(
                                 toAddr = from,
                                 toPort = 0,
-                                fromAddr = localMNodeAddress,
+                                fromAddr = localNodeAddress,
                                 fromPort = 0,
                                 hopCount = 0,
                                 maxHops = 5,
@@ -246,8 +123,8 @@ open class VirtualNode(
                             payload = pongBytes
                         )
 
-                        logger(Log.DEBUG, "Sending pong to ${from.addressToDotNotation()}", null)
-                        route(localMNodeAddress, replyPacket)
+                        logger(Log.DEBUG, "$logPrefix Sending pong to ${from.addressToDotNotation()}", null)
+                        route(localNodeAddress, replyPacket)
                     }
                     is MmcpPong -> {
                         pongListeners.forEach {
@@ -260,20 +137,45 @@ open class VirtualNode(
             //packet needs to be sent to nexthop
             val neighborManager = neighborNodeManagers[packet.header.toAddr]
             if(neighborManager != null) {
-                logger(Log.DEBUG, "Send packet to ${packet.header.toAddr.addressToDotNotation()}", null)
+                logger(Log.DEBUG, "$logPrefix ${packet.header.toAddr.addressToDotNotation()}", null)
                 neighborManager.send(packet)
             }else {
                 //not routeable
                 logger(Log.ERROR,
-                    "Cannot route packet to ${packet.header.toAddr.addressToDotNotation()}",
+                    "${logPrefix }Cannot route packet to ${packet.header.toAddr.addressToDotNotation()}",
                 null)
             }
         }
     }
 
-    suspend fun requestLocalHotspot() : LocalHotspotSubReservation {
-        return localHotspotManager.request()
+    fun handleNewSocketConnection(
+        iSocket: ISocket
+    ) {
+        logger(Log.DEBUG, "MNode.handleNewBluetoothConnection: write address: " +
+                localNodeAddress.addressToDotNotation(),null)
+
+        iSocket.outputStream.writeAddress(localNodeAddress)
+        iSocket.outputStream.flush()
+
+        val remoteAddress = iSocket.inStream.readRemoteAddress()
+        logger(Log.DEBUG, "MNode.handleNewBluetoothConnection: read remote address: " +
+                remoteAddress.addressToDotNotation(),null)
+
+        val newRemoteNodeManager = NeighborNodeManager(
+            remoteAddress = remoteAddress,
+            router = this,
+            localNodeAddress = localNodeAddress,
+            connectionExecutor = connectionExecutor,
+            scheduledExecutor = scheduledExecutor,
+            logger = logger,
+            listener = this,
+        ).also {
+            it.addConnection(iSocket)
+        }
+
+        neighborNodeManagers[remoteAddress] = newRemoteNodeManager
     }
+
 
     fun addPongListener(listener: PongListener) {
         pongListeners += listener
@@ -281,6 +183,15 @@ open class VirtualNode(
 
     fun removePongListener(listener: PongListener) {
         pongListeners -= listener
+    }
+
+    override fun close() {
+        neighborNodeManagers.values.forEach {
+            it.close()
+        }
+
+        connectionExecutor.shutdown()
+        scheduledExecutor.shutdown()
     }
 
 }

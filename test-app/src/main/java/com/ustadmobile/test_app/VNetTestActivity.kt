@@ -40,6 +40,7 @@ import androidx.lifecycle.lifecycleScope
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.trimIfExceeds
+import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
@@ -60,7 +61,7 @@ data class TestActivityUiState(
 class VNetTestActivity : ComponentActivity() {
 
 
-    private lateinit var virtualNode: VirtualNode
+    private lateinit var virtualNode: AndroidVirtualNode
 
     private val activityUiState = MutableStateFlow<TestActivityUiState>(TestActivityUiState())
 
@@ -130,14 +131,14 @@ class VNetTestActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        virtualNode = VirtualNode(
+        virtualNode = AndroidVirtualNode(
             appContext = applicationContext,
             allocationServiceUuid = SERVICE_UUID,
             allocationCharacteristicUuid = CHARACTERISTIC_UUID,
             logger = vNetLogger,
         )
         activityUiState.update { prev ->
-            prev.copy(localAddress = virtualNode.localMNodeAddress)
+            prev.copy(localAddress = virtualNode.localNodeAddress)
         }
 
         lifecycleScope.launch {

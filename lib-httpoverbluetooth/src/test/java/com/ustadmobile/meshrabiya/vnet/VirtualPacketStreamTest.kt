@@ -20,7 +20,7 @@ class VirtualPacketStreamTest {
             fromPort = 8072,
             hopCount = 1,
             maxHops = 4,
-            payloadSize = payload.size.toShort(),
+            payloadSize = payload.size,
         )
 
         val outStream = ByteArrayOutputStream()
@@ -35,9 +35,9 @@ class VirtualPacketStreamTest {
         val buf = ByteArray(8000)
         val packetIn = inStream.readVirtualPacket(buf, 0)
 
-        Assert.assertEquals("Header matches", header, packetIn.header)
+        Assert.assertEquals("Header matches", header, packetIn?.header)
         payload.forEachIndexed { index, byte ->
-            Assert.assertEquals(byte, packetIn.payload[index])
+            Assert.assertEquals(byte, packetIn!!.payload[index])
         }
     }
 
