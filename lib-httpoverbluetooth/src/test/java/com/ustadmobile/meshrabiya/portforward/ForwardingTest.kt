@@ -63,6 +63,7 @@ class ForwardingTest {
         val decoded = String(receivePacket.data, receivePacket.offset, receivePacket.length)
         Assert.assertEquals("Hello", decoded)
         executor.shutdown()
+        echoServer.close()
     }
 
     @Test(timeout = 5000)
@@ -70,13 +71,14 @@ class ForwardingTest {
         val executor = Executors.newCachedThreadPool()
         val echoServer = EchoDatagramServer(0, executor)
 
-        val forwardingRule = ForwardRuleDatagramSocket(0, executor,
+        val forwardingRule = UdpForwardRule(
+            DatagramSocket(), executor,
             InetAddress.getLoopbackAddress(), echoServer.listeningPort)
 
         val client = DatagramSocket()
         val helloBytes = "Hello".toByteArray()
         val helloPacket = DatagramPacket(helloBytes, helloBytes.size,
-            InetAddress.getLoopbackAddress(), forwardingRule.localPort)
+            forwardingRule.localAddress, forwardingRule.localPort)
         client.send(helloPacket)
 
         val receiveBuffer = ByteArray(100)
@@ -86,6 +88,7 @@ class ForwardingTest {
         val decoded = String(receivePacket.data, receivePacket.offset, receivePacket.length)
         Assert.assertEquals("Hello", decoded)
         executor.shutdown()
+        echoServer.close()
     }
 
 
