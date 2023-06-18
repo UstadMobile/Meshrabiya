@@ -115,19 +115,10 @@ class BluetoothNeighborNodeConnectionManager(
                     .putInt(lastPingId)
                     .array()
                 )
-                val pingPayloadBytes = ping.toBytes()
 
-                val virtualPacket = VirtualPacket(
-                    header = VirtualPacketHeader(
-                        toAddr = remoteNodeAddr,
-                        toPort = 0,
-                        fromAddr = localNodeAddr,
-                        fromPort = 0,
-                        hopCount = 0,
-                        maxHops = 5,
-                        payloadSize = pingPayloadBytes.size
-                    ),
-                    payload = pingPayloadBytes
+                val virtualPacket = ping.toVirtualPacket(
+                    toAddr = remoteNodeAddr,
+                    fromAddr = localNodeAddr
                 )
 
                 router.route(

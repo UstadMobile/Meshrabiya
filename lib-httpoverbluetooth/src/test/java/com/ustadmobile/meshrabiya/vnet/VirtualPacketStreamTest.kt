@@ -12,7 +12,8 @@ class VirtualPacketStreamTest {
 
     @Test
     fun givenVirtualPacketWrittenToOutputStream_whenReadFromInputStream_thenWillMatch() {
-        val payload = Random.nextBytes(ByteArray(1000))
+        val payloadSize = 1000
+        val data = Random.nextBytes(ByteArray(1000 + VirtualPacketHeader.HEADER_SIZE))
         val header = VirtualPacketHeader(
             toAddr = 1000,
             toPort = 8080,
@@ -20,11 +21,15 @@ class VirtualPacketStreamTest {
             fromPort = 8072,
             hopCount = 1,
             maxHops = 4,
-            payloadSize = payload.size,
+            payloadSize = payloadSize,
         )
 
         val outStream = ByteArrayOutputStream()
-        val packet = VirtualPacket(header, payload)
+        val packet = VirtualPacket.fromHeaderAndPayloadData(
+            header = header,
+            data = data,
+            payloadOffset = VirtualPacketHeader.HEADER_SIZE,
+        )
         outStream.writeVirtualPacket(packet)
         outStream.flush()
 
@@ -36,8 +41,8 @@ class VirtualPacketStreamTest {
         val packetIn = inStream.readVirtualPacket(buf, 0)
 
         Assert.assertEquals("Header matches", header, packetIn?.header)
-        payload.forEachIndexed { index, byte ->
-            Assert.assertEquals(byte, packetIn!!.payload[index])
+        data.forEachIndexed { index, byte ->
+            Assert.assertEquals(byte, packetIn!!.data[index])
         }
     }
 

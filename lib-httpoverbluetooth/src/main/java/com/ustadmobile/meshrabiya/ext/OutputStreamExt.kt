@@ -14,6 +14,5 @@ fun OutputStream.writeAddress(address: Int){
  * Write the given virtual packet to the receiver output stream
  */
 fun OutputStream.writeVirtualPacket(packet: VirtualPacket) {
-    write(packet.header.toBytes())
-    write(packet.payload, packet.payloadOffset, packet.header.payloadSize.toInt())
+    write(packet.data, packet.dataOffset, packet.datagramPacketSize)
 }

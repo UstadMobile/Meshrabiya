@@ -15,18 +15,19 @@ import java.util.concurrent.Future
  *
  * It receives packets on a local socket (UDP) socket. When a packet is received, it will:
  *
- *  a) Create a "return path" by opening another UDP socket on a random port on the same interface as
- *     as the toAddress. This return path is linked to the senders origin address and port.
+ *  a) Create a "return path" (if not already created) by opening another UDP socket on a random port
+ *     on the same interface as the toAddress. This return path is linked to the senders origin
+ *     address and port.
  *  b) Send the packet using the return path socket to the given toAddress/toPort
  *  c) When the return path receives a reply, it will be sent using the local socket back to the
  *     senders origin address and port.
  *
  *
  * @param localSocket a Socket that is listening on a particular interface (e.g. local interface)
- *                        that will forward outbound traffic to the given toAddress/toPort
+ *                    where any packets received should be forwarded to the given toAddress/toPort
  * @param ioExecutor ExecutorService that will be used to send/receive packets
  * @param toAddress the address that packets will be forwarded to
- * @param toPort the port that packets will be forwawrded to
+ * @param toPort the port that packets will be forwarded to
  * @param returnPathSocketFactory a factory that is used to generate the return path required for
  *                                step a) above.
  */
@@ -40,9 +41,6 @@ class UdpForwardRule(
     }
 ): Runnable, Closeable {
 
-    /**
-     *
-     */
     val localPort: Int = localSocket.localPort
 
     val localAddress: InetAddress= localSocket.localAddress
@@ -56,7 +54,7 @@ class UdpForwardRule(
         private val returnFuture: Future<*> = ioExecutor.submit(this)
 
         override fun run() {
-            val buffer = ByteArray(VirtualPacket.MAX_SIZE)
+            val buffer = ByteArray(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE)
 
             while(!Thread.interrupted()) {
                 val packet = DatagramPacket(buffer, 0, buffer.size)
@@ -78,7 +76,7 @@ class UdpForwardRule(
     private val returnSockets = ConcurrentHashMap<SocketAddress, ReturnPathDatagramSocket>()
 
     override fun run() {
-        val buffer = ByteArray(VirtualPacket.MAX_SIZE)
+        val buffer = ByteArray(VirtualPacket.MAX_PAYLOAD_SIZE)
         while(!Thread.interrupted()) {
             val packet = DatagramPacket(buffer, 0, buffer.size)
             localSocket.receive(packet)

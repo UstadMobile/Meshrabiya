@@ -31,8 +31,11 @@ data class VirtualPacketHeader(
             throw IllegalArgumentException("Payload size must not be > $MAX_PAYLOAD")
     }
 
-    fun toBytes(): ByteArray {
-        val buf = ByteBuffer.wrap(ByteArray(HEADER_SIZE)).order(ByteOrder.BIG_ENDIAN)
+    fun toBytes(
+        byteArray: ByteArray,
+        offset: Int
+    ) {
+        val buf = ByteBuffer.wrap(byteArray, offset, HEADER_SIZE).order(ByteOrder.BIG_ENDIAN)
         buf.putInt(toAddr)
         buf.putShort(toPort)
         buf.putInt(fromAddr)
@@ -40,8 +43,12 @@ data class VirtualPacketHeader(
         buf.put(hopCount)
         buf.put(maxHops)
         buf.putShort(payloadSize.toShort())
+    }
 
-        return buf.array()
+    fun toBytes(): ByteArray {
+        return ByteArray(HEADER_SIZE).also {
+            toBytes(it, 0)
+        }
     }
 
     companion object {

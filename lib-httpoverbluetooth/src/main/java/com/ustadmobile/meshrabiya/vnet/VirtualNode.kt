@@ -10,7 +10,6 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotStatus
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotSubReservation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,6 +58,7 @@ Connecting (client):
  * Addresses are 32 bit integers in the APIPA range
  */
 open class VirtualNode(
+    //Note: allocationServiceUuid should be based on datagram port using a UUID "Mask" and the port
     val allocationServiceUuid: UUID,
     val allocationCharacteristicUuid: UUID,
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
@@ -101,26 +101,16 @@ open class VirtualNode(
         if(packet.header.toAddr == localNodeAddress) {
             if(packet.header.toPort == 0.toShort()) {
                 //This is an Mmcp message
-                val mmcpMessage = MmcpMessage.fromBytes(packet.payload, packet.payloadOffset,
-                    packet.header.payloadSize)
+                val mmcpMessage = MmcpMessage.fromVirtualPacket(packet)
 
                 when(mmcpMessage) {
                     is MmcpPing -> {
                         logger(Log.DEBUG, "$logPrefix Received ping from ${from.addressToDotNotation()}", null)
                         //send pong
                         val pongMessage = MmcpPong(mmcpMessage.payload)
-                        val pongBytes = pongMessage.toBytes()
-                        val replyPacket = VirtualPacket(
-                            header = VirtualPacketHeader(
-                                toAddr = from,
-                                toPort = 0,
-                                fromAddr = localNodeAddress,
-                                fromPort = 0,
-                                hopCount = 0,
-                                maxHops = 5,
-                                payloadSize = pongBytes.size
-                            ),
-                            payload = pongBytes
+                        val replyPacket = pongMessage.toVirtualPacket(
+                            toAddr = from,
+                            fromAddr = localNodeAddress
                         )
 
                         logger(Log.DEBUG, "$logPrefix Sending pong to ${from.addressToDotNotation()}", null)

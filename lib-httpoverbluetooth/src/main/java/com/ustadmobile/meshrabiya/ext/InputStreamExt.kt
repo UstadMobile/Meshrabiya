@@ -57,14 +57,25 @@ fun InputStream.readVirtualPacket(
     buffer: ByteArray,
     offset: Int,
 ) : VirtualPacket? {
-    val headerBytes = readByteArrayOfSize(VirtualPacketHeader.HEADER_SIZE) ?: return null
-    val header = VirtualPacketHeader.fromBytes(headerBytes)
+    //Read header bytes into the buffer
+    val headerBytesRead = readExactly(buffer, offset, VirtualPacketHeader.HEADER_SIZE)
 
-    readExactlyOrThrow(buffer, offset, header.payloadSize.toInt())
+    if(headerBytesRead != VirtualPacketHeader.HEADER_SIZE)
+        return null
 
-    return VirtualPacket(
-        header = header,
-        payload = buffer,
-        payloadOffset = offset
+    val packetHeader = VirtualPacketHeader.fromBytes(buffer, offset)
+
+    readExactlyOrThrow(
+        b = buffer,
+        offset = offset + VirtualPacketHeader.HEADER_SIZE,
+        len = packetHeader.payloadSize
+    )
+
+
+    return VirtualPacket.fromHeaderAndPayloadData(
+        header = packetHeader,
+        data = buffer,
+        payloadOffset = offset + VirtualPacketHeader.HEADER_SIZE,
+        headerAlreadyInData = true,
     )
 }
