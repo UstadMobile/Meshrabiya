@@ -15,10 +15,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.io.Closeable
+import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 
 //Generate a random Automatic Private IP Address
@@ -37,20 +41,8 @@ fun randomApipaAddr(): Int {
  * Connection refers to the underlying "real" connection to some other device. There may be multiple
  * connections to the same remote node (e.g. Bluetooth, Sockets running over WiFi, etc)
  *
- * Streams: use KWIK?
+ * Streams run over KWIK ?
 Open local port on sender,
-
-Each node has a UDP port
-When packet is received: unwrap, check is it
-
-For general forwarding:
-Just wrap/unwrap each packet. Then forward to nexthop.
-
-Accepting (Server):
-1. open local QUIC server on given port
-
-Connecting (client):
-1. Open local port which will rewrite/forward
 
 
  *
@@ -63,6 +55,7 @@ open class VirtualNode(
     val allocationCharacteristicUuid: UUID,
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
     val localNodeAddress: Int = randomApipaAddr(),
+    val autoForwardInbound: Boolean = true,
 ): NeighborNodeManager.RemoteMNodeManagerListener, IRouter, Closeable {
 
     //This executor is used for direct I/O activities
@@ -74,6 +67,8 @@ open class VirtualNode(
     private val neighborNodeManagers: MutableMap<Int, NeighborNodeManager> = ConcurrentHashMap()
 
     private val _neighborNodesState = MutableStateFlow(emptyList<NeighborNodeState>())
+
+    private val mmcpMessageIdAtomic = AtomicInteger()
 
     val neighborNodesState: Flow<List<NeighborNodeState>> = _neighborNodesState.asStateFlow()
 
@@ -87,39 +82,50 @@ open class VirtualNode(
 
     protected val logPrefix: String = "[VirtualNode ${localNodeAddress.addressToDotNotation()}]"
 
+    protected val datagramSocket = VirtualNodeDatagramSocket(
+        port = 0,
+        ioExecutorService = connectionExecutor,
+        router = this,
+        localAddVirtualAddress = localNodeAddress,
+    )
+
     override fun onNodeStateChanged(remoteMNodeState: NeighborNodeState) {
         _neighborNodesState.update { prev ->
             prev.appendOrReplace(remoteMNodeState) { it.remoteAddress == remoteMNodeState.remoteAddress }
         }
     }
 
+    override fun nextMmcpMessageId() = mmcpMessageIdAtomic.incrementAndGet()
 
     override fun route(
-        from: Int,
         packet: VirtualPacket
     ) {
         if(packet.header.toAddr == localNodeAddress) {
-            if(packet.header.toPort == 0.toShort()) {
+            if(packet.header.toPort == 0) {
                 //This is an Mmcp message
                 val mmcpMessage = MmcpMessage.fromVirtualPacket(packet)
+                val from = packet.header.fromAddr
 
                 when(mmcpMessage) {
                     is MmcpPing -> {
                         logger(Log.DEBUG, "$logPrefix Received ping from ${from.addressToDotNotation()}", null)
                         //send pong
-                        val pongMessage = MmcpPong(mmcpMessage.payload)
+                        val pongMessage = MmcpPong(mmcpMessage.messageId)
                         val replyPacket = pongMessage.toVirtualPacket(
                             toAddr = from,
                             fromAddr = localNodeAddress
                         )
 
                         logger(Log.DEBUG, "$logPrefix Sending pong to ${from.addressToDotNotation()}", null)
-                        route(localNodeAddress, replyPacket)
+                        route(replyPacket)
                     }
                     is MmcpPong -> {
                         pongListeners.forEach {
                             it.onPongReceived(from, mmcpMessage)
                         }
+                    }
+                    else -> {
+                        // do nothing
                     }
                 }
             }
@@ -138,6 +144,22 @@ open class VirtualNode(
         }
     }
 
+    protected fun getOrCreateNeighborNodeManager(
+        remoteAddress: Int
+    ): NeighborNodeManager {
+        return neighborNodeManagers.getOrPut(remoteAddress) {
+            NeighborNodeManager(
+                remoteAddress = remoteAddress,
+                router = this,
+                localNodeAddress = localNodeAddress,
+                connectionExecutor = connectionExecutor,
+                scheduledExecutor = scheduledExecutor,
+                logger = logger,
+                listener = this,
+            )
+        }
+    }
+
     fun handleNewSocketConnection(
         iSocket: ISocket
     ) {
@@ -151,19 +173,63 @@ open class VirtualNode(
         logger(Log.DEBUG, "MNode.handleNewBluetoothConnection: read remote address: " +
                 remoteAddress.addressToDotNotation(),null)
 
-        val newRemoteNodeManager = NeighborNodeManager(
+        val newRemoteNodeManager = getOrCreateNeighborNodeManager(
             remoteAddress = remoteAddress,
-            router = this,
-            localNodeAddress = localNodeAddress,
-            connectionExecutor = connectionExecutor,
-            scheduledExecutor = scheduledExecutor,
-            logger = logger,
-            listener = this,
         ).also {
             it.addConnection(iSocket)
         }
 
         neighborNodeManagers[remoteAddress] = newRemoteNodeManager
+    }
+
+    /**
+     * Respond to a new
+     */
+    fun handleNewIncomingDatagramConnection(
+        address: InetAddress,
+        port: Int,
+        neighborNodeVirtualAddr: Int,
+    ) {
+        val remoteNodeManager = getOrCreateNeighborNodeManager(neighborNodeVirtualAddr)
+        remoteNodeManager.addDatagramConnection(address, port, datagramSocket)
+    }
+
+    /**
+     * Add a new datagram connection :
+     *  1. Send a MmcpHello to the remote address/port (virtual address = 0)
+     *  2. Wait for a reply MmcpAck that gives the remote virtual address
+     *
+     *  On the remote side receiving a Hello will trigger the DatagramSocket's
+     *  OnNewIncomingConnectionListener, so the remote side can also setup a connectionmanager
+     */
+    fun addNewDatagramNeighborConnection(
+        address: InetAddress,
+        port: Int,
+    ) {
+        val addrResponseLatch = CountDownLatch(1)
+        val remoteAddr = AtomicInteger(0)
+        val helloMessageId = nextMmcpMessageId()
+
+        val packetReceivedListener = VirtualNodeDatagramSocket.PacketReceivedListener {
+            if(it.address == address && it.port == port) {
+                val virtualPacket = VirtualPacket.fromDatagramPacket(it)
+                remoteAddr.set(virtualPacket.header.fromAddr)
+                addrResponseLatch.countDown()
+            }
+        }
+
+        try {
+            datagramSocket.addPacketReceivedListener(packetReceivedListener)
+
+            datagramSocket.sendHello(helloMessageId, address, port)
+
+            addrResponseLatch.await(10, TimeUnit.SECONDS)
+
+            val newRemoteNodeManager = getOrCreateNeighborNodeManager(remoteAddress = remoteAddr.get())
+            newRemoteNodeManager.addDatagramConnection(address, port, datagramSocket)
+        }finally {
+            datagramSocket.removePacketReceivedListener(packetReceivedListener)
+        }
     }
 
 
@@ -174,6 +240,9 @@ open class VirtualNode(
     fun removePongListener(listener: PongListener) {
         pongListeners -= listener
     }
+
+
+
 
     override fun close() {
         neighborNodeManagers.values.forEach {

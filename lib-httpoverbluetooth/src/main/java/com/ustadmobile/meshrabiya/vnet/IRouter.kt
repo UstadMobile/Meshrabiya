@@ -6,8 +6,10 @@ interface IRouter {
      * Route the given incoming packet.
      */
     fun route(
-        from: Int,
         packet: VirtualPacket
     )
+
+    fun nextMmcpMessageId(): Int
+
 
 }

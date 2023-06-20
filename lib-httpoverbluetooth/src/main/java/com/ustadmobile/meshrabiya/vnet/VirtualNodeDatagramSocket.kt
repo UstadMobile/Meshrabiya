@@ -1,16 +1,43 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import com.ustadmobile.meshrabiya.mmcp.MmcpAck
+import com.ustadmobile.meshrabiya.mmcp.MmcpHello
+import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 
 class VirtualNodeDatagramSocket(
     port: Int,
-    private val ioExecutorService: ExecutorService,
+    private val localAddVirtualAddress: Int,
+    ioExecutorService: ExecutorService,
     private val router: IRouter,
 ) : DatagramSocket(port), Runnable {
+
+    fun interface PacketReceivedListener {
+
+        fun onPacketReceived(packet: DatagramPacket)
+
+    }
+
+    /**
+     * Used to listen for new incoming
+     */
+    fun interface OnNewIncomingConnectionListener {
+
+        fun onNewIncomingConnection(
+            address: InetAddress,
+            port: Int,
+            remoteVirtualAddress: Int,
+        )
+
+    }
+
+
+    private val listeners: MutableList<PacketReceivedListener> = CopyOnWriteArrayList()
 
     private val future: Future<*> = ioExecutorService.submit(this)
 
@@ -18,15 +45,61 @@ class VirtualNodeDatagramSocket(
         val buffer = ByteArray(VirtualPacket.MAX_PAYLOAD_SIZE)
 
         while(!Thread.interrupted()) {
-            val packet = DatagramPacket(buffer, 0, buffer.size)
-            receive(packet)
-            val virtualPacket = VirtualPacket.fromDatagramPacket(packet)
+            val rxPacket = DatagramPacket(buffer, 0, buffer.size)
+            receive(rxPacket)
 
-            router.route(
-                from = virtualPacket.header.fromAddr,
-                packet = virtualPacket
-            )
+            listeners.forEach {
+                it.onPacketReceived(rxPacket)
+            }
+
+            val rxVirtualPacket = VirtualPacket.fromDatagramPacket(rxPacket)
+
+            //Respond to Hello from new nodes with a packet so they can get our virtual address
+            if(rxVirtualPacket.header.toAddr == 0 && rxVirtualPacket.header.toPort == 0) {
+                val mmcpPacket = MmcpMessage.fromVirtualPacket(rxVirtualPacket)
+                if(mmcpPacket is MmcpHello) {
+                    val replyAck = MmcpAck(
+                        messageId = router.nextMmcpMessageId(),
+                        ackOfMessageId = mmcpPacket.messageId
+                    )
+                    val replyDatagram = replyAck.toVirtualPacket(
+                        toAddr = 0,
+                        fromAddr = localAddVirtualAddress,
+                    ).toDatagramPacket()
+                    replyDatagram.address = rxPacket.address
+                    replyDatagram.port = rxPacket.port
+                    send(replyDatagram)
+                }
+            }else {
+                router.route(
+                    packet = rxVirtualPacket
+                )
+            }
         }
+    }
+
+    fun addPacketReceivedListener(listener: PacketReceivedListener) {
+        listeners += listener
+    }
+
+    fun removePacketReceivedListener(listener: PacketReceivedListener) {
+        listeners -= listener
+    }
+
+
+    fun sendHello(
+        messageId: Int,
+        nextHopAddress: InetAddress,
+        nextHopPort: Int
+    ) {
+        send(
+            nextHopPort = nextHopPort,
+            nextHopAddress = nextHopAddress,
+            virtualPacket = MmcpHello(messageId).toVirtualPacket(
+                toAddr = 0,
+                fromAddr = localAddVirtualAddress,
+            )
+        )
     }
 
     /**
@@ -47,5 +120,6 @@ class VirtualNodeDatagramSocket(
     override fun close() {
         future.cancel(true)
         super.close()
+        listeners.clear()
     }
 }

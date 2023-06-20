@@ -8,7 +8,7 @@ class MmcpMessageTest {
 
     @Test
     fun givenPingMessage_whenConvertedToAndFromVirtualPacket_thenWillMatch() {
-        val pingMessage = MmcpPing(Random.nextBytes(50))
+        val pingMessage = MmcpPing(Random.nextInt())
         val pingPacket = pingMessage.toVirtualPacket(
             toAddr = 1000,
             fromAddr = 1042,
@@ -16,9 +16,7 @@ class MmcpMessageTest {
 
         val pingFromPacket = MmcpMessage.fromVirtualPacket(pingPacket) as MmcpPing
 
-        for(i in 0 until pingMessage.payload.size) {
-            Assert.assertEquals(pingMessage.payload[i], pingFromPacket.payload[i])
-        }
+        Assert.assertEquals(pingMessage.messageId, pingFromPacket.messageId)
         Assert.assertEquals(1000, pingPacket.header.toAddr)
         Assert.assertEquals(1042, pingPacket.header.fromAddr)
 

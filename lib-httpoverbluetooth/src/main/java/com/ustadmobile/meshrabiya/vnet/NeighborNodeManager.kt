@@ -4,6 +4,7 @@ import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import java.io.IOException
+import java.net.InetAddress
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.ScheduledExecutorService
@@ -29,7 +30,7 @@ class NeighborNodeManager(
     private val scheduledExecutor: ScheduledExecutorService,
     private val logger: com.ustadmobile.meshrabiya.MNetLogger,
     private val listener: RemoteMNodeManagerListener,
-): BluetoothNeighborNodeConnectionManager.RemoteMNodeConnectionListener {
+): StreamConnectionNeighborNodeConnectionManager.RemoteMNodeConnectionListener {
 
     interface RemoteMNodeManagerListener {
 
@@ -50,7 +51,7 @@ class NeighborNodeManager(
     ) {
         logger(Log.DEBUG, "RemoteMNodeManager: addConnection", null)
 
-        val newConnectionManager = BluetoothNeighborNodeConnectionManager(
+        val newConnectionManager = StreamConnectionNeighborNodeConnectionManager(
             connectionId = connectionIdAtomic.getAndIncrement(),
             router = router,
             localNodeAddr = localNodeAddress,
@@ -71,8 +72,32 @@ class NeighborNodeManager(
         listener.onNodeStateChanged(newState)
     }
 
+    fun addDatagramConnection(
+        address: InetAddress,
+        port: Int,
+        datagramSocket: VirtualNodeDatagramSocket,
+    ) {
+        val connectionManager = DatagramSocketNeighborNodeConnectionManager(
+            connectionId = connectionIdAtomic.getAndIncrement(),
+            router = router,
+            localNodeAddr = localNodeAddress,
+            remoteNodeAddr = remoteAddress,
+            datagramSocket = datagramSocket,
+            neighborAddress = address,
+            neighborPort = port,
+        )
+
+        connections.add(connectionManager)
+
+        val newState = nodeState.updateAndGet { prev ->
+            prev.copy(numConnections = prev.numConnections + 1)
+        }
+
+        listener.onNodeStateChanged(newState)
+    }
+
     override fun onConnectionStateChanged(connectionState: NeighborNodeConnectionState) {
-        if(connectionState.connectionState == BluetoothNeighborNodeConnectionManager.ConnectionState.DISCONNECTED) {
+        if(connectionState.connectionState == StreamConnectionNeighborNodeConnectionManager.ConnectionState.DISCONNECTED) {
             connections.removeIf { it.connectionId == connectionState.connectionId }
         }else {
             val newState = nodeState.updateAndGet { prev ->

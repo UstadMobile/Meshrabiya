@@ -10,3 +10,9 @@ ext.buildConfigProperties = new Properties()
 if(project.file("buildconfig.local.properties").exists()) {
     ext.buildConfigProperties.load(new FileInputStream(project.file("buildconfig.local.properties")))
 }
+
+ext {
+
+    version_kotlin_mockito = "4.1.0"
+
+}

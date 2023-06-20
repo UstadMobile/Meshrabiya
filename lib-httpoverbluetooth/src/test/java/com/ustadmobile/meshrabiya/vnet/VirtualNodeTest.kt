@@ -8,7 +8,6 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
-import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -56,12 +55,7 @@ class VirtualNodeTest {
         executor.submit { node1.handleNewSocketConnection(node1Socket) }
         executor.submit { node2.handleNewSocketConnection(node2Socket) }
 
-        val node1ToNode2Ping = MmcpPing(
-            ByteBuffer
-                .wrap(ByteArray(4))
-                .putInt(Random.nextInt())
-                .array()
-        )
+        val node1ToNode2Ping = MmcpPing(Random.nextInt())
 
         val latch = CountDownLatch(1)
 
@@ -71,7 +65,7 @@ class VirtualNodeTest {
             }
         })
 
-        node1.route(node1.localNodeAddress,
+        node1.route(
             node1ToNode2Ping.toVirtualPacket(
                 toAddr = node2.localNodeAddress,
                 fromAddr = node1.localNodeAddress

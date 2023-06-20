@@ -8,7 +8,7 @@ data class NeighborNodeConnectionState(
     val remoteNodeAddr: Int,
     val connectionId: Int,
     val pingTime: Int = 0,
-    val connectionState: BluetoothNeighborNodeConnectionManager.ConnectionState,
+    val connectionState: StreamConnectionNeighborNodeConnectionManager.ConnectionState,
     val pingAttempts: Int = 0,
     val pingsReceived: Int = 0,
 )
@@ -17,8 +17,8 @@ data class NeighborNodeConnectionState(
 abstract class AbstractNeighborNodeConnectionManager(
     val connectionId: Int,
     protected val router: IRouter,
-    protected val localNodeAddr: Int,
-    protected val remoteNodeAddr: Int
+    protected val localNodeVirtualAddr: Int,
+    protected val remoteNodeVirtualAddr: Int
 ) : Closeable{
 
     abstract val state: Flow<NeighborNodeConnectionState>

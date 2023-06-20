@@ -2,11 +2,13 @@ package com.ustadmobile.meshrabiya.mmcp
 
 import com.ustadmobile.meshrabiya.util.emptyByteArray
 
-class MmcpPing(
-    messageId: Int
-): MmcpMessage(WHAT_PING, messageId) {
+class MmcpHello(
+    messageId: Int,
+) : MmcpMessage(WHAT_HELLO, messageId){
 
-    override fun toBytes() = headerAndPayloadToBytes(header, emptyByteArray())
+    override fun toBytes(): ByteArray {
+        return headerAndPayloadToBytes(header, emptyByteArray())
+    }
 
     companion object {
 
@@ -14,9 +16,9 @@ class MmcpPing(
             byteArray: ByteArray,
             offset: Int = 0,
             len: Int =  byteArray.size,
-        ): MmcpPing {
+        ): MmcpHello {
             val (header, _) = mmcpHeaderAndPayloadFromBytes(byteArray, offset, len)
-            return MmcpPing(header.messageId)
+            return MmcpHello(header.messageId)
         }
 
     }

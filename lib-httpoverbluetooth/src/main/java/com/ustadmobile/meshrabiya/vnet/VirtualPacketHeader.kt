@@ -18,9 +18,9 @@ import java.nio.ByteOrder
 
 data class VirtualPacketHeader(
     val toAddr: Int,
-    val toPort: Short,
+    val toPort: Int,
     val fromAddr: Int,
-    val fromPort: Short,
+    val fromPort: Int,
     val hopCount: Byte,
     val maxHops: Byte,
     val payloadSize: Int, //Max size should be in line with MTU e.g. 1500. Stored as short
@@ -37,9 +37,9 @@ data class VirtualPacketHeader(
     ) {
         val buf = ByteBuffer.wrap(byteArray, offset, HEADER_SIZE).order(ByteOrder.BIG_ENDIAN)
         buf.putInt(toAddr)
-        buf.putShort(toPort)
+        buf.putShort(toPort.toShort())
         buf.putInt(fromAddr)
-        buf.putShort(fromPort)
+        buf.putShort(fromPort.toShort())
         buf.put(hopCount)
         buf.put(maxHops)
         buf.putShort(payloadSize.toShort())
@@ -70,9 +70,9 @@ data class VirtualPacketHeader(
 
             return VirtualPacketHeader(
                 toAddr = _toAddr,
-                toPort = _toPort,
+                toPort = _toPort.toInt(),
                 fromAddr = _fromAddr,
-                fromPort =  _fromPort,
+                fromPort =  _fromPort.toInt(),
                 hopCount = _hopCount,
                 maxHops = _maxHops,
                 payloadSize = _payloadSize.toInt(),

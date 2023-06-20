@@ -11,8 +11,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import java.io.InputStream
 import java.io.OutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 import java.util.concurrent.ScheduledExecutorService
@@ -23,7 +21,7 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.random.Random
 
-class BluetoothNeighborNodeConnectionManager(
+class StreamConnectionNeighborNodeConnectionManager(
     connectionId: Int,
     router: IRouter,
     localNodeAddr: Int,
@@ -37,8 +35,8 @@ class BluetoothNeighborNodeConnectionManager(
 ): AbstractNeighborNodeConnectionManager(
     connectionId = connectionId,
     router = router,
-    localNodeAddr = localNodeAddr,
-    remoteNodeAddr = remoteNodeAddr,
+    localNodeVirtualAddr = localNodeAddr,
+    remoteNodeVirtualAddr = remoteNodeAddr,
 ) {
 
     enum class ConnectionState{
@@ -86,7 +84,7 @@ class BluetoothNeighborNodeConnectionManager(
                 while(
                     inStream.readVirtualPacket(buffer, 0)?.also { packet = it } != null && !Thread.interrupted()
                 ) {
-                    router.route(remoteNodeAddr, packet)
+                    router.route(packet)
                 }
             }catch(e: Exception) {
                 logger(Log.WARN, "Exception on handling socket", e)
@@ -109,20 +107,14 @@ class BluetoothNeighborNodeConnectionManager(
                     )
                 }
 
-                val ping = MmcpPing(ByteBuffer
-                    .wrap(ByteArray(4))
-                    .order(ByteOrder.BIG_ENDIAN)
-                    .putInt(lastPingId)
-                    .array()
-                )
+                val ping = MmcpPing(lastPingId)
 
                 val virtualPacket = ping.toVirtualPacket(
-                    toAddr = remoteNodeAddr,
-                    fromAddr = localNodeAddr
+                    toAddr = remoteNodeVirtualAddr,
+                    fromAddr = localNodeVirtualAddr
                 )
 
                 router.route(
-                    from = localNodeAddr,
                     packet = virtualPacket,
                 )
             }
