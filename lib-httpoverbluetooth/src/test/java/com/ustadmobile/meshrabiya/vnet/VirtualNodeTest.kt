@@ -3,15 +3,18 @@ package com.ustadmobile.meshrabiya.vnet
 import com.ustadmobile.meshrabiya.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import org.junit.Assert
 import org.junit.Test
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
+import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 
 class VirtualNodeTest {
@@ -26,17 +29,18 @@ class VirtualNodeTest {
         }
     }
 
+    private val logger = MNetLogger { priority, message, exception ->
+        println(buildString {
+            append(message)
+            if(exception != null) {
+                append(" ")
+                append(exception.stackTraceToString())
+            }
+        })
+    }
+
     @Test
-    fun givenTwoVirtualNodesConnected_whenPingSent_thenReplyWillBeReceived() {
-        val logger = MNetLogger { priority, message, exception ->
-            println(buildString {
-                append(message)
-                if(exception != null) {
-                    append(" ")
-                    append(exception.stackTraceToString())
-                }
-            })
-        }
+    fun givenTwoVirtualNodesConnectedOverIoStreamSocket_whenPingSent_thenReplyWillBeReceived() {
         val executor = Executors.newCachedThreadPool()
         val node1 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
         val node2 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
@@ -76,5 +80,39 @@ class VirtualNodeTest {
 
         executor.shutdown()
     }
+
+    @Test
+    fun givenTwoVirtualNodesConnectedOverDatagramSocket_whenPingSent_thenReplyWillBeReceived() {
+        val node1 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
+        val node2 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
+
+        node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.datagramPort)
+
+        val latch = CountDownLatch(1)
+        val pongMessage = AtomicReference<MmcpPong>()
+        val node1ToNode2Ping = MmcpPing(Random.nextInt())
+
+        node1.addPongListener(object: PongListener{
+            override fun onPongReceived(fromNode: Int, pong: MmcpPong) {
+                if(pong.messageId == node1ToNode2Ping.messageId) {
+                    pongMessage.set(pong)
+                    latch.countDown()
+                }
+
+            }
+        })
+
+
+        node1.route(
+            node1ToNode2Ping.toVirtualPacket(
+                toAddr = node2.localNodeAddress,
+                fromAddr = node1.localNodeAddress
+            )
+        )
+
+        latch.await(5000, TimeUnit.MILLISECONDS)
+        Assert.assertEquals(node1ToNode2Ping.messageId, pongMessage.get().messageId)
+    }
+
 
 }

@@ -10,11 +10,16 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 
+/**
+ * @param onMmcpHelloReceivedListener - Receives the Hello Event. This will be triggered when a new
+ * neighbor connects.
+ */
 class VirtualNodeDatagramSocket(
     port: Int,
     private val localAddVirtualAddress: Int,
     ioExecutorService: ExecutorService,
     private val router: IRouter,
+    private val onMmcpHelloReceivedListener: OnMmcpHelloReceivedListener = OnMmcpHelloReceivedListener { },
 ) : DatagramSocket(port), Runnable {
 
     fun interface PacketReceivedListener {
@@ -24,14 +29,14 @@ class VirtualNodeDatagramSocket(
     }
 
     /**
-     * Used to listen for new incoming
+     * Used to listen for new (e.g. incoming) connections being established over the datagram socket.
+     * The OnMmcpHelloReceivedListener may be invoked multiple times from the same client (e.g. in
+     * the event that a response is not received and the client retries).
      */
-    fun interface OnNewIncomingConnectionListener {
+    fun interface OnMmcpHelloReceivedListener {
 
-        fun onNewIncomingConnection(
-            address: InetAddress,
-            port: Int,
-            remoteVirtualAddress: Int,
+        fun onMmcpHelloReceived(
+            helloEvent: HelloEvent
         )
 
     }
@@ -69,6 +74,15 @@ class VirtualNodeDatagramSocket(
                     replyDatagram.address = rxPacket.address
                     replyDatagram.port = rxPacket.port
                     send(replyDatagram)
+
+                    onMmcpHelloReceivedListener.onMmcpHelloReceived(
+                        HelloEvent(
+                            address = rxPacket.address,
+                            port = rxPacket.port,
+                            virtualPacket = rxVirtualPacket,
+                            mmcpHello = mmcpPacket,
+                        ),
+                    )
                 }
             }else {
                 router.route(

@@ -11,8 +11,8 @@ class DatagramSocketNeighborNodeConnectionManager(
     localNodeAddr: Int,
     remoteNodeAddr: Int,
     private val datagramSocket: VirtualNodeDatagramSocket,
-    private val neighborAddress: InetAddress,
-    private val neighborPort: Int,
+    internal val neighborAddress: InetAddress,
+    internal val neighborPort: Int,
 ) : AbstractNeighborNodeConnectionManager(
     connectionId = connectionId,
     router = router,

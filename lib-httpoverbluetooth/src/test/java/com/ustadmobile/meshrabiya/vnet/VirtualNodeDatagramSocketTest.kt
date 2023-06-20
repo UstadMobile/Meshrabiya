@@ -3,7 +3,9 @@ package com.ustadmobile.meshrabiya.vnet
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import org.junit.Assert
 import org.junit.Test
+import org.mockito.kotlin.argWhere
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import java.net.InetAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -30,6 +32,7 @@ class VirtualNodeDatagramSocketTest {
         val executorService = Executors.newCachedThreadPool()
         val socket1VirtualNodeAddr = 42
         val socket2VirtualNodeAddr = 43
+        val socket2IncomingHelloListener: VirtualNodeDatagramSocket.OnMmcpHelloReceivedListener = mock { }
 
         val socket1 = VirtualNodeDatagramSocket(
             port = 0,
@@ -42,7 +45,8 @@ class VirtualNodeDatagramSocketTest {
             port = 0,
             localAddVirtualAddress = socket2VirtualNodeAddr,
             ioExecutorService = executorService,
-            router = createMockRouter()
+            router = createMockRouter(),
+            onMmcpHelloReceivedListener = socket2IncomingHelloListener,
         )
 
         try {
@@ -69,15 +73,16 @@ class VirtualNodeDatagramSocketTest {
             val mmcpMessage = MmcpMessage.fromVirtualPacket(responseMessage.get())
             Assert.assertEquals(helloMessageId, mmcpMessage.messageId)
             Assert.assertEquals(socket2VirtualNodeAddr, responseMessage.get().header.fromAddr)
+            verify(socket2IncomingHelloListener).onMmcpHelloReceived(argWhere {
+                it.address == InetAddress.getLoopbackAddress() &&
+                        it.port == socket1.localPort &&
+                        it.virtualPacket.header.fromAddr == socket1VirtualNodeAddr
+            })
         }finally {
             executorService.shutdown()
             socket1.close()
             socket2.close()
         }
-
-
-
-
     }
 
 }

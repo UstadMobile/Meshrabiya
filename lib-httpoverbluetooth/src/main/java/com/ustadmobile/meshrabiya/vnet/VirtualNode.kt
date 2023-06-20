@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.io.Closeable
+import java.io.IOException
 import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -87,7 +88,16 @@ open class VirtualNode(
         ioExecutorService = connectionExecutor,
         router = this,
         localAddVirtualAddress = localNodeAddress,
+        onMmcpHelloReceivedListener = {
+            handleNewDatagramNeighborConnection(
+                address = it.address,
+                port = it.port,
+                neighborNodeVirtualAddr = it.virtualPacket.header.fromAddr
+            )
+        }
     )
+
+    val datagramPort: Int = datagramSocket.localPort
 
     override fun onNodeStateChanged(remoteMNodeState: NeighborNodeState) {
         _neighborNodesState.update { prev ->
@@ -108,7 +118,7 @@ open class VirtualNode(
 
                 when(mmcpMessage) {
                     is MmcpPing -> {
-                        logger(Log.DEBUG, "$logPrefix Received ping from ${from.addressToDotNotation()}", null)
+                        logger(Log.DEBUG, "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}", null)
                         //send pong
                         val pongMessage = MmcpPong(mmcpMessage.messageId)
                         val replyPacket = pongMessage.toVirtualPacket(
@@ -120,6 +130,7 @@ open class VirtualNode(
                         route(replyPacket)
                     }
                     is MmcpPong -> {
+                        logger(Log.DEBUG, "$logPrefix Received pong(id=${mmcpMessage.messageId})}", null)
                         pongListeners.forEach {
                             it.onPongReceived(from, mmcpMessage)
                         }
@@ -163,14 +174,14 @@ open class VirtualNode(
     fun handleNewSocketConnection(
         iSocket: ISocket
     ) {
-        logger(Log.DEBUG, "MNode.handleNewBluetoothConnection: write address: " +
+        logger(Log.DEBUG, "$logPrefix handleNewBluetoothConnection: write address: " +
                 localNodeAddress.addressToDotNotation(),null)
 
         iSocket.outputStream.writeAddress(localNodeAddress)
         iSocket.outputStream.flush()
 
         val remoteAddress = iSocket.inStream.readRemoteAddress()
-        logger(Log.DEBUG, "MNode.handleNewBluetoothConnection: read remote address: " +
+        logger(Log.DEBUG, "$logPrefix handleNewBluetoothConnection: read remote address: " +
                 remoteAddress.addressToDotNotation(),null)
 
         val newRemoteNodeManager = getOrCreateNeighborNodeManager(
@@ -185,7 +196,7 @@ open class VirtualNode(
     /**
      * Respond to a new
      */
-    fun handleNewIncomingDatagramConnection(
+    protected fun handleNewDatagramNeighborConnection(
         address: InetAddress,
         port: Int,
         neighborNodeVirtualAddr: Int,
@@ -207,13 +218,13 @@ open class VirtualNode(
         port: Int,
     ) {
         val addrResponseLatch = CountDownLatch(1)
-        val remoteAddr = AtomicInteger(0)
+        val neighborVirtualAddr = AtomicInteger(0)
         val helloMessageId = nextMmcpMessageId()
 
         val packetReceivedListener = VirtualNodeDatagramSocket.PacketReceivedListener {
             if(it.address == address && it.port == port) {
                 val virtualPacket = VirtualPacket.fromDatagramPacket(it)
-                remoteAddr.set(virtualPacket.header.fromAddr)
+                neighborVirtualAddr.set(virtualPacket.header.fromAddr)
                 addrResponseLatch.countDown()
             }
         }
@@ -225,8 +236,15 @@ open class VirtualNode(
 
             addrResponseLatch.await(10, TimeUnit.SECONDS)
 
-            val newRemoteNodeManager = getOrCreateNeighborNodeManager(remoteAddress = remoteAddr.get())
-            newRemoteNodeManager.addDatagramConnection(address, port, datagramSocket)
+            if(neighborVirtualAddr.get() != 0) {
+                handleNewDatagramNeighborConnection(
+                    address, port, neighborVirtualAddr.get()
+                )
+            }else {
+                val exception = IOException("Sent HELLO to $address, did not receive reply")
+                logger(Log.ERROR, "$logPrefix addNewDatagramNeighborConnection", exception)
+                throw exception
+            }
         }finally {
             datagramSocket.removePacketReceivedListener(packetReceivedListener)
         }
@@ -248,6 +266,7 @@ open class VirtualNode(
         neighborNodeManagers.values.forEach {
             it.close()
         }
+        datagramSocket.close()
 
         connectionExecutor.shutdown()
         scheduledExecutor.shutdown()

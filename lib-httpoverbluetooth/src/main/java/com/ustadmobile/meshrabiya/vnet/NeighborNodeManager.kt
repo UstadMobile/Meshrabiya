@@ -1,6 +1,7 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import java.io.IOException
@@ -32,6 +33,8 @@ class NeighborNodeManager(
     private val listener: RemoteMNodeManagerListener,
 ): StreamConnectionNeighborNodeConnectionManager.RemoteMNodeConnectionListener {
 
+    private val logPrefix: String = "[NeighborNodeManager ${localNodeAddress.addressToDotNotation()}->${remoteAddress.addressToDotNotation()}]"
+
     interface RemoteMNodeManagerListener {
 
         fun onNodeStateChanged(
@@ -49,7 +52,7 @@ class NeighborNodeManager(
     fun addConnection(
         iSocket: ISocket
     ) {
-        logger(Log.DEBUG, "RemoteMNodeManager: addConnection", null)
+        logger(Log.DEBUG, "$logPrefix addIoStreamConnection", null)
 
         val newConnectionManager = StreamConnectionNeighborNodeConnectionManager(
             connectionId = connectionIdAtomic.getAndIncrement(),
@@ -77,6 +80,15 @@ class NeighborNodeManager(
         port: Int,
         datagramSocket: VirtualNodeDatagramSocket,
     ) {
+        if(connections.any {
+            it is DatagramSocketNeighborNodeConnectionManager &&
+                    it.neighborAddress == address &&
+                    it.neighborPort == port
+        }) {
+            logger(Log.DEBUG, "$logPrefix addDataGramConnection: Already have connection for address/port", null)
+            return
+        }
+
         val connectionManager = DatagramSocketNeighborNodeConnectionManager(
             connectionId = connectionIdAtomic.getAndIncrement(),
             router = router,

@@ -67,7 +67,7 @@ sealed class MmcpMessage(
         ): MmcpMessage {
             return when(val what = byteArray[offset]) {
                 WHAT_PING -> MmcpPing.fromBytes(byteArray, offset, len)
-                WHAT_PONG -> MmcpPong.fromBytes(byteArray)
+                WHAT_PONG -> MmcpPong.fromBytes(byteArray, offset, len)
                 WHAT_HELLO -> MmcpHello.fromBytes(byteArray, offset, len)
                 WHAT_ACK -> MmcpAck.fromBytes(byteArray, offset, len)
                 else -> throw IllegalArgumentException("Mmcp: Invalid what: $what")
