@@ -16,7 +16,7 @@ data class NeighborNodeConnectionState(
 
 abstract class AbstractNeighborNodeConnectionManager(
     val connectionId: Int,
-    protected val router: IRouter,
+    protected val router: VirtualRouter,
     protected val localNodeVirtualAddr: Int,
     protected val remoteNodeVirtualAddr: Int
 ) : Closeable{

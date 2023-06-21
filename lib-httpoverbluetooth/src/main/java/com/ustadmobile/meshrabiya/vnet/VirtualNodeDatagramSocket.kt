@@ -11,6 +11,11 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 
 /**
+ *
+ * VirtualNodeDatagramSocket listens on the real network interface. It uses the executor service
+ * to run a thread that will receive all packets, convert them from a DatagramPacket into a
+ * VirtualPacket, and then give them to the VirtualRouter.
+ *
  * @param onMmcpHelloReceivedListener - Receives the Hello Event. This will be triggered when a new
  * neighbor connects.
  */
@@ -18,7 +23,7 @@ class VirtualNodeDatagramSocket(
     port: Int,
     private val localAddVirtualAddress: Int,
     ioExecutorService: ExecutorService,
-    private val router: IRouter,
+    private val router: VirtualRouter,
     private val onMmcpHelloReceivedListener: OnMmcpHelloReceivedListener = OnMmcpHelloReceivedListener { },
 ) : DatagramSocket(port), Runnable {
 

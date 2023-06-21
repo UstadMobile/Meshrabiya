@@ -7,7 +7,7 @@ import java.net.InetAddress
 
 class DatagramSocketNeighborNodeConnectionManager(
     connectionId: Int,
-    router: IRouter,
+    router: VirtualRouter,
     localNodeAddr: Int,
     remoteNodeAddr: Int,
     private val datagramSocket: VirtualNodeDatagramSocket,

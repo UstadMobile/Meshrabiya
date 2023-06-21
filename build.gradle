@@ -14,5 +14,5 @@ if(project.file("buildconfig.local.properties").exists()) {
 ext {
 
     version_kotlin_mockito = "4.1.0"
-
+    version_apache_commons_pool = "2.11.1"
 }

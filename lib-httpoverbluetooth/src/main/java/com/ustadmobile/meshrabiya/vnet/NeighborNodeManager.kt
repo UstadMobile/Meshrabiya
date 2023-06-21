@@ -26,7 +26,7 @@ data class NeighborNodeState(
 class NeighborNodeManager(
     val remoteAddress: Int,
     val localNodeAddress: Int,
-    private val router: IRouter,
+    private val router: VirtualRouter,
     private val connectionExecutor: ExecutorService,
     private val scheduledExecutor: ScheduledExecutorService,
     private val logger: com.ustadmobile.meshrabiya.MNetLogger,

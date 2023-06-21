@@ -23,7 +23,7 @@ import kotlin.random.Random
 
 class StreamConnectionNeighborNodeConnectionManager(
     connectionId: Int,
-    router: IRouter,
+    router: VirtualRouter,
     localNodeAddr: Int,
     remoteNodeAddr: Int,
     private val socket: ISocket,

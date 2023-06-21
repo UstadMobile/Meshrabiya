@@ -57,7 +57,7 @@ open class VirtualNode(
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
     val localNodeAddress: Int = randomApipaAddr(),
     val autoForwardInbound: Boolean = true,
-): NeighborNodeManager.RemoteMNodeManagerListener, IRouter, Closeable {
+): NeighborNodeManager.RemoteMNodeManagerListener, VirtualRouter, Closeable {
 
     //This executor is used for direct I/O activities
     protected val connectionExecutor = Executors.newCachedThreadPool()
@@ -106,6 +106,10 @@ open class VirtualNode(
     }
 
     override fun nextMmcpMessageId() = mmcpMessageIdAtomic.incrementAndGet()
+
+    override fun allocatePortOrThrow(protocol: Protocol, portNum: Int): Int {
+        TODO("Not yet implemented")
+    }
 
     override fun route(
         packet: VirtualPacket

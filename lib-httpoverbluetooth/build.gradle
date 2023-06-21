@@ -34,9 +34,8 @@ dependencies {
 
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.9.0'
     implementation "com.athaydes.rawhttp:rawhttp-core:2.5.2"
-
+    implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool"
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"

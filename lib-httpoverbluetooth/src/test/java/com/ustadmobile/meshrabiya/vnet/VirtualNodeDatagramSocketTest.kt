@@ -16,7 +16,7 @@ import kotlin.random.Random
 
 class VirtualNodeDatagramSocketTest {
 
-    fun createMockRouter(): IRouter {
+    fun createMockRouter(): VirtualRouter {
         val atomicInt = AtomicInteger()
         return mock {
             on {
