@@ -5,15 +5,21 @@ import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.appendOrReplace
 import com.ustadmobile.meshrabiya.ext.readRemoteAddress
 import com.ustadmobile.meshrabiya.ext.writeAddress
+import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotRequest
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotStatus
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.io.Closeable
 import java.io.IOException
 import java.net.InetAddress
@@ -57,6 +63,7 @@ open class VirtualNode(
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
     val localNodeAddress: Int = randomApipaAddr(),
     val autoForwardInbound: Boolean = true,
+    protected val hotspotManager: LocalHotspotManager,
 ): NeighborNodeManager.RemoteMNodeManagerListener, VirtualRouter, Closeable {
 
     //This executor is used for direct I/O activities
@@ -64,6 +71,8 @@ open class VirtualNode(
 
     //This executor is used to schedule maintenance e.g. pings etc.
     protected val scheduledExecutor = Executors.newScheduledThreadPool(2)
+
+    private val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
 
     private val neighborNodeManagers: MutableMap<Int, NeighborNodeManager> = ConcurrentHashMap()
 
@@ -73,11 +82,7 @@ open class VirtualNode(
 
     val neighborNodesState: Flow<List<NeighborNodeState>> = _neighborNodesState.asStateFlow()
 
-    open val localHotSpotState: Flow<LocalHotspotState> = MutableStateFlow(
-        LocalHotspotState(
-            status = LocalHotspotStatus.STOPPED
-        )
-    )
+    val localHotSpotState: Flow<LocalHotspotState> = hotspotManager.state
 
     private val pongListeners = CopyOnWriteArrayList<PongListener>()
 
@@ -137,6 +142,13 @@ open class VirtualNode(
                         logger(Log.DEBUG, "$logPrefix Received pong(id=${mmcpMessage.messageId})}", null)
                         pongListeners.forEach {
                             it.onPongReceived(from, mmcpMessage)
+                        }
+                    }
+                    is MmcpHotspotRequest -> {
+                        logger(Log.INFO, "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})", null)
+                        coroutineScope.launch {
+                            val hotspotResult = hotspotManager.request(mmcpMessage.hotspotRequest)
+                            //TODO: reply
                         }
                     }
                     else -> {
@@ -262,6 +274,26 @@ open class VirtualNode(
     fun removePongListener(listener: PongListener) {
         pongListeners -= listener
     }
+
+
+
+    suspend fun requestLocalHotspot(virtualAddr: Int)  {
+        val request = MmcpHotspotRequest(
+            messageId = nextMmcpMessageId(),
+            hotspotRequest = LocalHotspotRequest(
+                is5GhzSupported = hotspotManager.is5GhzSupported
+            )
+        )
+
+        //Send MMCP request to the other node
+        route(request.toVirtualPacket(
+            toAddr = virtualAddr,
+            fromAddr = localNodeAddress
+        ))
+
+        //TODO: wait for the response
+    }
+
 
 
 

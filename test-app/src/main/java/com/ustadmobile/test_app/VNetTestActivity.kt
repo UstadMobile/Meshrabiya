@@ -18,21 +18,36 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -59,7 +74,6 @@ data class TestActivityUiState(
 )
 
 class VNetTestActivity : ComponentActivity() {
-
 
     private lateinit var virtualNode: AndroidVirtualNode
 
@@ -171,6 +185,7 @@ class VNetTestActivity : ComponentActivity() {
                         onClickAddNode = this::onClickAddNode,
                         onSetLocalOnlyHotspotEnabled = this::onSetLocalOnlyHotspotEnabled,
                         onClickLogs = this::onClickLogs,
+                        onClickNodeRequestWifiHotspot = this::onClickNodeRequestWifiHotspot,
                     )
                 }
             }
@@ -238,8 +253,14 @@ class VNetTestActivity : ComponentActivity() {
     fun onSetLocalOnlyHotspotEnabled(enabled: Boolean) {
         if(enabled){
             lifecycleScope.launch {
-                virtualNode.requestLocalHotspot()
+                virtualNode.requestLocalHotspot(virtualNode.localNodeAddress)
             }
+        }
+    }
+
+    fun onClickNodeRequestWifiHotspot(nodeAddr: Int) {
+        lifecycleScope.launch {
+            virtualNode.requestLocalHotspot(nodeAddr)
         }
     }
 
@@ -269,6 +290,7 @@ fun TestScreen(
     onClickMakeDiscoverable: () -> Unit = { },
     onSetLocalOnlyHotspotEnabled: (Boolean) -> Unit = { },
     onClickLogs: () -> Unit = { },
+    onClickNodeRequestWifiHotspot: (address: Int) -> Unit = { },
 ) {
     val uiStateVal: TestActivityUiState by uiState.collectAsState(
         TestActivityUiState()
@@ -280,6 +302,7 @@ fun TestScreen(
         onClickMakeDiscoverable = onClickMakeDiscoverable,
         onSetLocalOnlyHotspotEnabled = onSetLocalOnlyHotspotEnabled,
         onClickLogs = onClickLogs,
+        onClickNodeRequestWifiHotspot = onClickNodeRequestWifiHotspot,
     )
 
 }
@@ -292,6 +315,7 @@ fun TestScreen(
     onClickMakeDiscoverable: () -> Unit = { },
     onSetLocalOnlyHotspotEnabled: (Boolean) -> Unit = { },
     onClickLogs: () -> Unit = { },
+    onClickNodeRequestWifiHotspot: (address: Int) -> Unit = { },
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize()
@@ -303,7 +327,7 @@ fun TestScreen(
             )
         }
 
-        /*
+
         item(key = "hotspotswitch") {
             Row(
                 modifier = Modifier
@@ -325,7 +349,7 @@ fun TestScreen(
                 style = MaterialTheme.typography.bodySmall,
                 text = "Local Hotspot: ${uiState.localHotspotState?.config?.ssid}/${uiState.localHotspotState?.config?.passphrase}"
             )
-        }*/
+        }
 
         item(key = "makediscoverable") {
             Button(
@@ -363,6 +387,31 @@ fun TestScreen(
                 supportingText = {
                     Text("Ping: ${node.pingTime}ms Received ${node.pingsReceived}/${node.pingsSent}")
                 },
+                trailingContent = {
+                    var expanded by remember { mutableStateOf(false) }
+
+                    IconButton(
+                        onClick = { expanded = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More options"
+                        )
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = {  expanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                onClick = {
+                                    onClickNodeRequestWifiHotspot(node.remoteAddress)
+                                },
+                                text = {
+                                    Text("Request Wifi Hotspot")
+                                }
+                            )
+                        }
+                    }
+                }
             )
         }
 

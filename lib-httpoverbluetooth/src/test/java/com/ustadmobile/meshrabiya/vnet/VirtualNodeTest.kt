@@ -1,10 +1,22 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotConfigCompat
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotRequest
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotRequestResult
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotStatus
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert
 import org.junit.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.timeout
+import org.mockito.kotlin.verifyBlocking
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
@@ -42,8 +54,19 @@ class VirtualNodeTest {
     @Test
     fun givenTwoVirtualNodesConnectedOverIoStreamSocket_whenPingSent_thenReplyWillBeReceived() {
         val executor = Executors.newCachedThreadPool()
-        val node1 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
-        val node2 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
+        val node1 = VirtualNode(
+            allocationServiceUuid = UUID.randomUUID(),
+            allocationCharacteristicUuid = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { }
+        )
+
+        val node2 = VirtualNode(
+            allocationServiceUuid = UUID.randomUUID(),
+            allocationCharacteristicUuid = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { },
+        )
 
         val node1ToNode2Out = PipedOutputStream()
         val node2FromNode1In = PipedInputStream(node1ToNode2Out)
@@ -83,8 +106,18 @@ class VirtualNodeTest {
 
     @Test
     fun givenTwoVirtualNodesConnectedOverDatagramSocket_whenPingSent_thenReplyWillBeReceived() {
-        val node1 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
-        val node2 = VirtualNode(UUID.randomUUID(), UUID.randomUUID(), logger)
+        val node1 = VirtualNode(
+            allocationServiceUuid = UUID.randomUUID(),
+            allocationCharacteristicUuid = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { }
+        )
+        val node2 = VirtualNode(
+            allocationServiceUuid = UUID.randomUUID(),
+            allocationCharacteristicUuid = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { }
+        )
 
         node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.datagramPort)
 
@@ -114,5 +147,36 @@ class VirtualNodeTest {
         Assert.assertEquals(node1ToNode2Ping.messageId, pongMessage.get().messageId)
     }
 
+
+    @Test
+    fun givenMmcpHotspotRequestReceived_whenPacketRouted_thenWillRequestFromHotspotManagerAndReplyWithConfig() {
+        val hotspotState = MutableStateFlow(LocalHotspotState(status = LocalHotspotStatus.STOPPED))
+        val mockHotspotManager = mock<LocalHotspotManager> {
+            on { state }.thenReturn(hotspotState)
+            onBlocking { request(any()) }.thenReturn(LocalHotspotRequestResult(
+                errorCode = 0,
+                configCompat = LocalHotspotConfigCompat(ssid = "test", passphrase = "test")
+            ))
+        }
+
+        val node1 = VirtualNode(
+            allocationServiceUuid = UUID.randomUUID(),
+            allocationCharacteristicUuid = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mockHotspotManager,
+        )
+
+        node1.route(
+            packet = MmcpHotspotRequest(Random.nextInt(), LocalHotspotRequest(is5GhzSupported = true))
+                .toVirtualPacket(
+                    toAddr = node1.localNodeAddress,
+                    fromAddr = 42
+                )
+        )
+
+        verifyBlocking(mockHotspotManager, timeout(5000)) {
+            request(any())
+        }
+    }
 
 }

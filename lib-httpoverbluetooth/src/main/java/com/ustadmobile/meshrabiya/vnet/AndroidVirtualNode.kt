@@ -10,11 +10,8 @@ import com.ustadmobile.meshrabiya.client.UuidAllocationClient
 import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.server.UuidAllocationServer
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotSubReservation
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManagerAndroid
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
@@ -30,6 +27,7 @@ class AndroidVirtualNode(
     allocationCharacteristicUuid = allocationCharacteristicUuid,
     logger = logger,
     localNodeAddress = localMNodeAddress,
+    hotspotManager = LocalHotspotManagerAndroid(appContext, logger, localMNodeAddress),
 ) {
 
 
@@ -78,19 +76,9 @@ class AndroidVirtualNode(
 
     private val uuidAllocationClient = UuidAllocationClient(appContext, onLog = { _, _, _ -> } )
 
-    private val localHotspotManager = LocalHotspotManager(appContext, logger)
-
-    override val localHotSpotState: Flow<LocalHotspotState> = localHotspotManager.state
-
     init {
         uuidAllocationServer.start()
     }
-
-
-    suspend fun requestLocalHotspot() : LocalHotspotSubReservation {
-        return localHotspotManager.request()
-    }
-
 
 
     suspend fun addBluetoothConnection(
@@ -108,7 +96,7 @@ class AndroidVirtualNode(
 
             val remoteDevice = bluetoothAdapter?.getRemoteDevice(remoteBluetooothAddr)
 
-            var socket: BluetoothSocket? = null
+            val socket: BluetoothSocket?
             try {
                 logger(Log.DEBUG, "AddBluetoothConnection : got data UUID: $dataUuid, " +
                         "creating rfcomm sockettoservice", null)
