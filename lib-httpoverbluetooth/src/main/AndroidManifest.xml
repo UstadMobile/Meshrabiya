@@ -9,6 +9,7 @@
 
     <!-- Needed only if your app communicates with already-paired Bluetooth
          devices. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!-- Request legacy Bluetooth permissions on older devices. -->

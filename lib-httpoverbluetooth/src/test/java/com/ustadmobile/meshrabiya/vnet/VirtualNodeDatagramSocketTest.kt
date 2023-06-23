@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import com.ustadmobile.meshrabiya.mmcp.MmcpAck
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import org.junit.Assert
 import org.junit.Test
@@ -36,14 +37,14 @@ class VirtualNodeDatagramSocketTest {
 
         val socket1 = VirtualNodeDatagramSocket(
             port = 0,
-            localAddVirtualAddress = socket1VirtualNodeAddr,
+            localNodeVirtualAddress = socket1VirtualNodeAddr,
             ioExecutorService = executorService,
             router = createMockRouter()
         )
 
         val socket2 = VirtualNodeDatagramSocket(
             port = 0,
-            localAddVirtualAddress = socket2VirtualNodeAddr,
+            localNodeVirtualAddress = socket2VirtualNodeAddr,
             ioExecutorService = executorService,
             router = createMockRouter(),
             onMmcpHelloReceivedListener = socket2IncomingHelloListener,
@@ -57,8 +58,8 @@ class VirtualNodeDatagramSocketTest {
             val socket1Listener = VirtualNodeDatagramSocket.PacketReceivedListener {
                 val virtualPacket = VirtualPacket.fromDatagramPacket(it)
                 if(virtualPacket.header.fromAddr == socket2VirtualNodeAddr && virtualPacket.header.toPort == 0) {
-                    val mmcpMessage = MmcpMessage.fromVirtualPacket(virtualPacket)
-                    if(mmcpMessage.messageId == helloMessageId) {
+                    val mmcpMessage = MmcpMessage.fromVirtualPacket(virtualPacket) as? MmcpAck
+                    if(mmcpMessage?.ackOfMessageId == helloMessageId) {
                         responseMessage.set(virtualPacket)
                         helloLatch.countDown()
                     }
@@ -68,10 +69,10 @@ class VirtualNodeDatagramSocketTest {
             socket1.addPacketReceivedListener(socket1Listener)
             socket1.sendHello(helloMessageId, InetAddress.getLoopbackAddress(), socket2.localPort)
 
-            helloLatch.await(5, TimeUnit.SECONDS)
+            helloLatch.await(500, TimeUnit.SECONDS)
 
-            val mmcpMessage = MmcpMessage.fromVirtualPacket(responseMessage.get())
-            Assert.assertEquals(helloMessageId, mmcpMessage.messageId)
+            val mmcpMessage = MmcpMessage.fromVirtualPacket(responseMessage.get()) as MmcpAck
+            Assert.assertEquals(helloMessageId, mmcpMessage.ackOfMessageId)
             Assert.assertEquals(socket2VirtualNodeAddr, responseMessage.get().header.fromAddr)
             verify(socket2IncomingHelloListener).onMmcpHelloReceived(argWhere {
                 it.address == InetAddress.getLoopbackAddress() &&

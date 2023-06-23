@@ -6,6 +6,7 @@ import com.ustadmobile.meshrabiya.ext.appendOrReplace
 import com.ustadmobile.meshrabiya.ext.readRemoteAddress
 import com.ustadmobile.meshrabiya.ext.writeAddress
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
+import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
@@ -15,8 +16,11 @@ import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -92,7 +96,7 @@ open class VirtualNode(
         port = 0,
         ioExecutorService = connectionExecutor,
         router = this,
-        localAddVirtualAddress = localNodeAddress,
+        localNodeVirtualAddress = localNodeAddress,
         onMmcpHelloReceivedListener = {
             handleNewDatagramNeighborConnection(
                 address = it.address,
@@ -103,6 +107,13 @@ open class VirtualNode(
     )
 
     val datagramPort: Int = datagramSocket.localPort
+
+    private val _incomingMmcpMessages = MutableSharedFlow<MmcpMessage>(
+        replay = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
+    val incomingMmcpMessages: Flow<MmcpMessage> = _incomingMmcpMessages.asSharedFlow()
 
     override fun onNodeStateChanged(remoteMNodeState: NeighborNodeState) {
         _neighborNodesState.update { prev ->
@@ -147,14 +158,26 @@ open class VirtualNode(
                     is MmcpHotspotRequest -> {
                         logger(Log.INFO, "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})", null)
                         coroutineScope.launch {
-                            val hotspotResult = hotspotManager.request(mmcpMessage.hotspotRequest)
-                            //TODO: reply
+                            val hotspotResult = hotspotManager.request(
+                                mmcpMessage.messageId, mmcpMessage.hotspotRequest
+                            )
+                            val replyPacket = MmcpHotspotResponse(
+                                messageId = mmcpMessage.messageId,
+                                result = hotspotResult
+                            ).toVirtualPacket(
+                                toAddr = from,
+                                fromAddr = localNodeAddress
+                            )
+                            logger(Log.INFO, "$logPrefix sending hotspotresponse to ${from.addressToDotNotation()}", null)
+                            route(replyPacket)
                         }
                     }
                     else -> {
                         // do nothing
                     }
                 }
+
+                _incomingMmcpMessages.tryEmit(mmcpMessage)
             }
         }else {
             //packet needs to be sent to nexthop

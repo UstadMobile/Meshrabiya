@@ -260,7 +260,7 @@ class VNetTestActivity : ComponentActivity() {
 
     fun onClickNodeRequestWifiHotspot(nodeAddr: Int) {
         lifecycleScope.launch {
-            virtualNode.requestLocalHotspot(nodeAddr)
+            virtualNode.addWifiConnection(nodeAddr)
         }
     }
 

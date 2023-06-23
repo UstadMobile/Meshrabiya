@@ -49,6 +49,8 @@ sealed class MmcpMessage(
 
         const val WHAT_HOTSPOT_REQUEST = 5.toByte()
 
+        const val WHAT_HOTSPOT_RESPONSE = 6.toByte()
+
         const val MMCP_HEADER_LEN = 5 //1 byte what, 4 bytes message id
 
         fun fromVirtualPacket(
@@ -73,6 +75,7 @@ sealed class MmcpMessage(
                 WHAT_HELLO -> MmcpHello.fromBytes(byteArray, offset, len)
                 WHAT_ACK -> MmcpAck.fromBytes(byteArray, offset, len)
                 WHAT_HOTSPOT_REQUEST -> MmcpHotspotRequest.fromBytes(byteArray, offset, len)
+                WHAT_HOTSPOT_RESPONSE -> MmcpHotspotResponse.fromBytes(byteArray, offset, len)
                 else -> throw IllegalArgumentException("Mmcp: Invalid what: $what")
             }
         }
@@ -95,7 +98,7 @@ sealed class MmcpMessage(
         fun headerAndPayloadToBytes(header: MmcpHeader, payload: ByteArray): ByteArray {
             val byteArray = ByteArray(payload.size + MMCP_HEADER_LEN)
             header.toBytes(byteArray, 0)
-            System.arraycopy(payload, 0, byteArray, 1, payload.size)
+            System.arraycopy(payload, 0, byteArray, MMCP_HEADER_LEN, payload.size)
             return byteArray
         }
 

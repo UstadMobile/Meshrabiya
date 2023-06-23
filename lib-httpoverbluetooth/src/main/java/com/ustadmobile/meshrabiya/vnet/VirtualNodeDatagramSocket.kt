@@ -21,7 +21,7 @@ import java.util.concurrent.Future
  */
 class VirtualNodeDatagramSocket(
     port: Int,
-    private val localAddVirtualAddress: Int,
+    private val localNodeVirtualAddress: Int,
     ioExecutorService: ExecutorService,
     private val router: VirtualRouter,
     private val onMmcpHelloReceivedListener: OnMmcpHelloReceivedListener = OnMmcpHelloReceivedListener { },
@@ -74,7 +74,7 @@ class VirtualNodeDatagramSocket(
                     )
                     val replyDatagram = replyAck.toVirtualPacket(
                         toAddr = 0,
-                        fromAddr = localAddVirtualAddress,
+                        fromAddr = localNodeVirtualAddress,
                     ).toDatagramPacket()
                     replyDatagram.address = rxPacket.address
                     replyDatagram.port = rxPacket.port
@@ -116,7 +116,7 @@ class VirtualNodeDatagramSocket(
             nextHopAddress = nextHopAddress,
             virtualPacket = MmcpHello(messageId).toVirtualPacket(
                 toAddr = 0,
-                fromAddr = localAddVirtualAddress,
+                fromAddr = localNodeVirtualAddress,
             )
         )
     }

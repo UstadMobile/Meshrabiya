@@ -7,13 +7,12 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.util.Log
-import com.ustadmobile.meshrabiya.RemoteEndpoint
-import com.ustadmobile.meshrabiya.UuidUtil
 import com.ustadmobile.meshrabiya.MNetLogger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -36,7 +35,7 @@ import kotlin.concurrent.withLock
  */
 class UuidAllocationClient(
     private val appContext: Context,
-    private val onLog: com.ustadmobile.meshrabiya.MNetLogger,
+    private val onLog: MNetLogger,
 ) : Closeable{
 
     private val lockByRemote = ConcurrentHashMap<com.ustadmobile.meshrabiya.RemoteEndpoint, Mutex>()
@@ -60,7 +59,7 @@ class UuidAllocationClient(
     private class GetDataUuidGattCallback(
         private val remoteServiceUuid: UUID,
         private val remoteCharacteristicUuid: UUID,
-        coroutineScope: CoroutineScope,
+        private val scope: CoroutineScope,
         private val timeout: Long = DEFAULT_TIMEOUT,
         private val onLog: com.ustadmobile.meshrabiya.MNetLogger
     ) : BluetoothGattCallback() {
@@ -87,6 +86,12 @@ class UuidAllocationClient(
 
         private val clientId = CALLBACK_ID_ATOMIC.getAndIncrement()
 
+        private var serviceDiscoveryAttempts = 0
+
+        private var readAttempts = 0
+
+        private var discoveredCharacteristic: BluetoothGattCharacteristic? = null
+
         private val logPrefix: String
             get() = "UuidAllocationClient #$clientId (t+${System.currentTimeMillis()-startTime}ms)"
 
@@ -94,7 +99,7 @@ class UuidAllocationClient(
             onLog(priority, "$logPrefix: $message", exception)
         }
 
-        val timeoutJob = coroutineScope.launch {
+        val timeoutJob = scope.launch {
             delay(timeout)
             callbackLog(Log.DEBUG, "Timeout after ${timeout}ms: calling disconnectAndCloseIfRequired", null)
             disconnectAndCloseIfRequired(
@@ -172,9 +177,12 @@ class UuidAllocationClient(
                 return
             }
 
+            val service = services.firstOrNull { it.uuid == remoteServiceUuid }
+            if(service == null) {
+                callbackLog(Log.WARN, "onServicesDiscovered: did not discover expected service", null)
+            }
 
-            val characteristic = services.firstOrNull { it.uuid == remoteServiceUuid }
-                ?.characteristics?.firstOrNull { it.uuid == remoteCharacteristicUuid }
+            val characteristic = service?.characteristics?.firstOrNull { it.uuid == remoteCharacteristicUuid }
 
             if(characteristic != null) {
                 callbackLog(Log.DEBUG, "permissions = ${characteristic.permissions}, properties=${characteristic.properties}", null)
@@ -194,6 +202,18 @@ class UuidAllocationClient(
                     e.printStackTrace()
                 }
             }else {
+                serviceDiscoveryAttempts++
+
+                scope.takeIf { serviceDiscoveryAttempts < 5 }?.launch {
+                    callbackLog(Log.DEBUG, "Retry service discovery", null)
+                    delay(1000)
+                    try {
+                        gatt.discoverServices()
+                    }catch(e: SecurityException) {
+                        callbackLog(Log.ERROR, "Security exception", e)
+                    }
+
+                }
                 callbackLog(Log.WARN, "services discovered, but target characteristic not found", null)
             }
         }
@@ -225,8 +245,26 @@ class UuidAllocationClient(
                         disconnectAndCloseIfRequired(gatt, e)
                     }
                 }else {
-                    callbackLog(Log.ERROR, "onCharacteristicRead: Characteristic is null or status ($status) != GATT_SUCCESS", null)
-                    disconnectAndCloseIfRequired(gatt, IOException("Characteristic is null or status ($status) != GATT_SUCCESS"))
+                    callbackLog(Log.ERROR, "onCharacteristicRead: Characteristic status ($status) != GATT_SUCCESS", null)
+                    val discoveredCharacteristicVal = discoveredCharacteristic
+                    scope.launch {
+                        try {
+                            var readAttemptSubmitted = false
+                            while(readAttempts < 3 && !readAttemptSubmitted) {
+                                readAttempts++
+                                delay(1000)
+                                readAttemptSubmitted = gatt.readCharacteristic(discoveredCharacteristicVal)
+                                callbackLog(Log.DEBUG, "onCharacteristicRead: retry, submitted=$readAttemptSubmitted", null)
+                            }
+
+                            if(!readAttemptSubmitted){
+                                callbackLog(Log.ERROR, "onCharacteristicRead: after $readAttempts attempts, request not submitted, fail", null)
+                                disconnectAndCloseIfRequired(gatt, IOException("could not read characteristic after $readAttempts attempts"))
+                            }
+                        }catch(e: SecurityException){
+                            callbackLog(Log.ERROR, "Security exception", e)
+                        }
+                    }
                 }
             }
         }
@@ -336,7 +374,7 @@ class UuidAllocationClient(
                 val getDataUuidGattCallback = GetDataUuidGattCallback(
                     remoteServiceUuid = remoteServiceUuid,
                     remoteCharacteristicUuid = remoteCharacteristicUuid,
-                    coroutineScope = coroutineScope,
+                    scope = coroutineScope,
                     onLog = onLog
                 )
                 val gatt = remoteDevice.connectGatt(appContext, false, getDataUuidGattCallback)

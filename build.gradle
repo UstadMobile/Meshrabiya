@@ -15,4 +15,7 @@ ext {
 
     version_kotlin_mockito = "4.1.0"
     version_apache_commons_pool = "2.11.1"
+    version_turbine = "0.12.1"
+    version_wifi_utils = "1.6.6"
+
 }

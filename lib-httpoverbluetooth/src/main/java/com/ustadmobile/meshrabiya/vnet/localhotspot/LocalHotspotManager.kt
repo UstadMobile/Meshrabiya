@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 
 
 interface LocalHotspotManager {
-    suspend fun request(request: LocalHotspotRequest): LocalHotspotRequestResult
+    suspend fun request(requestMessageId: Int, request: LocalHotspotRequest): LocalHotspotResponse
 
     val state: Flow<LocalHotspotState>
 

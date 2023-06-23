@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pManager
@@ -13,6 +15,8 @@ import android.util.Log
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.groupToHotspotConfigCompat
 import com.ustadmobile.meshrabiya.ext.toPrettyString
+import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
+import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +28,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.Closeable
+import java.net.DatagramSocket
+import java.net.NetworkInterface
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 data class WifiDirectState(
     val state: Int,
@@ -60,6 +69,7 @@ class LocalHotspotManagerAndroid(
                             config = null,
                         )
                     }
+
                 }
                 WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                     val extraGroup: WifiP2pGroup? = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_GROUP)
@@ -69,11 +79,24 @@ class LocalHotspotManagerAndroid(
         }
     }
 
-
+    private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
 
     private val wifiP2pGroupInfoListener = WifiP2pManager.GroupInfoListener { group: WifiP2pGroup? ->
-        logger(Log.DEBUG, "P2P Group Info Available: ${group?.toPrettyString()}", null)
+        logger(Log.DEBUG, "P2P Group Info Available: ${group?.toPrettyString()} ", null)
+        val interfaceName = group?.`interface`
+        val networkInterface = interfaceName?.let { NetworkInterface.getByName(it) }
+        logger(Log.DEBUG, "P2P Group owner addresses = " +
+                "${networkInterface?.inetAddresses?.toList()?.joinToString { it.toString() }}", null)
 
+        if(group != null) {
+//            val datagramSocket = VirtualNodeDatagramSocket(
+//                port = 0,
+//                localNodeVirtualAddress =localNodeAddr,
+//                ioExecutorService = ioExecutor,
+//                router = router,
+//                onMmcpHelloReceivedListener =
+//            )
+        }
         //maybe group.networkId can help us get the network object?
         _state.update { prev ->
             prev.copy(
@@ -81,6 +104,42 @@ class LocalHotspotManagerAndroid(
                 errorCode = 0,
                 config = group?.groupToHotspotConfigCompat()
             )
+        }
+    }
+
+    data class AvailableNetwork(
+        val interfaceName: String,
+        val network: Network,
+    )
+
+    private val availableNetworks = MutableStateFlow(emptyList<AvailableNetwork>())
+
+    private val networkCallback = object: ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            val linkProps = connectivityManager.getLinkProperties(network)
+            val interfaceName = linkProps?.interfaceName
+            logger(Log.DEBUG, "$logPrefix networkCallback:onAvailable interfaceName=$interfaceName", null)
+            if(interfaceName != null) {
+                availableNetworks.update { prev ->
+                    prev + listOf(AvailableNetwork(interfaceName, network))
+                }
+            }
+
+        }
+
+        override fun onLosing(network: Network, maxMsToLive: Int) {
+            val availableNetwork = availableNetworks.value.firstOrNull { it.network == network }
+            logger(Log.DEBUG, "$logPrefix networkCallback:onLosing interfaceName=${availableNetwork?.interfaceName}", null)
+        }
+
+        override fun onLost(network: Network) {
+            val availableNetwork = availableNetworks.value.firstOrNull { it.network == network }
+            logger(Log.DEBUG, "$logPrefix networkCallback:onLost interfaceName=${availableNetwork?.interfaceName}", null)
+        }
+
+        override fun onUnavailable() {
+            logger(Log.DEBUG, "$logPrefix networkCallback:onUnavailable", null)
+            super.onUnavailable()
         }
     }
 
@@ -97,6 +156,8 @@ class LocalHotspotManagerAndroid(
     override val state: Flow<LocalHotspotState> = _state.asStateFlow()
 
     private val requestMutex = Mutex()
+
+    private val closed = AtomicBoolean(false)
 
     init {
         logger(Log.DEBUG, "$logPrefix init", null)
@@ -118,7 +179,13 @@ class LocalHotspotManagerAndroid(
     override val is5GhzSupported: Boolean
         get() = wifiManager.is5GHzBandSupported
 
-    override suspend fun request(request: LocalHotspotRequest): LocalHotspotRequestResult {
+    override suspend fun request(
+        requestMessageId: Int,
+        request: LocalHotspotRequest
+    ): LocalHotspotResponse {
+        if(closed.get())
+            throw IllegalStateException("$logPrefix is closed!")
+
         requestMutex.withLock {
             withContext(Dispatchers.Main) {
                 if(_state.value.status == LocalHotspotStatus.STOPPED) {
@@ -157,15 +224,25 @@ class LocalHotspotManagerAndroid(
             it.status == LocalHotspotStatus.STARTED || it.errorCode != 0
         }.first()
 
-        return LocalHotspotRequestResult(configResult.errorCode, configResult.config)
+        //now observe a flow of the datagramsocket that is bound to this network
+
+        return LocalHotspotResponse(
+            responseToMessageId = requestMessageId,
+            errorCode = configResult.errorCode,
+            config = configResult.config,
+            redirectAddr = 0
+        )
     }
 
     override fun close() {
-        if(Build.VERSION.SDK_INT >= 27) {
-            channel?.close()
+        if(!closed.getAndSet(true)) {
+            if(Build.VERSION.SDK_INT >= 27) {
+                channel?.close()
+            }
+            appContext.unregisterReceiver(wifiDirectBroadcastReceiver)
+
+            channel = null
         }
-        appContext.unregisterReceiver(wifiDirectBroadcastReceiver)
-        channel = null
     }
 
 
