@@ -39,13 +39,13 @@ import kotlin.time.Duration.Companion.seconds
 class VirtualNodeTest {
 
     class TestVirtualNode(
-        allocationServiceUuid: UUID = UUID.randomUUID(),
-        allocationCharacteristicUuid: UUID = UUID.randomUUID(),
+        uuidMask: UUID = UUID.randomUUID(),
+        port: Int = 0,
         logger: MNetLogger,
         override val hotspotManager: LocalHotspotManager = mock { }
     ) : VirtualNode(
-        allocationServiceUuid = allocationServiceUuid,
-        allocationCharacteristicUuid = allocationCharacteristicUuid,
+        uuidMask = uuidMask,
+        port = port,
         logger = logger,
     )
 
@@ -73,15 +73,13 @@ class VirtualNodeTest {
     fun givenTwoVirtualNodesConnectedOverIoStreamSocket_whenPingSent_thenReplyWillBeReceived() {
         val executor = Executors.newCachedThreadPool()
         val node1 = TestVirtualNode(
-            allocationServiceUuid = UUID.randomUUID(),
-            allocationCharacteristicUuid = UUID.randomUUID(),
+            uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )
 
         val node2 = TestVirtualNode(
-            allocationServiceUuid = UUID.randomUUID(),
-            allocationCharacteristicUuid = UUID.randomUUID(),
+            uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { },
         )
@@ -125,14 +123,12 @@ class VirtualNodeTest {
     @Test
     fun givenTwoVirtualNodesConnectedOverDatagramSocket_whenPingSent_thenReplyWillBeReceived() {
         val node1 = TestVirtualNode(
-            allocationServiceUuid = UUID.randomUUID(),
-            allocationCharacteristicUuid = UUID.randomUUID(),
+            uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )
         val node2 = TestVirtualNode(
-            allocationServiceUuid = UUID.randomUUID(),
-            allocationCharacteristicUuid = UUID.randomUUID(),
+            uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )
@@ -183,15 +179,13 @@ class VirtualNodeTest {
         }
 
         val node1 = TestVirtualNode(
-            allocationServiceUuid = UUID.randomUUID(),
-            allocationCharacteristicUuid = UUID.randomUUID(),
+            uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mockHotspotManager,
         )
 
         val node2 = TestVirtualNode(
-            allocationServiceUuid = UUID.randomUUID(),
-            allocationCharacteristicUuid = UUID.randomUUID(),
+            uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )

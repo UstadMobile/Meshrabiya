@@ -8,11 +8,12 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.util.Log
 import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.util.matchesMask
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -36,7 +37,10 @@ import kotlin.concurrent.withLock
 class UuidAllocationClient(
     private val appContext: Context,
     private val onLog: MNetLogger,
+    clientNodeAddr: Int,
 ) : Closeable{
+
+    private val logPrefix = "[UuidAllocationClient for ${clientNodeAddr.addressToDotNotation()}] "
 
     private val lockByRemote = ConcurrentHashMap<com.ustadmobile.meshrabiya.RemoteEndpoint, Mutex>()
 
@@ -50,18 +54,16 @@ class UuidAllocationClient(
 
     private val coroutineScope = CoroutineScope(Dispatchers.Main + Job())
 
-
-
     /**
      * Bluetooth GATT error messages: see
      * https://github.com/NordicSemiconductor/Android-BLE-Library/blob/5e0e2f08c309a6de2376d9b8705c83f9e9a80d56/ble/src/main/java/no/nordicsemi/android/ble/error/GattError.java#L38
      */
     private class GetDataUuidGattCallback(
-        private val remoteServiceUuid: UUID,
-        private val remoteCharacteristicUuid: UUID,
+        private val uuidMask: UUID,
         private val scope: CoroutineScope,
         private val timeout: Long = DEFAULT_TIMEOUT,
-        private val onLog: com.ustadmobile.meshrabiya.MNetLogger
+        private val logger: MNetLogger,
+        private val logPrefix: String,
     ) : BluetoothGattCallback() {
 
         val dataPortUuid = CompletableDeferred<UUID>()
@@ -92,11 +94,12 @@ class UuidAllocationClient(
 
         private var discoveredCharacteristic: BluetoothGattCharacteristic? = null
 
-        private val logPrefix: String
-            get() = "UuidAllocationClient #$clientId (t+${System.currentTimeMillis()-startTime}ms)"
+        //There should be exactly one characteristic on the remote service. This will be discovered
+        // in on the onservicesDiscovered. It will then be checked in onCharacteristicRead
+        private var characteristicUuid: UUID? = null
 
         fun callbackLog(priority: Int, message: String, exception: Exception?) {
-            onLog(priority, "$logPrefix: $message", exception)
+            logger(priority, "$logPrefix - Callback #$clientId - $message", exception)
         }
 
         val timeoutJob = scope.launch {
@@ -104,7 +107,7 @@ class UuidAllocationClient(
             callbackLog(Log.DEBUG, "Timeout after ${timeout}ms: calling disconnectAndCloseIfRequired", null)
             disconnectAndCloseIfRequired(
                 callbackGatt,
-                TimeoutException("GetDataUuidGattCallback for $remoteServiceUuid/$remoteCharacteristicUuid timed out after ${timeout}ms")
+                TimeoutException("GetDataUuidGattCallback for $uuidMask timed out after ${timeout}ms")
             )
         }
 
@@ -177,12 +180,18 @@ class UuidAllocationClient(
                 return
             }
 
-            val service = services.firstOrNull { it.uuid == remoteServiceUuid }
-            if(service == null) {
-                callbackLog(Log.WARN, "onServicesDiscovered: did not discover expected service", null)
+            val service = services.firstOrNull { it.uuid.matchesMask(uuidMask) }
+
+            //there should be exactly one characteristic on the service
+            if(service != null && service.characteristics.size == 1) {
+                characteristicUuid = service.characteristics.first().uuid
             }
 
-            val characteristic = service?.characteristics?.firstOrNull { it.uuid == remoteCharacteristicUuid }
+            if(service == null) {
+                callbackLog(Log.WARN, "onServicesDiscovered: did not discover service matching mask $uuidMask", null)
+            }
+
+            val characteristic = service?.characteristics?.firstOrNull()
 
             if(characteristic != null) {
                 callbackLog(Log.DEBUG, "permissions = ${characteristic.permissions}, properties=${characteristic.properties}", null)
@@ -191,6 +200,7 @@ class UuidAllocationClient(
                     if(!requestedRead) {
                         callbackLog(Log.WARN, "Found UUID allocation service/characteristic, but request to read submission failed", null)
 
+                        //Note: this should also go to the retry
                         disconnectAndCloseIfRequired(gatt,
                             IllegalStateException("Found UUID allocation service/characteristic, but request to read submission failed")
                         )
@@ -214,7 +224,12 @@ class UuidAllocationClient(
                     }
 
                 }
-                callbackLog(Log.WARN, "services discovered, but target characteristic not found", null)
+                val errorCause = if(service == null) {
+                    "Service matching UUID mask not found"
+                }else  {
+                    "Service matching UUID found, but did not find characteristic."
+                }
+                callbackLog(Log.WARN, errorCause, null)
             }
         }
 
@@ -231,7 +246,7 @@ class UuidAllocationClient(
                 return
             }
 
-            if(characteristic != null && characteristic.uuid == remoteCharacteristicUuid) {
+            if(characteristic != null && characteristic.uuid == characteristicUuid) {
                 callbackLog(Log.DEBUG, "onCharacteristicReadCompat: for target characteristic", null)
                 if(value != null && status == BluetoothGatt.GATT_SUCCESS) {
                     try {
@@ -347,8 +362,7 @@ class UuidAllocationClient(
 
     suspend fun requestUuidAllocation(
         remoteAddress: String,
-        remoteServiceUuid: UUID,
-        remoteCharacteristicUuid: UUID,
+        uuidMask: UUID,
     ) : UUID {
         val bluetoothAdapterVal = bluetoothAdapter
             ?: throw IllegalStateException("Bluetooth not supported")
@@ -358,7 +372,7 @@ class UuidAllocationClient(
         val remoteDevice = bluetoothAdapterVal.getRemoteDevice(remoteAddress)
         val getDataPortMutex = mapLock.withLock {
             lockByRemote.getOrPut(
-                com.ustadmobile.meshrabiya.RemoteEndpoint(remoteAddress, remoteServiceUuid)
+                com.ustadmobile.meshrabiya.RemoteEndpoint(remoteAddress, uuidMask)
             ) {
                 Mutex()
             }
@@ -372,10 +386,10 @@ class UuidAllocationClient(
                 //val gatt = remoteDevice.connectGatt(appContext, false, gattCallback)
                 val startTime = System.currentTimeMillis()
                 val getDataUuidGattCallback = GetDataUuidGattCallback(
-                    remoteServiceUuid = remoteServiceUuid,
-                    remoteCharacteristicUuid = remoteCharacteristicUuid,
+                    uuidMask = uuidMask,
                     scope = coroutineScope,
-                    onLog = onLog
+                    logger = onLog,
+                    logPrefix = logPrefix,
                 )
                 val gatt = remoteDevice.connectGatt(appContext, false, getDataUuidGattCallback)
                 val uuid = getDataUuidGattCallback.getDataPortUuid(gatt)

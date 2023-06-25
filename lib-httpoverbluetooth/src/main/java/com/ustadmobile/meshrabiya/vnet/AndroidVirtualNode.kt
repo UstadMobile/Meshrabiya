@@ -37,13 +37,13 @@ import kotlin.random.Random
 
 class AndroidVirtualNode(
     val appContext: Context,
-    allocationServiceUuid: UUID,
-    allocationCharacteristicUuid: UUID,
+    uuidMask: UUID,
+    port: Int = 0,
     logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _ -> },
     localMNodeAddress: Int = randomApipaAddr(),
 ): VirtualNode(
-    allocationServiceUuid = allocationServiceUuid,
-    allocationCharacteristicUuid = allocationCharacteristicUuid,
+    uuidMask = uuidMask,
+    port = port,
     logger = logger,
     localNodeAddress = localMNodeAddress,
 ) {
@@ -102,7 +102,11 @@ class AndroidVirtualNode(
         onUuidAllocated = onUuidAllocatedListener,
     )
 
-    private val uuidAllocationClient = UuidAllocationClient(appContext, onLog = logger )
+    private val uuidAllocationClient = UuidAllocationClient(
+        appContext = appContext,
+        onLog = logger,
+        clientNodeAddr = localNodeAddress
+    )
 
     init {
         uuidAllocationServer.start()
@@ -111,15 +115,12 @@ class AndroidVirtualNode(
 
     suspend fun addBluetoothConnection(
         remoteBluetooothAddr: String,
-        remoteAllocationServiceUuid: UUID,
-        remoteAllocationCharacteristicUuid: UUID,
     ) {
         logger(Log.DEBUG, "AddBluetoothConnection to $remoteBluetooothAddr", null)
         withContext(Dispatchers.IO) {
             val dataUuid = uuidAllocationClient.requestUuidAllocation(
                 remoteAddress = remoteBluetooothAddr,
-                remoteServiceUuid = remoteAllocationServiceUuid,
-                remoteCharacteristicUuid = remoteAllocationCharacteristicUuid,
+                uuidMask = uuidMask,
             )
 
             val remoteDevice = bluetoothAdapter?.getRemoteDevice(remoteBluetooothAddr)

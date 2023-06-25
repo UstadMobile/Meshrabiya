@@ -57,7 +57,6 @@ import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.trimIfExceeds
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
-import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
 import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
@@ -147,8 +146,7 @@ class VNetTestActivity : ComponentActivity() {
 
         virtualNode = AndroidVirtualNode(
             appContext = applicationContext,
-            allocationServiceUuid = SERVICE_UUID,
-            allocationCharacteristicUuid = CHARACTERISTIC_UUID,
+            uuidMask = UUID_MASK,
             logger = vNetLogger,
         )
         activityUiState.update { prev ->
@@ -240,8 +238,6 @@ class VNetTestActivity : ComponentActivity() {
             try {
                 virtualNode.addBluetoothConnection(
                     remoteBluetooothAddr = device.address,
-                    remoteAllocationServiceUuid = SERVICE_UUID,
-                    remoteAllocationCharacteristicUuid = CHARACTERISTIC_UUID,
                 )
             }catch(e: Exception) {
                 vNetLogger(Log.ERROR, "Error adding bluetooth connection", e)
@@ -267,9 +263,8 @@ class VNetTestActivity : ComponentActivity() {
 
     companion object {
 
-        val SERVICE_UUID = UUID.fromString("db803871-2136-4a7a-8859-6fdc28b567b6")
+        val UUID_MASK = UUID.fromString("db803871-2136-4a7a-8859-6fdc28b567b6")
 
-        val CHARACTERISTIC_UUID = UUID.fromString("d4a16cbe-4113-4098-bf0c-bc7d10ab2fdf")
     }
 }
 

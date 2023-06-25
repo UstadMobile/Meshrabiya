@@ -10,6 +10,8 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.util.matchesMask
+import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotRequest
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
@@ -62,8 +64,8 @@ Open local port on sender,
  */
 abstract class VirtualNode(
     //Note: allocationServiceUuid should be based on datagram port using a UUID "Mask" and the port
-    val allocationServiceUuid: UUID,
-    val allocationCharacteristicUuid: UUID,
+    val uuidMask: UUID,
+    val port: Int,
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
     val localNodeAddress: Int = randomApipaAddr(),
     val autoForwardInbound: Boolean = true,
@@ -95,7 +97,7 @@ abstract class VirtualNode(
     protected val logPrefix: String = "[VirtualNode ${localNodeAddress.addressToDotNotation()}]"
 
     protected val datagramSocket = VirtualNodeDatagramSocket(
-        port = 0,
+        port = port,
         ioExecutorService = connectionExecutor,
         router = this,
         localNodeVirtualAddress = localNodeAddress,
@@ -108,6 +110,17 @@ abstract class VirtualNode(
         },
         logger = logger,
     )
+
+    val allocationServiceUuid: UUID by lazy {
+        uuidForMaskAndPort(uuidMask, datagramSocket.localPort).also {
+            val matches = it.matchesMask(uuidMask)
+            logger(Log.DEBUG, "Allocation Service UUID: matches mask ($uuidMask) = $matches", null)
+        }
+    }
+
+    val allocationCharacteristicUuid: UUID by lazy {
+        uuidForMaskAndPort(uuidMask, datagramSocket.localPort + 1)
+    }
 
     private val _incomingMmcpMessages = MutableSharedFlow<MmcpMessage>(
         replay = 8,

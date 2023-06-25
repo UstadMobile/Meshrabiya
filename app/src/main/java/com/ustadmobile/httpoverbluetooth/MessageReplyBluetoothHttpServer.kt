@@ -16,7 +16,7 @@ class MessageReplyBluetoothHttpServer(
 ): AbstractHttpOverBluetoothServer(
     appContext = appContext,
     rawHttp = rawHttp,
-    allocationServiceUuid = UUID.fromString(SERVICE_UUID),
+    allocationServiceUuid = UUID.fromString(UUID_MASK),
     allocationCharacteristicUuid = UUID.fromString(CHARACTERISTIC_UUID),
     maxClients = 4,
 ) {
@@ -50,7 +50,7 @@ class MessageReplyBluetoothHttpServer(
 
     companion object {
 
-        const val SERVICE_UUID = "21d46f25-4640-4791-a67b-2a32ddd104b3"
+        const val UUID_MASK = "21d46f25-4640-4791-a67b-2a32ddd104b3"
 
         const val CHARACTERISTIC_UUID = "d7747e7c-b0d3-4093-bca8-547ee070e41a"
 

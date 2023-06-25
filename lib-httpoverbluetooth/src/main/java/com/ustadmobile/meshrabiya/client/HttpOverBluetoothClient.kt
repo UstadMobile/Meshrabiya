@@ -28,9 +28,11 @@ class HttpOverBluetoothClient(
     private val appContext: Context,
     private val rawHttp: RawHttp,
     private val onLog: (priority: Int, message: String, exception: Exception?) -> Unit = { _, _, _ -> },
+    private val clientNodeAddr: Int,
     private val uuidAllocationClient: UuidAllocationClient = UuidAllocationClient(
         appContext = appContext,
         onLog = onLog,
+        clientNodeAddr = clientNodeAddr
     ),
 ) {
 
@@ -78,8 +80,7 @@ class HttpOverBluetoothClient(
      */
     suspend fun sendRequest(
         remoteAddress: String,
-        remoteUuidAllocationUuid: UUID,
-        remoteUuidAllocationCharacteristicUuid: UUID,
+        uuidMask: UUID,
         request: RawHttpRequest
     ) : BluetoothHttpResponse {
         val adapter = bluetoothAdapter ?: return newInternalErrorResponse("No bluetooth adapter")
@@ -89,8 +90,7 @@ class HttpOverBluetoothClient(
 
         val dataUuid = uuidAllocationClient.requestUuidAllocation(
             remoteAddress = remoteAddress,
-            remoteServiceUuid = remoteUuidAllocationUuid,
-            remoteCharacteristicUuid = remoteUuidAllocationCharacteristicUuid,
+            uuidMask = uuidMask,
         )
 
         if(dataUuid == UUID_BUSY) {
