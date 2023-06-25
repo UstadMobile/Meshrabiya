@@ -10,6 +10,7 @@ import java.nio.ByteOrder
 data class HotspotConfig(
     val ssid: String?,
     val passphrase: String?,
+    val port: Int,
 ) {
 
     private val ssidBytes: ByteArray? by lazy {
@@ -20,9 +21,9 @@ data class HotspotConfig(
         passphrase?.encodeToByteArray()
     }
 
-    //Add 4 bytes for each string ... where the length is encoded stored
+    //Add 4 bytes for each string ... where the length is encoded stored and 4 bytes for the port
     val sizeInBytes: Int
-        get() = (ssidBytes?.size ?: 0) + (passphraseBytes?.size ?: 0) + 8
+        get() = (ssidBytes?.size ?: 0) + (passphraseBytes?.size ?: 0) + 16
 
     fun toBytes(
         byteArray: ByteArray,
@@ -33,6 +34,7 @@ data class HotspotConfig(
             .order(ByteOrder.BIG_ENDIAN)
             .putStringFromBytes(ssidBytes)
             .putStringFromBytes(passphraseBytes)
+            .putInt(port)
 
         return sizeInBytes
     }
@@ -54,9 +56,12 @@ data class HotspotConfig(
                 .order(ByteOrder.BIG_ENDIAN)
             val ssid = byteBuf.getString()
             val passphrase = byteBuf.getString()
+            val port = byteBuf.int
+
             return HotspotConfig(
                 ssid = ssid,
                 passphrase = passphrase,
+                port = port,
             )
 
         }
@@ -65,18 +70,22 @@ data class HotspotConfig(
 
 }
 
-fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(): HotspotConfig {
+fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
+    port: Int,
+): HotspotConfig {
     return if(Build.VERSION.SDK_INT >= 30) {
         val softApConfig = softApConfiguration
         HotspotConfig(
             ssid = softApConfig.ssid,
             passphrase = softApConfig.passphrase,
+            port = 0,
         )
     }else {
         val wifiConfig = wifiConfiguration
         HotspotConfig(
             ssid = wifiConfig?.SSID,
-            passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\"")
+            passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\""),
+            port = 0,
         )
     }
 }

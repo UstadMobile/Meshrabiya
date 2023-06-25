@@ -60,14 +60,13 @@ Open local port on sender,
  *
  * Addresses are 32 bit integers in the APIPA range
  */
-open class VirtualNode(
+abstract class VirtualNode(
     //Note: allocationServiceUuid should be based on datagram port using a UUID "Mask" and the port
     val allocationServiceUuid: UUID,
     val allocationCharacteristicUuid: UUID,
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
     val localNodeAddress: Int = randomApipaAddr(),
     val autoForwardInbound: Boolean = true,
-    protected val hotspotManager: LocalHotspotManager,
 ): NeighborNodeManager.RemoteMNodeManagerListener, VirtualRouter, Closeable {
 
     //This executor is used for direct I/O activities
@@ -86,7 +85,10 @@ open class VirtualNode(
 
     val neighborNodesState: Flow<List<NeighborNodeState>> = _neighborNodesState.asStateFlow()
 
-    val localHotSpotState: Flow<LocalHotspotState> = hotspotManager.state
+    abstract val hotspotManager: LocalHotspotManager
+
+    val localHotSpotState: Flow<LocalHotspotState>
+        get() = hotspotManager.state
 
     private val pongListeners = CopyOnWriteArrayList<PongListener>()
 
@@ -103,10 +105,9 @@ open class VirtualNode(
                 port = it.port,
                 neighborNodeVirtualAddr = it.virtualPacket.header.fromAddr
             )
-        }
+        },
+        logger = logger,
     )
-
-    val datagramPort: Int = datagramSocket.localPort
 
     private val _incomingMmcpMessages = MutableSharedFlow<MmcpMessage>(
         replay = 8,
@@ -126,6 +127,9 @@ open class VirtualNode(
     override fun allocatePortOrThrow(protocol: Protocol, portNum: Int): Int {
         TODO("Not yet implemented")
     }
+
+    override val localDatagramPort: Int
+        get() = datagramSocket.localPort
 
     override fun route(
         packet: VirtualPacket
@@ -161,15 +165,18 @@ open class VirtualNode(
                             val hotspotResult = hotspotManager.request(
                                 mmcpMessage.messageId, mmcpMessage.hotspotRequest
                             )
-                            val replyPacket = MmcpHotspotResponse(
-                                messageId = mmcpMessage.messageId,
-                                result = hotspotResult
-                            ).toVirtualPacket(
-                                toAddr = from,
-                                fromAddr = localNodeAddress
-                            )
-                            logger(Log.INFO, "$logPrefix sending hotspotresponse to ${from.addressToDotNotation()}", null)
-                            route(replyPacket)
+
+                            if(from != localNodeAddress) {
+                                val replyPacket = MmcpHotspotResponse(
+                                    messageId = mmcpMessage.messageId,
+                                    result = hotspotResult
+                                ).toVirtualPacket(
+                                    toAddr = from,
+                                    fromAddr = localNodeAddress
+                                )
+                                logger(Log.INFO, "$logPrefix sending hotspotresponse to ${from.addressToDotNotation()}", null)
+                                route(replyPacket)
+                            }
                         }
                     }
                     else -> {

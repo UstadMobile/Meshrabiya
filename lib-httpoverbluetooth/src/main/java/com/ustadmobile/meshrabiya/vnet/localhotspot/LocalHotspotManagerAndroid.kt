@@ -13,9 +13,7 @@ import android.os.Build
 import android.os.Looper
 import android.util.Log
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
-import com.ustadmobile.meshrabiya.ext.groupToHotspotConfigCompat
 import com.ustadmobile.meshrabiya.ext.toPrettyString
-import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -28,11 +26,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.Closeable
-import java.net.DatagramSocket
-import java.net.NetworkInterface
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 data class WifiDirectState(
     val state: Int,
@@ -48,9 +43,15 @@ class LocalHotspotManagerAndroid(
     private val appContext: Context,
     private val logger: com.ustadmobile.meshrabiya.MNetLogger,
     private val localNodeAddr: Int,
+    private val router: VirtualRouter,
 ) : Closeable, LocalHotspotManager, WifiP2pManager.ChannelListener {
 
     private val logPrefix = "[LocalHotspotManagerAndroid: ${localNodeAddr.addressToDotNotation()}] "
+
+    //will be replaced
+    private val anotherExeuctor = Executors.newCachedThreadPool()
+
+    private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
 
     private val wifiDirectBroadcastReceiver = object: BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -79,30 +80,20 @@ class LocalHotspotManagerAndroid(
         }
     }
 
-    private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
+
 
     private val wifiP2pGroupInfoListener = WifiP2pManager.GroupInfoListener { group: WifiP2pGroup? ->
         logger(Log.DEBUG, "P2P Group Info Available: ${group?.toPrettyString()} ", null)
-        val interfaceName = group?.`interface`
-        val networkInterface = interfaceName?.let { NetworkInterface.getByName(it) }
-        logger(Log.DEBUG, "P2P Group owner addresses = " +
-                "${networkInterface?.inetAddresses?.toList()?.joinToString { it.toString() }}", null)
 
-        if(group != null) {
-//            val datagramSocket = VirtualNodeDatagramSocket(
-//                port = 0,
-//                localNodeVirtualAddress =localNodeAddr,
-//                ioExecutorService = ioExecutor,
-//                router = router,
-//                onMmcpHelloReceivedListener =
-//            )
-        }
-        //maybe group.networkId can help us get the network object?
         _state.update { prev ->
             prev.copy(
                 status = LocalHotspotStatus.STARTED,
                 errorCode = 0,
-                config = group?.groupToHotspotConfigCompat()
+                config = HotspotConfig(
+                    ssid = group?.networkName,
+                    passphrase = group?.passphrase,
+                    port = router.localDatagramPort,
+                )
             )
         }
     }

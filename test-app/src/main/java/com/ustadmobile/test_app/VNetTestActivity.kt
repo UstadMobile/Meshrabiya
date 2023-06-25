@@ -347,7 +347,9 @@ fun TestScreen(
         item(key = "hotspotstate") {
             Text(
                 style = MaterialTheme.typography.bodySmall,
-                text = "Local Hotspot: ${uiState.localHotspotState?.config?.ssid}/${uiState.localHotspotState?.config?.passphrase}"
+                text = "Local Hotspot: ${uiState.localHotspotState?.config?.ssid}\n" +
+                        "Passphrase: ${uiState.localHotspotState?.config?.passphrase}\n" +
+                        "Port: ${uiState.localHotspotState?.config?.port}"
             )
         }
 

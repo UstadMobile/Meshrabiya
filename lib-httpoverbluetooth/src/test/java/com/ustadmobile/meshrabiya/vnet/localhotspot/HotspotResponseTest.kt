@@ -13,7 +13,8 @@ class HotspotResponseTest {
             errorCode = 0,
             config = HotspotConfig(
                 ssid = "test",
-                passphrase = "world"
+                passphrase = "world",
+                port = 8042
             ),
             redirectAddr = 0,
         )

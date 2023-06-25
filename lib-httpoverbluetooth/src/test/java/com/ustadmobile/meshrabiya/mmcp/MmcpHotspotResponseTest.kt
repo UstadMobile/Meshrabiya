@@ -17,14 +17,15 @@ class MmcpHotspotResponseTest {
                 errorCode = 0,
                 config = HotspotConfig(
                     ssid = "test",
-                    passphrase = "secret"
+                    passphrase = "secret",
+                    port = 8042,
                 ),
                 redirectAddr = 0
             )
         )
 
         val responseBytes = responseMessage.toBytes()
-        val responseDeserialized = MmcpHotspotResponse.fromBytes(responseBytes)
+        val responseDeserialized = MmcpHotspotResponse.fromBytes(responseBytes) as MmcpHotspotResponse
         Assert.assertEquals(responseMessage.messageId, responseDeserialized.messageId)
         Assert.assertEquals(responseMessage.result, responseDeserialized.result)
     }

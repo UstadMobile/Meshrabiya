@@ -38,6 +38,17 @@ import kotlin.time.Duration.Companion.seconds
 
 class VirtualNodeTest {
 
+    class TestVirtualNode(
+        allocationServiceUuid: UUID = UUID.randomUUID(),
+        allocationCharacteristicUuid: UUID = UUID.randomUUID(),
+        logger: MNetLogger,
+        override val hotspotManager: LocalHotspotManager = mock { }
+    ) : VirtualNode(
+        allocationServiceUuid = allocationServiceUuid,
+        allocationCharacteristicUuid = allocationCharacteristicUuid,
+        logger = logger,
+    )
+
     class PipeSocket(
         override val inStream: InputStream,
         override val outputStream: OutputStream,
@@ -61,14 +72,14 @@ class VirtualNodeTest {
     @Test
     fun givenTwoVirtualNodesConnectedOverIoStreamSocket_whenPingSent_thenReplyWillBeReceived() {
         val executor = Executors.newCachedThreadPool()
-        val node1 = VirtualNode(
+        val node1 = TestVirtualNode(
             allocationServiceUuid = UUID.randomUUID(),
             allocationCharacteristicUuid = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )
 
-        val node2 = VirtualNode(
+        val node2 = TestVirtualNode(
             allocationServiceUuid = UUID.randomUUID(),
             allocationCharacteristicUuid = UUID.randomUUID(),
             logger = logger,
@@ -113,20 +124,20 @@ class VirtualNodeTest {
 
     @Test
     fun givenTwoVirtualNodesConnectedOverDatagramSocket_whenPingSent_thenReplyWillBeReceived() {
-        val node1 = VirtualNode(
+        val node1 = TestVirtualNode(
             allocationServiceUuid = UUID.randomUUID(),
             allocationCharacteristicUuid = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )
-        val node2 = VirtualNode(
+        val node2 = TestVirtualNode(
             allocationServiceUuid = UUID.randomUUID(),
             allocationCharacteristicUuid = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )
 
-        node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.datagramPort)
+        node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.localDatagramPort)
 
         val latch = CountDownLatch(1)
         val pongMessage = AtomicReference<MmcpPong>()
@@ -165,27 +176,27 @@ class VirtualNodeTest {
                 LocalHotspotResponse(
                     responseToMessageId = messageId,
                     errorCode = 0,
-                    config = HotspotConfig(ssid = "networkname", passphrase = "secret123"),
+                    config = HotspotConfig(ssid = "networkname", passphrase = "secret123", port = 8042),
                     redirectAddr = 0,
                 )
             }
         }
 
-        val node1 = VirtualNode(
+        val node1 = TestVirtualNode(
             allocationServiceUuid = UUID.randomUUID(),
             allocationCharacteristicUuid = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mockHotspotManager,
         )
 
-        val node2 = VirtualNode(
+        val node2 = TestVirtualNode(
             allocationServiceUuid = UUID.randomUUID(),
             allocationCharacteristicUuid = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { }
         )
 
-        node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.datagramPort)
+        node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.localDatagramPort)
 
         //Wait for connection to be established
         runBlocking {

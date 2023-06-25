@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothServerSocket
@@ -19,16 +20,20 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.server.UuidAllocationServer
+import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
 import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManagerAndroid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.InetAddress
 import java.util.UUID
+import kotlin.random.Random
 
 class AndroidVirtualNode(
     val appContext: Context,
@@ -41,7 +46,6 @@ class AndroidVirtualNode(
     allocationCharacteristicUuid = allocationCharacteristicUuid,
     logger = logger,
     localNodeAddress = localMNodeAddress,
-    hotspotManager = LocalHotspotManagerAndroid(appContext, logger, localMNodeAddress),
 ) {
 
 
@@ -56,6 +60,10 @@ class AndroidVirtualNode(
     private val wifiManager: WifiManager = appContext.getSystemService(WifiManager::class.java)
 
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
+
+    override val hotspotManager: LocalHotspotManager = LocalHotspotManagerAndroid(
+        appContext, logger, localMNodeAddress, this
+    )
 
     /**
      * Listener that opens a bluetooth server socket
@@ -161,7 +169,43 @@ class AndroidVirtualNode(
             val ssid = hotspotResponse.result.config?.ssid
             val passphrase = hotspotResponse.result.config?.passphrase
             if(ssid != null && passphrase != null) {
-                connectToHotspot(ssid, passphrase)
+                val network = connectToHotspot(ssid, passphrase)
+                if(network != null) {
+                    withContext(Dispatchers.IO) {
+                        val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
+                            port = 0,
+                            localNodeVirtualAddress = localNodeAddress,
+                            ioExecutorService = connectionExecutor,
+                            router = this@AndroidVirtualNode,
+                            onMmcpHelloReceivedListener = { },
+                            logger = logger,
+                        )
+
+                        //Binding something to the network helps to avoid older versions of Android
+                        //deciding to disconnect from this network.
+                        network.bindSocket(networkBoundDatagramSocket)
+                        logger(Log.INFO, "$logPrefix : addWifiConnectionConnect:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
+
+                        for(i in 0 until 50) {
+                            logger(Log.INFO, "$logPrefix : addWifiConnectionConnect:Sending hello to 192.168.49.1:${hotspotResponse.result.config.port} from local:${networkBoundDatagramSocket.localPort}", null)
+
+                            val helloMessageId = Random.nextInt()
+                            networkBoundDatagramSocket.sendHello(
+                                messageId = helloMessageId,
+                                nextHopAddress = InetAddress.getByName("192.168.49.1"),
+                                nextHopPort = hotspotResponse.result.config.port
+                            )
+                            delay(1000)
+                        }
+
+
+                    }
+                }else {
+                    logger(Log.ERROR, "$logPrefix : addWifiConnectionConnect: to hotspot: returned null network", null)
+                }
+
+                // Create a new datagram socket, bind it to the network, then
+                // addNewDatagramNeighborConnection(remoteAddress, remotePort, socket
             }
 
         }
@@ -170,20 +214,26 @@ class AndroidVirtualNode(
         //3: init connection
     }
 
+    @Suppress("DEPRECATION") //Must use deperecated class to support pre-SDK29
+    @SuppressLint("MissingPermission") //Permissions will be set by the app, not the library
     fun WifiManager.addOrLookupNetwork(config: WifiConfiguration): Int {
         val existingNetwork = configuredNetworks.firstOrNull {
             it.SSID == config.SSID && it.status != WifiConfiguration.Status.DISABLED
         }
 
-        logger(Log.DEBUG, "addOrLookupNetwork: existingNetworkId=${existingNetwork?.networkId}", null)
+        logger(Log.DEBUG, "$logPrefix addOrLookupNetwork: existingNetworkId=${existingNetwork?.networkId}", null)
         return existingNetwork?.networkId ?: addNetwork(config)
     }
 
 
-    suspend fun connectToHotspot(ssid: String, passphrase: String) {
+    /**
+     * Connect to the given hotspot as a station.
+     */
+    @Suppress("DEPRECATION") //Must use deprecated classes to support pre-SDK29
+    suspend fun connectToHotspot(ssid: String, passphrase: String): Network? {
         logger(Log.INFO, "$logPrefix Connecting to hotspot: ssid=$ssid passphrase=$passphrase", null)
 
-        val completable = CompletableDeferred<Boolean>()
+        val completable = CompletableDeferred<Network?>()
         if(Build.VERSION.SDK_INT >= 29) {
             //Use the suggestion API as per https://developer.android.com/guide/topics/connectivity/wifi-bootstrap
             val specifier = WifiNetworkSpecifier.Builder()
@@ -200,26 +250,27 @@ class AndroidVirtualNode(
 
             val callback = object: ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    logger(Log.DEBUG, "$logPrefix connection available", null)
-                    completable.complete(true)
+                    logger(Log.DEBUG, "$logPrefix connectToHotspot: connection available", null)
+                    completable.complete(network)
                 }
 
                 override fun onUnavailable() {
-                    logger(Log.DEBUG, "$logPrefix connection unavailable", null)
-                    completable.complete(false)
+                    logger(Log.DEBUG, "$logPrefix connectToHotspot: connection unavailable", null)
+                    completable.complete(null)
                     super.onUnavailable()
                 }
             }
-            logger(Log.DEBUG, "$logPrefix Requesting connection to $ssid / $passphrase", null)
+
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: Requesting network for $ssid / $passphrase", null)
             connectivityManager.requestNetwork(request, callback)
-            completable.await()
         }else {
             //use pre-Android 10 WifiManager API
             val wifiConfig = WifiConfiguration().apply {
                 SSID =  "\"$ssid\""
                 preSharedKey = "\"$passphrase\""
 
-                /* Setting hiddenSSID = true is necessary, even though it is not hidden
+                /* Setting hiddenSSID = true is necessary, even though the network we are connecting
+                 * to is not hidden...
                  * Android won't connect to an SSID if it thinks the SSID is not there. The SSID
                  * might have created only a few ms ago by the other peer, and therefor won't be
                  * in the scan list. Setting hiddenSSID to true will ensure that Android attempts to
@@ -229,21 +280,41 @@ class AndroidVirtualNode(
             }
             val configNetworkId = wifiManager.addOrLookupNetwork(wifiConfig)
             val currentlyConnectedNetworkId = wifiManager.connectionInfo.networkId
-            logger(Log.DEBUG, "Currently connected to networkId: $currentlyConnectedNetworkId", null)
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: Currently connected to networkId: $currentlyConnectedNetworkId", null)
 
             if(currentlyConnectedNetworkId == configNetworkId) {
-                logger(Log.DEBUG, "Already connected to target networkid", null)
+                logger(Log.DEBUG, "$logPrefix connectToHotspot: Already connected to target networkid", null)
             }else {
+                //If currently connected to another network, we need to disconnect.
+                wifiManager.takeIf { currentlyConnectedNetworkId != -1 }?.disconnect()
                 wifiManager.enableNetwork(configNetworkId, true)
             }
 
+            val networkRequest = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+
+            val callback = object: ConnectivityManager.NetworkCallback() {
+
+
+                override fun onAvailable(network: Network) {
+                    logger(Log.DEBUG, "$logPrefix connectToHotspot: connection available", null)
+                    completable.complete(network)
+                }
+
+                override fun onUnavailable() {
+                    logger(Log.DEBUG, "$logPrefix connectToHotspot: connection unavailable", null)
+                    completable.complete(null)
+                    super.onUnavailable()
+                }
+            }
+
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: requesting network for $ssid", null)
+            connectivityManager.requestNetwork(networkRequest, callback)
         }
-    }
 
-    companion object {
-
-
-
+        return completable.await()
     }
 
 }

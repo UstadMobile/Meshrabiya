@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.vnet
 
 import com.ustadmobile.meshrabiya.mmcp.MmcpAck
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
+import com.ustadmobile.meshrabiya.test.TestLogger
 import org.junit.Assert
 import org.junit.Test
 import org.mockito.kotlin.argWhere
@@ -39,7 +40,9 @@ class VirtualNodeDatagramSocketTest {
             port = 0,
             localNodeVirtualAddress = socket1VirtualNodeAddr,
             ioExecutorService = executorService,
-            router = createMockRouter()
+            router = createMockRouter(),
+            onMmcpHelloReceivedListener = { },
+            logger = TestLogger(),
         )
 
         val socket2 = VirtualNodeDatagramSocket(
@@ -48,6 +51,7 @@ class VirtualNodeDatagramSocketTest {
             ioExecutorService = executorService,
             router = createMockRouter(),
             onMmcpHelloReceivedListener = socket2IncomingHelloListener,
+            logger = TestLogger(),
         )
 
         try {

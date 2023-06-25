@@ -9,7 +9,8 @@ class HotspotConfigTest {
     fun givenHotspotConfigWithSsidAndPassphrase_whenConvertedToAndFromBytes_thenWillBeEqual() {
         val hotspotConfig = HotspotConfig(
             ssid = "test",
-            passphrase = "secret"
+            passphrase = "secret",
+            port = 8042
         )
 
         val someOffset = 5//just to test that the offset is used appropriately

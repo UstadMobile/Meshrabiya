@@ -14,6 +14,12 @@ interface VirtualRouter {
 
     fun nextMmcpMessageId(): Int
 
+    /**
+     * The default datagram socket local port (not bound to any network). Used to send/receive
+     * VirtualPackets over the real network.
+     */
+    val localDatagramPort: Int
+
 
     /**
      * Allocate a port on the virtual router

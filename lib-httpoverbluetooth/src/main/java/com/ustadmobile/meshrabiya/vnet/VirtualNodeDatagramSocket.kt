@@ -1,5 +1,8 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import android.util.Log
+import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.mmcp.MmcpAck
 import com.ustadmobile.meshrabiya.mmcp.MmcpHello
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
@@ -24,8 +27,14 @@ class VirtualNodeDatagramSocket(
     private val localNodeVirtualAddress: Int,
     ioExecutorService: ExecutorService,
     private val router: VirtualRouter,
-    private val onMmcpHelloReceivedListener: OnMmcpHelloReceivedListener = OnMmcpHelloReceivedListener { },
+    private val onMmcpHelloReceivedListener: OnMmcpHelloReceivedListener,
+    private val logger: MNetLogger,
+    name: String? = null
 ) : DatagramSocket(port), Runnable {
+
+    private val future: Future<*>
+
+    private val logPrefix: String
 
     fun interface PacketReceivedListener {
 
@@ -49,10 +58,19 @@ class VirtualNodeDatagramSocket(
 
     private val listeners: MutableList<PacketReceivedListener> = CopyOnWriteArrayList()
 
-    private val future: Future<*> = ioExecutorService.submit(this)
+    init {
+        logPrefix = buildString {
+            append("[VirtualNodeSocket for ${localNodeVirtualAddress.addressToDotNotation()} ")
+            if(name != null)
+                append("- $name")
+            append("] ")
+        }
+        future = ioExecutorService.submit(this)
+    }
 
     override fun run() {
         val buffer = ByteArray(VirtualPacket.MAX_PAYLOAD_SIZE)
+        logger(Log.DEBUG, "$logPrefix Started on $localPort waiting for first packet", null)
 
         while(!Thread.interrupted()) {
             val rxPacket = DatagramPacket(buffer, 0, buffer.size)
@@ -67,7 +85,10 @@ class VirtualNodeDatagramSocket(
             //Respond to Hello from new nodes with a packet so they can get our virtual address
             if(rxVirtualPacket.header.toAddr == 0 && rxVirtualPacket.header.toPort == 0) {
                 val mmcpPacket = MmcpMessage.fromVirtualPacket(rxVirtualPacket)
+                logger(Log.DEBUG, "$logPrefix received MMCP packet from ${rxPacket.address}/${rxPacket.port} id=${mmcpPacket.messageId} type=${mmcpPacket::class.simpleName}", null)
                 if(mmcpPacket is MmcpHello) {
+                    logger(Log.DEBUG, "$logPrefix Received hello from ${rxPacket.address}/${rxPacket.port}", null)
+
                     val replyAck = MmcpAck(
                         messageId = router.nextMmcpMessageId(),
                         ackOfMessageId = mmcpPacket.messageId
@@ -88,6 +109,10 @@ class VirtualNodeDatagramSocket(
                             mmcpHello = mmcpPacket,
                         ),
                     )
+                }
+
+                if(mmcpPacket is MmcpAck) {
+                    logger(Log.DEBUG, "Ack: messageId = ${mmcpPacket.messageId} from ${rxPacket.address}/${rxPacket.port}", null)
                 }
             }else {
                 router.route(
