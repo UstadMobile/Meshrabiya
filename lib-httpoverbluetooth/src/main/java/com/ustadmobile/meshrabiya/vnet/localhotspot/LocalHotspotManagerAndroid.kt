@@ -4,8 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.ConnectivityManager
-import android.net.Network
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pManager
@@ -26,15 +24,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.Closeable
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-
-data class WifiDirectState(
-    val state: Int,
-) {
-    val stateEnabled: Boolean
-        get() = state == WifiP2pManager.WIFI_P2P_STATE_ENABLED
-}
 
 /**
  * Close the hotspot when there are no connections depending on it
@@ -42,16 +32,11 @@ data class WifiDirectState(
 class LocalHotspotManagerAndroid(
     private val appContext: Context,
     private val logger: com.ustadmobile.meshrabiya.MNetLogger,
-    private val localNodeAddr: Int,
+    localNodeAddr: Int,
     private val router: VirtualRouter,
 ) : Closeable, LocalHotspotManager, WifiP2pManager.ChannelListener {
 
     private val logPrefix = "[LocalHotspotManagerAndroid: ${localNodeAddr.addressToDotNotation()}] "
-
-    //will be replaced
-    private val anotherExeuctor = Executors.newCachedThreadPool()
-
-    private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
 
     private val wifiDirectBroadcastReceiver = object: BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -95,42 +80,6 @@ class LocalHotspotManagerAndroid(
                     port = router.localDatagramPort,
                 )
             )
-        }
-    }
-
-    data class AvailableNetwork(
-        val interfaceName: String,
-        val network: Network,
-    )
-
-    private val availableNetworks = MutableStateFlow(emptyList<AvailableNetwork>())
-
-    private val networkCallback = object: ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) {
-            val linkProps = connectivityManager.getLinkProperties(network)
-            val interfaceName = linkProps?.interfaceName
-            logger(Log.DEBUG, "$logPrefix networkCallback:onAvailable interfaceName=$interfaceName", null)
-            if(interfaceName != null) {
-                availableNetworks.update { prev ->
-                    prev + listOf(AvailableNetwork(interfaceName, network))
-                }
-            }
-
-        }
-
-        override fun onLosing(network: Network, maxMsToLive: Int) {
-            val availableNetwork = availableNetworks.value.firstOrNull { it.network == network }
-            logger(Log.DEBUG, "$logPrefix networkCallback:onLosing interfaceName=${availableNetwork?.interfaceName}", null)
-        }
-
-        override fun onLost(network: Network) {
-            val availableNetwork = availableNetworks.value.firstOrNull { it.network == network }
-            logger(Log.DEBUG, "$logPrefix networkCallback:onLost interfaceName=${availableNetwork?.interfaceName}", null)
-        }
-
-        override fun onUnavailable() {
-            logger(Log.DEBUG, "$logPrefix networkCallback:onUnavailable", null)
-            super.onUnavailable()
         }
     }
 
