@@ -59,14 +59,11 @@ class VirtualNodeDatagramSocketTest {
             val helloLatch = CountDownLatch(1)
             val responseMessage = AtomicReference<VirtualPacket>()
 
-            val socket1Listener = VirtualNodeDatagramSocket.PacketReceivedListener {
-                val virtualPacket = VirtualPacket.fromDatagramPacket(it)
-                if(virtualPacket.header.fromAddr == socket2VirtualNodeAddr && virtualPacket.header.toPort == 0) {
-                    val mmcpMessage = MmcpMessage.fromVirtualPacket(virtualPacket) as? MmcpAck
-                    if(mmcpMessage?.ackOfMessageId == helloMessageId) {
-                        responseMessage.set(virtualPacket)
-                        helloLatch.countDown()
-                    }
+            val socket1Listener = VirtualNodeDatagramSocket.NeighborMmcpMessageReceivedListener {
+                val message = it.mmcpMessage
+                if(message is MmcpAck && message.ackOfMessageId == helloMessageId) {
+                    responseMessage.set(it.virtualPacket)
+                    helloLatch.countDown()
                 }
             }
 

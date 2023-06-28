@@ -6,6 +6,8 @@ import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.mmcp.MmcpAck
 import com.ustadmobile.meshrabiya.mmcp.MmcpHello
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
+import com.ustadmobile.meshrabiya.mmcp.MmcpPing
+import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -36,9 +38,15 @@ class VirtualNodeDatagramSocket(
 
     private val logPrefix: String
 
-    fun interface PacketReceivedListener {
+    data class NeighborMmcpPacketReceivedEvent(
+        val datagramPacket: DatagramPacket,
+        val virtualPacket: VirtualPacket,
+        val mmcpMessage: MmcpMessage,
+    )
 
-        fun onPacketReceived(packet: DatagramPacket)
+    fun interface NeighborMmcpMessageReceivedListener {
+
+        fun onNeighborMmcpMessageReceived(event: NeighborMmcpPacketReceivedEvent)
 
     }
 
@@ -56,11 +64,11 @@ class VirtualNodeDatagramSocket(
     }
 
 
-    private val listeners: MutableList<PacketReceivedListener> = CopyOnWriteArrayList()
+    private val listeners: MutableList<NeighborMmcpMessageReceivedListener> = CopyOnWriteArrayList()
 
     init {
         logPrefix = buildString {
-            append("[VirtualNodeSocket for ${localNodeVirtualAddress.addressToDotNotation()} ")
+            append("[VirtualNodeDatagramSocket for ${localNodeVirtualAddress.addressToDotNotation()} ")
             if(name != null)
                 append("- $name")
             append("] ")
@@ -76,44 +84,71 @@ class VirtualNodeDatagramSocket(
             val rxPacket = DatagramPacket(buffer, 0, buffer.size)
             receive(rxPacket)
 
-            listeners.forEach {
-                it.onPacketReceived(rxPacket)
-            }
-
             val rxVirtualPacket = VirtualPacket.fromDatagramPacket(rxPacket)
 
-            //Respond to Hello from new nodes with a packet so they can get our virtual address
+            //A virtual packet with toAddress = 0 means that this packet is only being sent
+            // over between two neighbors. This can include initial Hello packet and connection
+            // management e.g. pings
             if(rxVirtualPacket.header.toAddr == 0 && rxVirtualPacket.header.toPort == 0) {
-                val mmcpPacket = MmcpMessage.fromVirtualPacket(rxVirtualPacket)
-                logger(Log.DEBUG, "$logPrefix received MMCP packet from ${rxPacket.address}/${rxPacket.port} id=${mmcpPacket.messageId} type=${mmcpPacket::class.simpleName}", null)
-                if(mmcpPacket is MmcpHello) {
-                    logger(Log.DEBUG, "$logPrefix Received hello from ${rxPacket.address}/${rxPacket.port}", null)
+                val mmcpMessage = MmcpMessage.fromVirtualPacket(rxVirtualPacket)
 
-                    val replyAck = MmcpAck(
-                        messageId = router.nextMmcpMessageId(),
-                        ackOfMessageId = mmcpPacket.messageId
-                    )
-                    val replyDatagram = replyAck.toVirtualPacket(
-                        toAddr = 0,
-                        fromAddr = localNodeVirtualAddress,
-                    ).toDatagramPacket()
-                    replyDatagram.address = rxPacket.address
-                    replyDatagram.port = rxPacket.port
-                    send(replyDatagram)
-
-                    onMmcpHelloReceivedListener.onMmcpHelloReceived(
-                        HelloEvent(
-                            address = rxPacket.address,
-                            port = rxPacket.port,
-                            virtualPacket = rxVirtualPacket,
-                            mmcpHello = mmcpPacket,
-                            socket = this,
-                        ),
-                    )
+                listeners.forEach {
+                    it.onNeighborMmcpMessageReceived(NeighborMmcpPacketReceivedEvent(
+                        rxPacket, rxVirtualPacket, mmcpMessage
+                    ))
                 }
 
-                if(mmcpPacket is MmcpAck) {
-                    logger(Log.DEBUG, "Ack: messageId = ${mmcpPacket.messageId} from ${rxPacket.address}/${rxPacket.port}", null)
+                logger(Log.DEBUG, "$logPrefix received MMCP packet from ${rxPacket.address}/${rxPacket.port} id=${mmcpMessage.messageId} type=${mmcpMessage::class.simpleName}", null)
+                when(mmcpMessage) {
+                    is MmcpHello -> {
+                        logger(Log.DEBUG, "$logPrefix Received hello from ${rxPacket.address}/${rxPacket.port}", null)
+
+                        val replyAck = MmcpAck(
+                            messageId = router.nextMmcpMessageId(),
+                            ackOfMessageId = mmcpMessage.messageId
+                        )
+
+                        val replyDatagram = replyAck.toVirtualPacket(
+                            toAddr = 0,
+                            fromAddr = localNodeVirtualAddress,
+                        ).toDatagramPacket()
+
+                        replyDatagram.address = rxPacket.address
+                        replyDatagram.port = rxPacket.port
+                        send(replyDatagram)
+
+                        onMmcpHelloReceivedListener.onMmcpHelloReceived(
+                            HelloEvent(
+                                address = rxPacket.address,
+                                port = rxPacket.port,
+                                virtualPacket = rxVirtualPacket,
+                                mmcpHello = mmcpMessage,
+                                socket = this,
+                            ),
+                        )
+                    }
+
+                    is MmcpPing -> {
+                        val replyPongPacket = MmcpPong(
+                            messageId = router.nextMmcpMessageId(),
+                            replyToMessageId = mmcpMessage.messageId,
+                        ).toVirtualPacket(
+                            toAddr = 0,
+                            fromAddr = localNodeVirtualAddress,
+                        ).toDatagramPacket()
+                        replyPongPacket.address = rxPacket.address
+                        replyPongPacket.port = rxPacket.port
+
+                        send(replyPongPacket)
+                    }
+
+                    else -> {
+                        //do nothing
+                    }
+                }
+
+                if(mmcpMessage is MmcpAck) {
+                    logger(Log.DEBUG, "Ack: messageId = ${mmcpMessage.messageId} from ${rxPacket.address}/${rxPacket.port}", null)
                 }
             }else {
                 router.route(
@@ -123,11 +158,11 @@ class VirtualNodeDatagramSocket(
         }
     }
 
-    fun addPacketReceivedListener(listener: PacketReceivedListener) {
+    fun addPacketReceivedListener(listener: NeighborMmcpMessageReceivedListener) {
         listeners += listener
     }
 
-    fun removePacketReceivedListener(listener: PacketReceivedListener) {
+    fun removePacketReceivedListener(listener: NeighborMmcpMessageReceivedListener) {
         listeners -= listener
     }
 

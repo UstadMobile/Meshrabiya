@@ -36,6 +36,24 @@ sealed class MmcpMessage(
         )
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is MmcpMessage) return false
+
+        if (what != other.what) return false
+        if (messageId != other.messageId) return false
+        if (header != other.header) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = what.toInt()
+        result = 31 * result + messageId
+        result = 31 * result + header.hashCode()
+        return result
+    }
+
 
     companion object {
 

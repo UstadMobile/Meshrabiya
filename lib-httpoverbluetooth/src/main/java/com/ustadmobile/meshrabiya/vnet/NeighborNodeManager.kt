@@ -102,6 +102,8 @@ class NeighborNodeManager(
             datagramSocket = datagramSocket,
             neighborAddress = address,
             neighborPort = port,
+            scheduledExecutor = scheduledExecutor,
+            logger = logger,
         )
 
         connections.add(connectionManager)

@@ -134,7 +134,11 @@ class VirtualNodeTest {
             hotspotManager = mock { }
         )
 
-        node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.localDatagramPort)
+        node1.addNewDatagramNeighborConnection(
+            InetAddress.getLoopbackAddress(),
+            node2.localDatagramPort,
+            node1.datagramSocket,
+        )
 
         val latch = CountDownLatch(1)
         val pongMessage = AtomicReference<MmcpPong>()
@@ -142,7 +146,7 @@ class VirtualNodeTest {
 
         node1.addPongListener(object: PongListener{
             override fun onPongReceived(fromNode: Int, pong: MmcpPong) {
-                if(pong.messageId == node1ToNode2Ping.messageId) {
+                if(pong.replyToMessageId == node1ToNode2Ping.messageId) {
                     pongMessage.set(pong)
                     latch.countDown()
                 }
@@ -159,7 +163,7 @@ class VirtualNodeTest {
         )
 
         latch.await(5000, TimeUnit.MILLISECONDS)
-        Assert.assertEquals(node1ToNode2Ping.messageId, pongMessage.get().messageId)
+        Assert.assertEquals(node1ToNode2Ping.messageId, pongMessage.get().replyToMessageId)
     }
 
 
@@ -196,7 +200,11 @@ class VirtualNodeTest {
             hotspotManager = mock { }
         )
 
-        node1.addNewDatagramNeighborConnection(InetAddress.getLoopbackAddress(), node2.localDatagramPort)
+        node1.addNewDatagramNeighborConnection(
+            InetAddress.getLoopbackAddress(),
+            node2.localDatagramPort,
+            node1.datagramSocket,
+        )
 
         //Wait for connection to be established
         runBlocking {

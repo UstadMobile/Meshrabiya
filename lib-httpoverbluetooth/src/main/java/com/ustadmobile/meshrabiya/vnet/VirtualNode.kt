@@ -96,7 +96,7 @@ abstract class VirtualNode(
 
     protected val logPrefix: String = "[VirtualNode ${localNodeAddress.addressToDotNotation()}]"
 
-    protected val datagramSocket = VirtualNodeDatagramSocket(
+    internal val datagramSocket = VirtualNodeDatagramSocket(
         port = port,
         ioExecutorService = connectionExecutor,
         router = this,
@@ -159,7 +159,11 @@ abstract class VirtualNode(
                     is MmcpPing -> {
                         logger(Log.DEBUG, "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}", null)
                         //send pong
-                        val pongMessage = MmcpPong(mmcpMessage.messageId)
+                        val pongMessage = MmcpPong(
+                            messageId = nextMmcpMessageId(),
+                            replyToMessageId = mmcpMessage.messageId
+                        )
+
                         val replyPacket = pongMessage.toVirtualPacket(
                             toAddr = from,
                             fromAddr = localNodeAddress
@@ -298,10 +302,9 @@ abstract class VirtualNode(
         val neighborVirtualAddr = AtomicInteger(0)
         val helloMessageId = nextMmcpMessageId()
 
-        val packetReceivedListener = VirtualNodeDatagramSocket.PacketReceivedListener {
-            if(it.address == address && it.port == port) {
-                val virtualPacket = VirtualPacket.fromDatagramPacket(it)
-                neighborVirtualAddr.set(virtualPacket.header.fromAddr)
+        val packetReceivedListener = VirtualNodeDatagramSocket.NeighborMmcpMessageReceivedListener {
+            if(it.datagramPacket.address == address && it.datagramPacket.port == port) {
+                neighborVirtualAddr.set(it.virtualPacket.header.fromAddr)
                 addrResponseLatch.countDown()
             }
         }
