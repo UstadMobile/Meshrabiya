@@ -1,4 +1,4 @@
-package com.ustadmobile.meshrabiya.vnet.localhotspot
+package com.ustadmobile.meshrabiya.vnet.wifi
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

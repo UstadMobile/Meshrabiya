@@ -1,4 +1,4 @@
-package com.ustadmobile.meshrabiya.vnet.localhotspot
+package com.ustadmobile.meshrabiya.vnet.wifi
 
 import org.junit.Assert
 import org.junit.Test
@@ -10,7 +10,8 @@ class HotspotConfigTest {
         val hotspotConfig = HotspotConfig(
             ssid = "test",
             passphrase = "secret",
-            port = 8042
+            port = 8042,
+            hotspotType = HotspotType.LOCALONLY_HOTSPOT,
         )
 
         val someOffset = 5//just to test that the offset is used appropriately

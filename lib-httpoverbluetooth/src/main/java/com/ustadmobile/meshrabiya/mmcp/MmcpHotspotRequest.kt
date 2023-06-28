@@ -1,6 +1,6 @@
 package com.ustadmobile.meshrabiya.mmcp
 
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotRequest
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 

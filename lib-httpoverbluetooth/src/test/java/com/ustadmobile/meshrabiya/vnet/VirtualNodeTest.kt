@@ -7,12 +7,13 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
-import com.ustadmobile.meshrabiya.vnet.localhotspot.HotspotConfig
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotRequest
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotResponse
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotStatus
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
+import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
+import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.runBlocking
@@ -42,7 +43,7 @@ class VirtualNodeTest {
         uuidMask: UUID = UUID.randomUUID(),
         port: Int = 0,
         logger: MNetLogger,
-        override val hotspotManager: LocalHotspotManager = mock { }
+        override val hotspotManager: MeshrabiyaWifiManager = mock { }
     ) : VirtualNode(
         uuidMask = uuidMask,
         port = port,
@@ -164,15 +165,20 @@ class VirtualNodeTest {
 
     @Test
     fun givenMmcpHotspotRequestReceived_whenPacketRouted_thenWillRequestFromHotspotManagerAndReplyWithConfig() {
-        val hotspotState = MutableStateFlow(LocalHotspotState(status = LocalHotspotStatus.STOPPED))
-        val mockHotspotManager = mock<LocalHotspotManager> {
+        val hotspotState = MutableStateFlow(MeshrabiyaWifiState(wifiDirectGroupStatus = LocalHotspotStatus.STOPPED))
+        val mockHotspotManager = mock<MeshrabiyaWifiManager> {
             on { state }.thenReturn(hotspotState)
-            onBlocking { request(any(), any()) }.thenAnswer {
+            onBlocking { requestHotspot(any(), any()) }.thenAnswer {
                 val messageId = it.arguments.first() as Int
                 LocalHotspotResponse(
                     responseToMessageId = messageId,
                     errorCode = 0,
-                    config = HotspotConfig(ssid = "networkname", passphrase = "secret123", port = 8042),
+                    config = HotspotConfig(
+                        ssid = "networkname",
+                        passphrase = "secret123",
+                        port = 8042,
+                        hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+                    ),
                     redirectAddr = 0,
                 )
             }
@@ -210,7 +216,7 @@ class VirtualNodeTest {
         )
 
         verifyBlocking(mockHotspotManager, timeout(5000)) {
-            request(eq(requestId), any())
+            requestHotspot(eq(requestId), any())
         }
 
         runBlocking {

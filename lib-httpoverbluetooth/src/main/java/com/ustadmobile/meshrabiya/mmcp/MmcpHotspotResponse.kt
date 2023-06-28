@@ -1,6 +1,6 @@
 package com.ustadmobile.meshrabiya.mmcp
 
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotResponse
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 
 class MmcpHotspotResponse(
     messageId: Int,

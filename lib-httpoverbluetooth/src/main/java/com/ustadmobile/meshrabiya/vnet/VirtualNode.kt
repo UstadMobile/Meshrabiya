@@ -12,9 +12,9 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotManager
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotRequest
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
+import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
+import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -87,9 +87,9 @@ abstract class VirtualNode(
 
     val neighborNodesState: Flow<List<NeighborNodeState>> = _neighborNodesState.asStateFlow()
 
-    abstract val hotspotManager: LocalHotspotManager
+    abstract val hotspotManager: MeshrabiyaWifiManager
 
-    val localHotSpotState: Flow<LocalHotspotState>
+    val localHotSpotState: Flow<MeshrabiyaWifiState>
         get() = hotspotManager.state
 
     private val pongListeners = CopyOnWriteArrayList<PongListener>()
@@ -175,7 +175,7 @@ abstract class VirtualNode(
                     is MmcpHotspotRequest -> {
                         logger(Log.INFO, "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})", null)
                         coroutineScope.launch {
-                            val hotspotResult = hotspotManager.request(
+                            val hotspotResult = hotspotManager.requestHotspot(
                                 mmcpMessage.messageId, mmcpMessage.hotspotRequest
                             )
 
@@ -320,7 +320,7 @@ abstract class VirtualNode(
 
 
 
-    suspend fun requestLocalHotspot(virtualAddr: Int)  {
+    fun sendRequestWifiConnectionMmcpMessage(virtualAddr: Int)  {
         val request = MmcpHotspotRequest(
             messageId = nextMmcpMessageId(),
             hotspotRequest = LocalHotspotRequest(
@@ -334,7 +334,6 @@ abstract class VirtualNode(
             fromAddr = localNodeAddress
         ))
 
-        //TODO: wait for the response
     }
 
 

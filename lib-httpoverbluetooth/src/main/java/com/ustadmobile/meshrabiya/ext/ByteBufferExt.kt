@@ -33,3 +33,7 @@ fun ByteBuffer.getString(): String? {
         return null
     }
 }
+
+fun ByteBuffer.getStringOrThrow() : String {
+    return getString() ?: throw NullPointerException("ByteBuffer.getStringOrThrow: stored string was null")
+}

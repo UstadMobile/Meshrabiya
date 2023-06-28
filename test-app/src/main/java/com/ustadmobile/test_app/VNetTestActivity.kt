@@ -57,7 +57,7 @@ import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.trimIfExceeds
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotState
+import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
 import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,7 +68,7 @@ import java.util.UUID
 data class TestActivityUiState(
     val localAddress: Int = 0,
     val remoteNodes: List<NeighborNodeState> = emptyList(),
-    val localHotspotState: LocalHotspotState? = null,
+    val localHotspotState: MeshrabiyaWifiState? = null,
     val logLines: List<LogLine> = emptyList(),
 )
 
@@ -249,7 +249,7 @@ class VNetTestActivity : ComponentActivity() {
     fun onSetLocalOnlyHotspotEnabled(enabled: Boolean) {
         if(enabled){
             lifecycleScope.launch {
-                virtualNode.requestLocalHotspot(virtualNode.localNodeAddress)
+                virtualNode.sendRequestWifiConnectionMmcpMessage(virtualNode.localNodeAddress)
             }
         }
     }

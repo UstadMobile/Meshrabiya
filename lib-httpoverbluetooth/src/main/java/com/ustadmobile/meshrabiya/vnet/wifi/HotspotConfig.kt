@@ -1,24 +1,25 @@
-package com.ustadmobile.meshrabiya.vnet.localhotspot
+package com.ustadmobile.meshrabiya.vnet.wifi
 
 import android.net.wifi.WifiManager
 import android.os.Build
-import com.ustadmobile.meshrabiya.ext.getString
+import com.ustadmobile.meshrabiya.ext.getStringOrThrow
 import com.ustadmobile.meshrabiya.ext.putStringFromBytes
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 data class HotspotConfig(
-    val ssid: String?,
-    val passphrase: String?,
+    val ssid: String,
+    val passphrase: String,
     val port: Int,
+    val hotspotType: HotspotType
 ) {
 
     private val ssidBytes: ByteArray? by lazy {
-        ssid?.encodeToByteArray()
+        ssid.encodeToByteArray()
     }
 
     private val passphraseBytes: ByteArray? by lazy {
-        passphrase?.encodeToByteArray()
+        passphrase.encodeToByteArray()
     }
 
     //Add 4 bytes for each string ... where the length is encoded stored and 4 bytes for the port
@@ -35,6 +36,7 @@ data class HotspotConfig(
             .putStringFromBytes(ssidBytes)
             .putStringFromBytes(passphraseBytes)
             .putInt(port)
+            .putInt(hotspotType.flag)
 
         return sizeInBytes
     }
@@ -54,14 +56,16 @@ data class HotspotConfig(
         ): HotspotConfig {
             val byteBuf = ByteBuffer.wrap(byteArray, offset, byteArray.size - offset)
                 .order(ByteOrder.BIG_ENDIAN)
-            val ssid = byteBuf.getString()
-            val passphrase = byteBuf.getString()
+            val ssid = byteBuf.getStringOrThrow()
+            val passphrase = byteBuf.getStringOrThrow()
             val port = byteBuf.int
+            val hotspotType = HotspotType.fromFlag(byteBuf.int)
 
             return HotspotConfig(
                 ssid = ssid,
                 passphrase = passphrase,
                 port = port,
+                hotspotType = hotspotType,
             )
 
         }
@@ -72,20 +76,34 @@ data class HotspotConfig(
 
 fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
     port: Int,
-): HotspotConfig {
+): HotspotConfig? {
     return if(Build.VERSION.SDK_INT >= 30) {
         val softApConfig = softApConfiguration
-        HotspotConfig(
-            ssid = softApConfig.ssid,
-            passphrase = softApConfig.passphrase,
-            port = 0,
-        )
+        val ssid = softApConfig.ssid
+        val passphrase = softApConfig.passphrase
+        if(ssid != null && passphrase != null) {
+            HotspotConfig(
+                ssid = ssid,
+                passphrase = passphrase,
+                port = port,
+                hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+            )
+        }else {
+            null
+        }
     }else {
         val wifiConfig = wifiConfiguration
-        HotspotConfig(
-            ssid = wifiConfig?.SSID,
-            passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\""),
-            port = 0,
-        )
+        val ssid = wifiConfig?.SSID
+        val passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\"")
+        if(ssid != null && passphrase != null) {
+            HotspotConfig(
+                ssid = ssid,
+                passphrase = passphrase,
+                port = port,
+                hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+            )
+        }else {
+            null
+        }
     }
 }

@@ -1,4 +1,4 @@
-package com.ustadmobile.meshrabiya.vnet.localhotspot
+package com.ustadmobile.meshrabiya.vnet.wifi
 
 import org.junit.Assert
 import org.junit.Test
@@ -14,7 +14,8 @@ class HotspotResponseTest {
             config = HotspotConfig(
                 ssid = "test",
                 passphrase = "world",
-                port = 8042
+                port = 8042,
+                hotspotType = HotspotType.LOCALONLY_HOTSPOT
             ),
             redirectAddr = 0,
         )

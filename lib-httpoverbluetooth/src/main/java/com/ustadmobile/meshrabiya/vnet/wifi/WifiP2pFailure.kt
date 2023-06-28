@@ -1,4 +1,4 @@
-package com.ustadmobile.meshrabiya.vnet.localhotspot
+package com.ustadmobile.meshrabiya.vnet.wifi
 
 import android.net.wifi.p2p.WifiP2pManager
 

@@ -10,8 +10,5 @@ fun Int.addressToDotNotation() : String {
 }
 
 fun Int.addressToByteArray(): ByteArray {
-    return ByteBuffer.wrap(ByteArray(4))
-        .order(ByteOrder.BIG_ENDIAN)
-        .putInt(this)
-        .array()
+    return ByteBuffer.wrap(ByteArray(4)).order(ByteOrder.BIG_ENDIAN).putInt(this).array()
 }

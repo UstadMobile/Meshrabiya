@@ -1,7 +1,8 @@
 package com.ustadmobile.meshrabiya.mmcp
 
-import com.ustadmobile.meshrabiya.vnet.localhotspot.HotspotConfig
-import com.ustadmobile.meshrabiya.vnet.localhotspot.LocalHotspotResponse
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 import org.junit.Assert
 import org.junit.Test
 import kotlin.random.Random
@@ -19,6 +20,7 @@ class MmcpHotspotResponseTest {
                     ssid = "test",
                     passphrase = "secret",
                     port = 8042,
+                    hotspotType = HotspotType.LOCALONLY_HOTSPOT,
                 ),
                 redirectAddr = 0
             )
