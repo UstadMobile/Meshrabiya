@@ -17,6 +17,8 @@ data class NeighborNodeState(
     val pingTime: Int,
     val pingsSent: Int = 0,
     val pingsReceived: Int = 0,
+    val hasBluetoothConnection: Boolean = false,
+    val hasWifiConnection: Boolean = false,
 )
 
 /**
@@ -69,7 +71,10 @@ class NeighborNodeManager(
         connections.add(newConnectionManager)
 
         val newState = nodeState.updateAndGet { prev ->
-            prev.copy(numConnections = prev.numConnections + 1)
+            prev.copy(
+                numConnections = prev.numConnections + 1,
+                hasBluetoothConnection = true,
+            )
         }
 
         listener.onNodeStateChanged(newState)
@@ -102,7 +107,10 @@ class NeighborNodeManager(
         connections.add(connectionManager)
 
         val newState = nodeState.updateAndGet { prev ->
-            prev.copy(numConnections = prev.numConnections + 1)
+            prev.copy(
+                numConnections = prev.numConnections + 1,
+                hasWifiConnection = true,
+            )
         }
 
         listener.onNodeStateChanged(newState)

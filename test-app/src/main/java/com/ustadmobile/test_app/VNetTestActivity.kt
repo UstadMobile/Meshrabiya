@@ -18,6 +18,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +28,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -382,7 +385,25 @@ fun TestScreen(
                     Text(node.remoteAddress.addressToDotNotation())
                 },
                 supportingText = {
-                    Text("Ping: ${node.pingTime}ms Received ${node.pingsReceived}/${node.pingsSent}")
+                    Column {
+                        Row {
+                            if(node.hasBluetoothConnection) {
+                                Icon(
+                                    imageVector = Icons.Default.Bluetooth,
+                                    contentDescription = "Bluetooth"
+                                )
+                            }
+
+                            if(node.hasWifiConnection) {
+                                Icon(
+                                    imageVector = Icons.Default.Wifi,
+                                    contentDescription = "Wifi"
+                                )
+                            }
+                        }
+                        Text("Ping: ${node.pingTime}ms Received ${node.pingsReceived}/${node.pingsSent}")
+                    }
+
                 },
                 trailingContent = {
                     var expanded by remember { mutableStateOf(false) }

@@ -8,5 +8,6 @@ data class HelloEvent(
     val port: Int,
     val virtualPacket: VirtualPacket,
     val mmcpHello: MmcpHello,
+    val socket: VirtualNodeDatagramSocket,
 ) {
 }

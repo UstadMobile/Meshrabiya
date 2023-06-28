@@ -11,7 +11,7 @@ data class HotspotConfig(
     val ssid: String,
     val passphrase: String,
     val port: Int,
-    val hotspotType: HotspotType
+    val hotspotType: HotspotType,
 ) {
 
     private val ssidBytes: ByteArray? by lazy {

@@ -24,7 +24,6 @@ import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.WifiRole
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,10 +39,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.random.Random
+import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Close the hotspot when there are no connections depending on it
+ *
  */
 class MeshrabiyaWifiManagerAndroid(
     private val appContext: Context,
@@ -51,6 +50,7 @@ class MeshrabiyaWifiManagerAndroid(
     private val localNodeAddr: Int,
     private val router: VirtualRouter,
     private val ioExecutor: ExecutorService,
+    private val onNewWifiConnectionListener: OnNewWifiConnectionListener = OnNewWifiConnectionListener { },
 ) : Closeable, MeshrabiyaWifiManager, WifiP2pManager.ChannelListener {
 
     private val logPrefix = "[LocalHotspotManagerAndroid: ${localNodeAddr.addressToDotNotation()}] "
@@ -60,6 +60,11 @@ class MeshrabiyaWifiManagerAndroid(
         val network: Network,
         val dhcpServer: InetAddress
     )
+
+
+    fun interface OnNewWifiConnectionListener {
+        fun onNewWifiConnection(connectEvent: WifiConnectEvent)
+    }
 
 
     private val wifiDirectBroadcastReceiver = object: BroadcastReceiver() {
@@ -176,6 +181,14 @@ class MeshrabiyaWifiManagerAndroid(
     override val state: Flow<MeshrabiyaWifiState> = _state.asStateFlow()
 
     private val requestMutex = Mutex()
+
+    /**
+     * When this device is connected as a station, we will create a new datagramsocket that is
+     * bound to the Android Network object. This helps prevent older versions of Android from
+     * disconnecting when it realizes the connection has no Internet (e.g. Android will see
+     * activity on the network).
+     */
+    private val stationNetworkBoundDatagramSocket = AtomicReference<VirtualNodeDatagramSocket?>()
 
     private val closed = AtomicBoolean(false)
 
@@ -405,9 +418,18 @@ class MeshrabiyaWifiManagerAndroid(
                     localNodeVirtualAddress = localNodeAddr,
                     ioExecutorService = ioExecutor,
                     router = router,
-                    onMmcpHelloReceivedListener = { },
+                    onMmcpHelloReceivedListener = {
+                        //Do nothing - this will never receive an incoming hello.
+                    },
                     logger = logger,
+                    name = "network bound to ${config.ssid}"
                 )
+
+                val previousSocket = stationNetworkBoundDatagramSocket.getAndUpdate {
+                    networkBoundDatagramSocket
+                }
+
+                previousSocket?.close()
 
                 //Binding something to the network helps to avoid older versions of Android
                 //deciding to disconnect from this network.
@@ -423,27 +445,23 @@ class MeshrabiyaWifiManagerAndroid(
                     )
                 }
 
-                for(i in 0 until 50) {
-                    logger(
-                        Log.INFO, "$logPrefix : addWifiConnectionConnect:Sending " +
-                                "hello to ${networkAndServerAddr.dhcpServer}:${config.port} " +
-                                "from local:${networkBoundDatagramSocket.localPort}", null
-                    )
+                logger(
+                    Log.INFO, "$logPrefix : addWifiConnectionConnect:Sending " +
+                            "hello to ${networkAndServerAddr.dhcpServer}:${config.port} " +
+                            "from local:${networkBoundDatagramSocket.localPort}", null
+                )
 
-                    val helloMessageId = Random.nextInt()
-                    networkBoundDatagramSocket.sendHello(
-                        messageId = helloMessageId,
-                        nextHopAddress = networkAndServerAddr.dhcpServer,
-                        nextHopPort = config.port
-                    )
-                    delay(1000)
-                }
+                //Once connected,
+                onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
+                    neighborPort = config.port,
+                    neighborInetAddress = networkAndServerAddr.dhcpServer,
+                    socket = networkBoundDatagramSocket,
+                ))
+
             }
         }else {
             logger(Log.ERROR, "$logPrefix : addWifiConnectionConnect: to hotspot: returned null network", null)
         }
-
-        // addNewDatagramNeighborConnection(remoteAddress, remotePort, socket
     }
 
     override fun close() {

@@ -148,7 +148,7 @@ class MainActivity : ComponentActivity() {
             onLog = { priority, message, exception ->
                 onLogLine(priority,"Client: $message", exception)
             }
-        )
+         )
     }
 
     fun onSetServerEnabled(enabled: Boolean) {

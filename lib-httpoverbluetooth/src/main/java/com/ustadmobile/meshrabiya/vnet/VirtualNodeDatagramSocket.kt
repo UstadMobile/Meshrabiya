@@ -107,6 +107,7 @@ class VirtualNodeDatagramSocket(
                             port = rxPacket.port,
                             virtualPacket = rxVirtualPacket,
                             mmcpHello = mmcpPacket,
+                            socket = this,
                         ),
                     )
                 }

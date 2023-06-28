@@ -44,8 +44,21 @@ class AndroidVirtualNode(
 
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
 
+    /**
+     * Listen to the WifiManager for new wifi connections being established.. When they are
+     * established call addNewDatagramNeighborConnection to setup the neighbor connection.
+     */
+    private val newWifiConnectionListener = MeshrabiyaWifiManagerAndroid.OnNewWifiConnectionListener {
+        addNewDatagramNeighborConnection(it.neighborInetAddress, it.neighborPort, it.socket)
+    }
+
     override val hotspotManager: MeshrabiyaWifiManager = MeshrabiyaWifiManagerAndroid(
-        appContext, logger, localMNodeAddress, this, connectionExecutor
+        appContext = appContext,
+        logger = logger,
+        localNodeAddr = localMNodeAddress,
+        router = this,
+        ioExecutor = connectionExecutor,
+        onNewWifiConnectionListener = newWifiConnectionListener,
     )
 
     /**
@@ -90,6 +103,8 @@ class AndroidVirtualNode(
         onLog = logger,
         clientNodeAddr = localNodeAddress
     )
+
+
 
     init {
         uuidAllocationServer.start()

@@ -102,10 +102,12 @@ abstract class VirtualNode(
         router = this,
         localNodeVirtualAddress = localNodeAddress,
         onMmcpHelloReceivedListener = {
+            logger(Log.DEBUG, "$logPrefix onMmcpHelloReceived from ${it.address}", null)
             handleNewDatagramNeighborConnection(
                 address = it.address,
                 port = it.port,
-                neighborNodeVirtualAddr = it.virtualPacket.header.fromAddr
+                neighborNodeVirtualAddr = it.virtualPacket.header.fromAddr,
+                socket = it.socket
             )
         },
         logger = logger,
@@ -259,13 +261,22 @@ abstract class VirtualNode(
         address: InetAddress,
         port: Int,
         neighborNodeVirtualAddr: Int,
+        socket: VirtualNodeDatagramSocket,
     ) {
+        logger(Log.DEBUG,
+            "$logPrefix handleNewDatagramNeighborConnection connection to virtual addr " +
+                    "${neighborNodeVirtualAddr.addressToDotNotation()} " +
+                    "via datagram to $address:$port",
+            null
+        )
+
         val remoteNodeManager = getOrCreateNeighborNodeManager(neighborNodeVirtualAddr)
-        remoteNodeManager.addDatagramConnection(address, port, datagramSocket)
+        remoteNodeManager.addDatagramConnection(address, port, socket)
     }
 
     /**
-     * Add a new datagram connection :
+     * Add a new datagram neighbor connection :
+     *
      *  1. Send a MmcpHello to the remote address/port (virtual address = 0)
      *  2. Wait for a reply MmcpAck that gives the remote virtual address
      *
@@ -275,7 +286,14 @@ abstract class VirtualNode(
     fun addNewDatagramNeighborConnection(
         address: InetAddress,
         port: Int,
+        socket: VirtualNodeDatagramSocket
     ) {
+        logger(
+            Log.DEBUG,
+            "$logPrefix addNewDatagramNeighborConnection to addr=$address port=$port ",
+            null
+        )
+
         val addrResponseLatch = CountDownLatch(1)
         val neighborVirtualAddr = AtomicInteger(0)
         val helloMessageId = nextMmcpMessageId()
@@ -289,15 +307,18 @@ abstract class VirtualNode(
         }
 
         try {
-            datagramSocket.addPacketReceivedListener(packetReceivedListener)
-
-            datagramSocket.sendHello(helloMessageId, address, port)
-
+            logger(
+                Log.DEBUG,
+                "$logPrefix addNewDatagramNeighborConnection Sending hello to $address:$port",
+                null
+            )
+            socket.addPacketReceivedListener(packetReceivedListener)
+            socket.sendHello(helloMessageId, address, port)
             addrResponseLatch.await(10, TimeUnit.SECONDS)
 
             if(neighborVirtualAddr.get() != 0) {
                 handleNewDatagramNeighborConnection(
-                    address, port, neighborVirtualAddr.get()
+                    address, port, neighborVirtualAddr.get(), socket,
                 )
             }else {
                 val exception = IOException("Sent HELLO to $address, did not receive reply")
@@ -305,7 +326,7 @@ abstract class VirtualNode(
                 throw exception
             }
         }finally {
-            datagramSocket.removePacketReceivedListener(packetReceivedListener)
+            socket.removePacketReceivedListener(packetReceivedListener)
         }
     }
 
