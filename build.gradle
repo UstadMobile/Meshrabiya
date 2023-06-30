@@ -18,5 +18,8 @@ ext {
     version_turbine = "0.12.1"
     version_wifi_utils = "1.6.6"
     version_compose_bom = "2022.10.00"
+    version_code_scanner = "2.3.2"
+    version_navigation = "2.5.3"
+    version_kodein_di = "7.20.1"
 
 }

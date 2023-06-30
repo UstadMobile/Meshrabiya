@@ -61,6 +61,12 @@ dependencies {
     implementation "ch.acra:acra-http:5.9.7"
     implementation "ch.acra:acra-dialog:5.9.7"
 
+    implementation "com.github.yuriy-budiyev:code-scanner:$version_code_scanner"
+    implementation "androidx.navigation:navigation-compose:$version_navigation"
+    implementation "org.kodein.di:kodein-di-framework-compose:$version_kodein_di"
+    implementation "org.kodein.di:kodein-di-framework-android-x:$version_kodein_di"
+
+
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.3.1'
     implementation 'androidx.activity:activity-compose:1.5.1'

@@ -17,6 +17,14 @@
     https://developer.android.com/guide/topics/connectivity/localonlyhotspot
     -->
 
+
+    <!-- For QR code scanning -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false"/>
+
     <!-- If your app targets Android 13 (API level 33)
           or higher, you must declare the NEARBY_WIFI_DEVICES permission. -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
@@ -45,6 +53,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".CodeScannerActivity"
+            android:exported="true"
+            android:label="QR code scan"
+            android:theme="@style/Theme.HttpOverBluetooth"
+            />
+
     </application>
 
 </manifest>

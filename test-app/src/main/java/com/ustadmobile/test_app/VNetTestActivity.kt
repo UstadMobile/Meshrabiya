@@ -18,6 +18,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,7 +30,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.ConnectWithoutContact
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -39,10 +43,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,17 +63,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.trimIfExceeds
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
+import com.ustadmobile.test_app.screens.LocalVirtualNodeScreen
 import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.kodein.di.DI
+import org.kodein.di.DIAware
+import org.kodein.di.android.closestDI
+import org.kodein.di.compose.withDI
 import java.util.UUID
 
 data class TestActivityUiState(
@@ -75,11 +92,18 @@ data class TestActivityUiState(
     val logLines: List<LogLine> = emptyList(),
 )
 
-class VNetTestActivity : ComponentActivity() {
+//TODO: show QR code e.g. https://stackoverflow.com/questions/28232116/android-using-zxing-generate-qr-code
+class VNetTestActivity : ComponentActivity(), DIAware {
+
+    override val di by closestDI()
 
     private lateinit var virtualNode: AndroidVirtualNode
 
-    private val activityUiState = MutableStateFlow<TestActivityUiState>(TestActivityUiState())
+    private val activityUiState = MutableStateFlow(TestActivityUiState())
+
+    private val scanQrCode = registerForActivityResult(ScanQrCodeContract()) { qrCode ->
+        Toast.makeText(this, qrCode, Toast.LENGTH_LONG).show()
+    }
 
     val launchCompanionDeviceIntentSender = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(), activityResultRegistry
@@ -180,6 +204,10 @@ class VNetTestActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+
+                    MeshrabiyaTestApp(di)
+
+                    /*
                     TestScreen(
                         uiState = activityUiState,
                         onClickMakeDiscoverable = this::onClickMakeDiscoverable,
@@ -187,7 +215,7 @@ class VNetTestActivity : ComponentActivity() {
                         onSetLocalOnlyHotspotEnabled = this::onSetLocalOnlyHotspotEnabled,
                         onClickLogs = this::onClickLogs,
                         onClickNodeRequestWifiHotspot = this::onClickNodeRequestWifiHotspot,
-                    )
+                    )*/
                 }
             }
         }
@@ -202,6 +230,9 @@ class VNetTestActivity : ComponentActivity() {
     }
 
     fun onClickAddNode() {
+        scanQrCode.launch(Unit)
+
+        /*
         val deviceFilter = BluetoothDeviceFilter.Builder()
             .build()
 
@@ -232,6 +263,7 @@ class VNetTestActivity : ComponentActivity() {
             },
             null
         )
+         */
     }
 
     fun onDeviceSelected(bluetoothDevice: BluetoothDevice?) {
@@ -271,6 +303,97 @@ class VNetTestActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MeshrabiyaTestApp(
+    di: DI
+) = withDI(di) {
+    val navController: NavHostController = rememberNavController()
+    var selectedItem: String? by remember {
+        mutableStateOf(null)
+    }
+
+
+    Scaffold(
+        topBar = {
+            TopAppBar(title = {
+                Text("Meshrabiya")
+            })
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = selectedItem == "localvirtualnode",
+                    label = { Text("This Node") },
+                    onClick = {
+                        navController.navigate("localvirtualnode")
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.PhoneAndroid,
+                            contentDescription = null
+                        )
+                    }
+                )
+
+                NavigationBarItem(
+                    selected = selectedItem == "neighbornodes" ,
+                    label = { Text("Neighbor Nodes") },
+                    onClick = { /*TODO*/ },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.ConnectWithoutContact,
+                            contentDescription = null,
+                        )
+                    }
+                )
+
+                NavigationBarItem(
+                    selected = selectedItem == "mesh" ,
+                    label = { Text("Mesh") },
+                    onClick = { /*TODO*/ },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Radar,
+                            contentDescription = null,
+                        )
+                    }
+                )
+            }
+        }
+
+    ) { contentPadding ->
+        // Screen content
+        Box(
+            modifier = Modifier.padding(contentPadding)
+        ) {
+            AppNavHost(
+                navController = navController,
+            )
+        }
+    }
+}
+
+@Composable
+fun AppNavHost(
+    modifier: Modifier = Modifier,
+    navController: NavHostController = rememberNavController(),
+    startDestination: String = "localvirtualnode",
+){
+    NavHost(
+        modifier = modifier,
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        composable("localvirtualnode") {
+            LocalVirtualNodeScreen()
+        }
+
+
+    }
+}
+
+
 @Composable
 @Preview
 fun TestScreenPreview() {
@@ -280,6 +403,7 @@ fun TestScreenPreview() {
 
     }
 }
+
 
 @Composable
 fun TestScreen(
