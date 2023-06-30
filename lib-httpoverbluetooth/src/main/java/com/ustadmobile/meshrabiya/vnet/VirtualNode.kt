@@ -31,7 +31,6 @@ import kotlinx.serialization.json.Json
 import java.io.Closeable
 import java.io.IOException
 import java.net.InetAddress
-import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -143,7 +142,7 @@ abstract class VirtualNode(
         _state.update { prev ->
             prev.copy(
                 address = localNodeAddress,
-                connectUri = generateConnectUri(hotspot = null)
+                connectUri = generateConnectLink(hotspot = null).uri
             )
         }
     }
@@ -164,19 +163,16 @@ abstract class VirtualNode(
         get() = datagramSocket.localPort
 
 
-    protected fun generateConnectUri(
+    protected fun generateConnectLink(
         hotspot: HotspotConfig?,
-    ) : String{
-        return buildString {
-            append("meshrabiya://${localNodeAddress.addressToDotNotation()}:$localDatagramPort}/?")
-            if(hotspot != null) {
-                append("hotspot=")
-                append(URLEncoder.encode(json.encodeToString(
-                    HotspotConfig.serializer(), hotspot
-                ), "UTF-8"))
-            }
-        }
-
+    ) : MeshrabiyaConnectLink {
+        return MeshrabiyaConnectLink.fromComponents(
+            nodeAddr = localNodeAddress,
+            port = localDatagramPort,
+            hotspotConfig = hotspot,
+            bluetoothConfig = null,
+            json = json,
+        )
     }
 
 

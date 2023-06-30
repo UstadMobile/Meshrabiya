@@ -11,6 +11,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.server.UuidAllocationServer
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid
 import kotlinx.coroutines.CompletableDeferred
@@ -118,9 +119,9 @@ class AndroidVirtualNode(
                 _state.update { prev ->
                     prev.copy(
                         wifiState = it,
-                        connectUri = generateConnectUri(
+                        connectUri = generateConnectLink(
                             hotspot = it.config
-                        )
+                        ).uri
                     )
                 }
             }
@@ -181,18 +182,19 @@ class AndroidVirtualNode(
             sendRequestWifiConnectionMmcpMessage(remoteVirtualAddr)
             val hotspotResponse = responseCompleteableDeferred.await()
 
-            logger(Log.INFO, "$logPrefix : addWifiConnection: got response ${hotspotResponse.result}", null)
+            logger(Log.INFO, "$logPrefix : addWifiConnection (by remote address): got response ${hotspotResponse.result}", null)
             val config = hotspotResponse.result.config
+
             if(config != null) {
-                hotspotManager.connectToHotspot(config)
+                addWifiConnection(config)
             }else {
                 logger(Log.ERROR, "$logPrefix: addWifiConnection: Received null config", null)
             }
         }
     }
 
-
-
-
+    suspend fun addWifiConnection(config: HotspotConfig) {
+        hotspotManager.connectToHotspot(config)
+    }
 
 }

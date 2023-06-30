@@ -17,6 +17,7 @@ import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import org.junit.Assert
 import org.junit.Test
 import org.mockito.kotlin.any
@@ -43,11 +44,13 @@ class VirtualNodeTest {
         uuidMask: UUID = UUID.randomUUID(),
         port: Int = 0,
         logger: MNetLogger,
-        override val hotspotManager: MeshrabiyaWifiManager = mock { }
+        override val hotspotManager: MeshrabiyaWifiManager = mock { },
+        json: Json,
     ) : VirtualNode(
         uuidMask = uuidMask,
         port = port,
         logger = logger,
+        json = json,
     )
 
     class PipeSocket(
@@ -73,16 +76,19 @@ class VirtualNodeTest {
     @Test
     fun givenTwoVirtualNodesConnectedOverIoStreamSocket_whenPingSent_thenReplyWillBeReceived() {
         val executor = Executors.newCachedThreadPool()
+        val json = Json { encodeDefaults = true }
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { }
+            hotspotManager = mock { },
+            json = json,
         )
 
         val node2 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { },
+            json = json,
         )
 
         val node1ToNode2Out = PipedOutputStream()
@@ -123,15 +129,18 @@ class VirtualNodeTest {
 
     @Test
     fun givenTwoVirtualNodesConnectedOverDatagramSocket_whenPingSent_thenReplyWillBeReceived() {
+        val json = Json { encodeDefaults = true }
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { }
+            hotspotManager = mock { },
+            json = json,
         )
         val node2 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { }
+            hotspotManager = mock { },
+            json = json,
         )
 
         node1.addNewDatagramNeighborConnection(
@@ -188,16 +197,20 @@ class VirtualNodeTest {
             }
         }
 
+        val json = Json { encodeDefaults = true }
+
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mockHotspotManager,
+            json = json,
         )
 
         val node2 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { }
+            hotspotManager = mock { },
+            json = json,
         )
 
         node1.addNewDatagramNeighborConnection(
