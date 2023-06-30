@@ -12,6 +12,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
@@ -26,9 +27,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import java.io.Closeable
 import java.io.IOException
 import java.net.InetAddress
+import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -69,6 +72,7 @@ abstract class VirtualNode(
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
     val localNodeAddress: Int = randomApipaAddr(),
     val autoForwardInbound: Boolean = true,
+    val json: Json,
 ): NeighborNodeManager.RemoteMNodeManagerListener, VirtualRouter, Closeable {
 
     //This executor is used for direct I/O activities
@@ -77,13 +81,17 @@ abstract class VirtualNode(
     //This executor is used to schedule maintenance e.g. pings etc.
     protected val scheduledExecutor = Executors.newScheduledThreadPool(2)
 
-    private val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
+    protected val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
 
     private val neighborNodeManagers: MutableMap<Int, NeighborNodeManager> = ConcurrentHashMap()
 
     private val _neighborNodesState = MutableStateFlow(emptyList<NeighborNodeState>())
 
     private val mmcpMessageIdAtomic = AtomicInteger()
+
+    val _state = MutableStateFlow(LocalNodeState())
+
+    val state: Flow<LocalNodeState> = _state.asStateFlow()
 
     val neighborNodesState: Flow<List<NeighborNodeState>> = _neighborNodesState.asStateFlow()
 
@@ -131,6 +139,15 @@ abstract class VirtualNode(
 
     val incomingMmcpMessages: Flow<MmcpMessage> = _incomingMmcpMessages.asSharedFlow()
 
+    init {
+        _state.update { prev ->
+            prev.copy(
+                address = localNodeAddress,
+                connectUri = generateConnectUri(hotspot = null)
+            )
+        }
+    }
+
     override fun onNodeStateChanged(remoteMNodeState: NeighborNodeState) {
         _neighborNodesState.update { prev ->
             prev.appendOrReplace(remoteMNodeState) { it.remoteAddress == remoteMNodeState.remoteAddress }
@@ -145,6 +162,23 @@ abstract class VirtualNode(
 
     override val localDatagramPort: Int
         get() = datagramSocket.localPort
+
+
+    protected fun generateConnectUri(
+        hotspot: HotspotConfig?,
+    ) : String{
+        return buildString {
+            append("meshrabiya://${localNodeAddress.addressToDotNotation()}:$localDatagramPort}/?")
+            if(hotspot != null) {
+                append("hotspot=")
+                append(URLEncoder.encode(json.encodeToString(
+                    HotspotConfig.serializer(), hotspot
+                ), "UTF-8"))
+            }
+        }
+
+    }
+
 
     override fun route(
         packet: VirtualPacket
@@ -357,7 +391,17 @@ abstract class VirtualNode(
             toAddr = virtualAddr,
             fromAddr = localNodeAddress
         ))
+    }
 
+    suspend fun setWifiHotspotEnabled(enabled: Boolean) {
+        if(enabled){
+            hotspotManager.requestHotspot(
+                requestMessageId = nextMmcpMessageId(),
+                request = LocalHotspotRequest(
+                    is5GhzSupported = hotspotManager.is5GhzSupported
+                )
+            )
+        }
     }
 
 

@@ -18,8 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.util.UUID
 
@@ -29,11 +31,13 @@ class AndroidVirtualNode(
     port: Int = 0,
     logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _ -> },
     localMNodeAddress: Int = randomApipaAddr(),
+    json: Json,
 ): VirtualNode(
     uuidMask = uuidMask,
     port = port,
     logger = logger,
     localNodeAddress = localMNodeAddress,
+    json = json,
 ) {
 
 
@@ -108,6 +112,19 @@ class AndroidVirtualNode(
 
     init {
         uuidAllocationServer.start()
+
+        coroutineScope.launch {
+            hotspotManager.state.collect {
+                _state.update { prev ->
+                    prev.copy(
+                        wifiState = it,
+                        connectUri = generateConnectUri(
+                            hotspot = it.config
+                        )
+                    )
+                }
+            }
+        }
     }
 
 

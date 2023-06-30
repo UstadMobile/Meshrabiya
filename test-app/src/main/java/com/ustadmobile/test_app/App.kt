@@ -5,6 +5,7 @@ import android.content.Context
 import com.ustadmobile.meshrabiya.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.test_app.VNetTestActivity.Companion.UUID_MASK
+import kotlinx.serialization.json.Json
 import org.acra.ACRA
 import org.acra.config.CoreConfigurationBuilder
 import org.acra.config.HttpSenderConfigurationBuilder
@@ -21,12 +22,18 @@ class App: Application(), DIAware {
         bind<MNetLogger>() with singleton {
             MNetLoggerImpl()
         }
+        bind<Json>() with singleton {
+            Json {
+                encodeDefaults = true
+            }
+        }
 
         bind<AndroidVirtualNode>() with singleton {
             AndroidVirtualNode(
                 appContext = applicationContext,
                 uuidMask = UUID_MASK,
                 logger = instance(),
+                json = instance(),
             )
         }
     }

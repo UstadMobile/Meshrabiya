@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.serialization'
 }
 
 android {
@@ -65,6 +66,9 @@ dependencies {
     implementation "androidx.navigation:navigation-compose:$version_navigation"
     implementation "org.kodein.di:kodein-di-framework-compose:$version_kodein_di"
     implementation "org.kodein.di:kodein-di-framework-android-x:$version_kodein_di"
+
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+    implementation "com.journeyapps:zxing-android-embedded:$version_zxing_embedded"
 
 
     implementation 'androidx.core:core-ktx:1.8.0'

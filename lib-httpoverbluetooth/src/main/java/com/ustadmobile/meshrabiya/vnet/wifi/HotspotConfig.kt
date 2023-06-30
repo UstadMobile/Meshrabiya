@@ -4,9 +4,11 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import com.ustadmobile.meshrabiya.ext.getStringOrThrow
 import com.ustadmobile.meshrabiya.ext.putStringFromBytes
+import kotlinx.serialization.Serializable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+@Serializable
 data class HotspotConfig(
     val ssid: String,
     val passphrase: String,

@@ -97,8 +97,6 @@ class VNetTestActivity : ComponentActivity(), DIAware {
 
     override val di by closestDI()
 
-    private lateinit var virtualNode: AndroidVirtualNode
-
     private val activityUiState = MutableStateFlow(TestActivityUiState())
 
     private val scanQrCode = registerForActivityResult(ScanQrCodeContract()) { qrCode ->
@@ -170,32 +168,6 @@ class VNetTestActivity : ComponentActivity(), DIAware {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        virtualNode = AndroidVirtualNode(
-            appContext = applicationContext,
-            uuidMask = UUID_MASK,
-            logger = vNetLogger,
-        )
-        activityUiState.update { prev ->
-            prev.copy(localAddress = virtualNode.localNodeAddress)
-        }
-
-        lifecycleScope.launch {
-            virtualNode.neighborNodesState.collect {
-                activityUiState.update { prev ->
-                    prev.copy(remoteNodes = it)
-                }
-            }
-        }
-
-        lifecycleScope.launch {
-            virtualNode.localHotSpotState.collect { hotspotState ->
-                activityUiState.update { prev ->
-                    prev.copy(localHotspotState = hotspotState)
-                }
-            }
-        }
-
 
         setContent {
             HttpOverBluetoothTheme {
@@ -271,9 +243,9 @@ class VNetTestActivity : ComponentActivity(), DIAware {
 
         lifecycleScope.launch {
             try {
-                virtualNode.addBluetoothConnection(
-                    remoteBluetooothAddr = device.address,
-                )
+//                virtualNode.addBluetoothConnection(
+//                    remoteBluetooothAddr = device.address,
+//                )
             }catch(e: Exception) {
                 vNetLogger(Log.ERROR, "Error adding bluetooth connection", e)
             }
@@ -284,14 +256,14 @@ class VNetTestActivity : ComponentActivity(), DIAware {
     fun onSetLocalOnlyHotspotEnabled(enabled: Boolean) {
         if(enabled){
             lifecycleScope.launch {
-                virtualNode.sendRequestWifiConnectionMmcpMessage(virtualNode.localNodeAddress)
+                //virtualNode.sendRequestWifiConnectionMmcpMessage(virtualNode.localNodeAddress)
             }
         }
     }
 
     fun onClickNodeRequestWifiHotspot(nodeAddr: Int) {
         lifecycleScope.launch {
-            virtualNode.addWifiConnection(nodeAddr)
+            //virtualNode.addWifiConnection(nodeAddr)
         }
     }
 
