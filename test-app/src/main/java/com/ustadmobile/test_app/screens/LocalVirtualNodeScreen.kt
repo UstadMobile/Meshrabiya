@@ -1,7 +1,9 @@
 package com.ustadmobile.test_app.screens
 
 import android.Manifest
+import android.content.res.Resources
 import android.os.Build
+import android.util.TypedValue
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -16,15 +18,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import kotlin.math.min as mathmin
 import com.ustadmobile.test_app.viewmodel.LocalVirtualNodeViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
@@ -32,6 +37,7 @@ import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.test_app.NEARBY_WIFI_PERMISSION_NAME
 import com.ustadmobile.test_app.ViewModelFactory
+import com.ustadmobile.test_app.appstate.AppUiState
 import com.ustadmobile.test_app.hasBluetoothConnectPermission
 import com.ustadmobile.test_app.hasNearbyWifiDevicesOrLocationPermission
 import com.ustadmobile.test_app.viewmodel.LocalVirtualNodeUiState
@@ -48,11 +54,16 @@ fun LocalVirtualNodeScreen(
             },
             defaultArgs = null,
         )
-    )
+    ),
+    onSetAppUiState: (AppUiState) -> Unit,
 ){
     val uiState: LocalVirtualNodeUiState by viewModel.uiState.collectAsState(
         initial = LocalVirtualNodeUiState()
     )
+
+    LaunchedEffect(uiState.appUiState) {
+        onSetAppUiState(uiState.appUiState)
+    }
 
     val context = LocalContext.current
 
@@ -129,9 +140,18 @@ fun LocalVirtualNodeScreen(
         val connectUri = uiState.connectUri
         if(connectUri != null && uiState.incomingConnectionsEnabled) {
             item("qrcode") {
+                val config = LocalConfiguration.current
+                val screenWidth = config.screenWidthDp
+                val screenWidthPx = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    screenWidth.toFloat(),
+                    Resources.getSystem().displayMetrics,
+                )
+                val width = mathmin(screenWidthPx.toInt(), 600)
+
                 val qrCodeBitmap = remember(connectUri) {
                     barcodeEncoder.encodeBitmap(
-                        connectUri, BarcodeFormat.QR_CODE, 400, 400
+                        connectUri, BarcodeFormat.QR_CODE, width, width
                     ).asImageBitmap()
                 }
 

@@ -39,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -73,7 +74,9 @@ import com.ustadmobile.meshrabiya.ext.trimIfExceeds
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
+import com.ustadmobile.test_app.appstate.AppUiState
 import com.ustadmobile.test_app.screens.LocalVirtualNodeScreen
+import com.ustadmobile.test_app.screens.NeighborNodeListScreen
 import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -281,6 +284,10 @@ fun MeshrabiyaTestApp(
     di: DI
 ) = withDI(di) {
     val navController: NavHostController = rememberNavController()
+    var appUiState: AppUiState by remember {
+        mutableStateOf(AppUiState())
+    }
+
     var selectedItem: String? by remember {
         mutableStateOf(null)
     }
@@ -289,13 +296,29 @@ fun MeshrabiyaTestApp(
     Scaffold(
         topBar = {
             TopAppBar(title = {
-                Text("Meshrabiya")
+                Text(appUiState.title)
             })
+        },
+        floatingActionButton = {
+            if(appUiState.fabState.visible) {
+                ExtendedFloatingActionButton(
+                    onClick = appUiState.fabState.onClick,
+                    icon = {
+                        appUiState.fabState.icon?.also {
+                            Icon(imageVector = it, contentDescription = null)
+                        }
+                    },
+                    text = {
+                        Text(appUiState.fabState.label ?: "")
+                    }
+                )
+            }
+
         },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = selectedItem == "localvirtualnode",
+                    selected = navController.currentDestination?.route == "localvirtualnode",
                     label = { Text("This Node") },
                     onClick = {
                         navController.navigate("localvirtualnode")
@@ -309,9 +332,11 @@ fun MeshrabiyaTestApp(
                 )
 
                 NavigationBarItem(
-                    selected = selectedItem == "neighbornodes" ,
+                    selected = navController.currentDestination?.route == "neighbornodes" ,
                     label = { Text("Neighbor Nodes") },
-                    onClick = { /*TODO*/ },
+                    onClick = {
+                        navController.navigate("neighbornodes")
+                    },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.ConnectWithoutContact,
@@ -341,6 +366,9 @@ fun MeshrabiyaTestApp(
         ) {
             AppNavHost(
                 navController = navController,
+                onSetAppUiState = {
+                    appUiState = it
+                }
             )
         }
     }
@@ -351,6 +379,7 @@ fun AppNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startDestination: String = "localvirtualnode",
+    onSetAppUiState: (AppUiState) -> Unit = { },
 ){
     NavHost(
         modifier = modifier,
@@ -358,9 +387,14 @@ fun AppNavHost(
         startDestination = startDestination
     ) {
         composable("localvirtualnode") {
-            LocalVirtualNodeScreen()
+            LocalVirtualNodeScreen(
+                onSetAppUiState = onSetAppUiState,
+            )
         }
 
+        composable("neighbornodes") {
+            NeighborNodeListScreen(onSetAppUiState = onSetAppUiState)
+        }
 
     }
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
+import com.ustadmobile.test_app.appstate.AppUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +17,7 @@ data class LocalVirtualNodeUiState(
     val localAddress: Int = 0,
     val wifiState: MeshrabiyaWifiState? = null,
     val connectUri: String? = null,
+    val appUiState: AppUiState = AppUiState(),
 ){
     val incomingConnectionsEnabled: Boolean
         get() = wifiState?.config != null
@@ -39,10 +41,14 @@ class LocalVirtualNodeViewModel(
                         localAddress = it.address,
                         wifiState = it.wifiState,
                         connectUri = it.connectUri,
+                        appUiState = AppUiState(
+                            title = "This node"
+                        )
                     )
                 }
             }
         }
+
     }
 
     fun onSetIncomingConnectionsEnabled(enabled: Boolean) {
