@@ -1,6 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
-import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
+import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 
 data class LocalNodeState(
     val address: Int = 0,

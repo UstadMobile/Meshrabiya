@@ -166,7 +166,8 @@ fun LocalVirtualNodeScreen(
             Text(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.bodySmall,
-                text = "Local Hotspot: ${uiState.wifiState?.config?.ssid}\n" +
+                text = "Wifi Role ${uiState.wifiState?.wifiRole}\n" +
+                        "Local Hotspot: ${uiState.wifiState?.config?.ssid}\n" +
                         "Passphrase: ${uiState.wifiState?.config?.passphrase}\n" +
                         "Port: ${uiState.wifiState?.config?.port}"
             )

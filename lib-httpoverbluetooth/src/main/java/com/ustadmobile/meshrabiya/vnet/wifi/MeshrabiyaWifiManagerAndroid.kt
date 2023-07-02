@@ -22,6 +22,9 @@ import com.ustadmobile.meshrabiya.ext.toPrettyString
 import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.WifiRole
+import com.ustadmobile.meshrabiya.vnet.wifi.state.LocalOnlyHotspotState
+import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
+import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiDirectGroupState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -29,10 +32,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.Closeable
 import java.net.InetAddress
 import java.nio.ByteBuffer
@@ -80,8 +84,9 @@ class MeshrabiyaWifiManagerAndroid(
                     //If Wifi has been disabled, make sure to
                     _state.takeIf { state == WifiP2pManager.WIFI_P2P_STATE_DISABLED }?.update { prev ->
                         prev.copy(
-                            wifiDirectGroupStatus = LocalHotspotStatus.STOPPED,
-                            config = null,
+                            wifiDirectGroupState = WifiDirectGroupState(
+                                hotspotStatus = HotspotStatus.STOPPED
+                            ),
                         )
                     }
 
@@ -89,8 +94,45 @@ class MeshrabiyaWifiManagerAndroid(
                 WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                     val extraGroup: WifiP2pGroup? = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_GROUP)
                     logger(Log.DEBUG, "wifi p2p connection changed action: group=${extraGroup?.toPrettyString()}", null)
+                    if(extraGroup != null)
+                        onNewWifiP2pGroupInfoReceived(extraGroup)
                 }
             }
+        }
+    }
+
+    /**
+     * This function can be called by the WIFI_P2P_CONNECTION_CHANGED_ACTION or groupInfoListener.
+     * Sometimes the info only comes with the callback, sometimes it only comes in the broadcast.
+     */
+    private fun onNewWifiP2pGroupInfoReceived(group: WifiP2pGroup) {
+        val ssid = group.networkName
+        val passphrase = group.passphrase
+
+        _state.update { prev ->
+            val hotspotConfig = if(ssid != null && passphrase != null) {
+                HotspotConfig(
+                    ssid = ssid,
+                    passphrase = passphrase,
+                    port = router.localDatagramPort,
+                    hotspotType = HotspotType.WIFIDIRECT_GROUP
+                )
+            }else {
+                null
+            }
+
+            prev.copy(
+                wifiRole = if(hotspotConfig != null) {
+                    WifiRole.WIFI_DIRECT_GROUP_OWNER
+                } else {
+                    prev.wifiRole
+                },
+                wifiDirectGroupState = WifiDirectGroupState(
+                    hotspotStatus = HotspotStatus.STARTED,
+                    config = hotspotConfig,
+                ),
+                errorCode = 0,
+            )
         }
     }
 
@@ -103,61 +145,55 @@ class MeshrabiyaWifiManagerAndroid(
         if(group == null)
             return@GroupInfoListener
 
-        val ssid = group.networkName
-        val passphrase = group.passphrase
-
-        _state.update { prev ->
-            prev.copy(
-                wifiRole = WifiRole.WIFI_DIRECT_GROUP_OWNER,
-                wifiDirectGroupStatus = LocalHotspotStatus.STARTED,
-                errorCode = 0,
-                config = if(ssid != null && passphrase != null) {
-                    HotspotConfig(
-                        ssid = ssid,
-                        passphrase = passphrase,
-                        port = router.localDatagramPort,
-                        hotspotType = HotspotType.WIFIDIRECT_GROUP
-                    )
-                }else {
-                    null
-                }
-            )
-        }
+        onNewWifiP2pGroupInfoReceived(group)
     }
 
     private var localOnlyHotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
 
     private val localOnlyHotspotCallback = object: WifiManager.LocalOnlyHotspotCallback() {
         override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation?) {
+            logger(Log.DEBUG, "$logPrefix localonlyhotspotcallback: onStarted", null)
             localOnlyHotspotReservation = reservation
-            _state.takeIf{ reservation != null }?.update {prev ->
+            _state.takeIf { reservation != null }?.update {prev ->
                 prev.copy(
                     wifiRole = WifiRole.LOCAL_ONLY_HOTSPOT,
-                    localOnlyHotspotStatus = LocalHotspotStatus.STARTED,
-                    config = reservation?.toLocalHotspotConfig(router.localDatagramPort),
+                    localOnlyHotspotState = LocalOnlyHotspotState(
+                        status = HotspotStatus.STARTED,
+                        config = reservation?.toLocalHotspotConfig(router.localDatagramPort),
+                    ),
                 )
             }
         }
 
         override fun onStopped() {
+            logger(Log.DEBUG, "$logPrefix localonlyhotspotcallback: onStopped", null)
             localOnlyHotspotReservation = null
             _state.update { prev ->
+                val wasLocalOnlyHotspot = prev.wifiRole == WifiRole.LOCAL_ONLY_HOTSPOT
                 prev.copy(
-                    wifiRole = if(prev.wifiRole == WifiRole.LOCAL_ONLY_HOTSPOT) {
+                    wifiRole = if(wasLocalOnlyHotspot) {
                         WifiRole.NONE
                     } else {
                         prev.wifiRole
                     },
-                    localOnlyHotspotStatus = LocalHotspotStatus.STOPPED,
+                    localOnlyHotspotState = LocalOnlyHotspotState(
+                        status = HotspotStatus.STOPPED,
+                    ),
                 )
             }
         }
 
         override fun onFailed(reason: Int) {
+            logger(Log.ERROR, "$logPrefix localOnlyhotspotcallback : onFailed: " +
+                LocalOnlyHotspotState.errorCodeToString(reason), null
+            )
+
             _state.update { prev ->
                 prev.copy(
-                    localOnlyHotspotStatus = LocalHotspotStatus.STOPPED,
-                    errorCode = reason,
+                    localOnlyHotspotState = LocalOnlyHotspotState(
+                        status = HotspotStatus.STOPPED,
+                        errorCode = reason,
+                    )
                 )
             }
         }
@@ -204,61 +240,157 @@ class MeshrabiyaWifiManagerAndroid(
         appContext.registerReceiver(wifiDirectBroadcastReceiver, intentFilter)
     }
 
+    //WifiDirect Channel Listener
     override fun onChannelDisconnected() {
+        logger(Log.DEBUG, "$logPrefix onChannelDisconnected", null)
         channel = null
+
+        _state.update { prev ->
+            prev.copy(
+                wifiRole = if(prev.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER){
+                    WifiRole.NONE
+                }else {
+                    prev.wifiRole
+                },
+                wifiDirectGroupState = WifiDirectGroupState(
+                    hotspotStatus = HotspotStatus.STOPPED,
+                )
+            )
+        }
     }
 
     override val is5GhzSupported: Boolean
         get() = wifiManager.is5GHzBandSupported
 
 
-    suspend fun startWifiDirectGroup() {
-        val completable = CompletableDeferred<Boolean>()
-        if(_state.value.wifiDirectGroupStatus == LocalHotspotStatus.STOPPED) {
-            _state.update { prev ->
-                prev.copy(wifiDirectGroupStatus = LocalHotspotStatus.STARTING)
-            }
+    private suspend fun startWifiDirectGroup(): Boolean {
+        logger(Log.DEBUG, "$logPrefix startWifiDirectGroup", null)
+        stopLocalOnlyHotspot()
 
-            //TODO: stop local only hotspot if that is running
-
-            if(channel == null) {
-                channel = wifiP2pManager?.initialize(appContext, Looper.getMainLooper(), this)
-            }
-
-            logger(Log.DEBUG, "$logPrefix Requesting WifiP2PGroup", null)
-            wifiP2pManager?.createGroup(channel, object: WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    logger(Log.DEBUG, "$logPrefix WifiP2PGroup:onSuccess", null)
-                    wifiP2pManager?.requestGroupInfo(channel, wifiP2pGroupInfoListener)
-                    completable.complete(true)
-                }
-
-                override fun onFailure(reason: Int) {
-                    logger(
-                        Log.ERROR,
-                        "WifiP2pGroup: ONFailure ${WifiP2pFailure.reasonToString(reason)}",
-                        null
-                    )
-
-                    _state.update { prev ->
-                        prev.copy(
-                            wifiDirectGroupStatus = LocalHotspotStatus.STOPPED,
-                            errorCode = reason,
-                            config = null
-                        )
-                    }
-                    completable.complete(false)
-                }
-            })
+        if(channel == null) {
+            channel = wifiP2pManager?.initialize(appContext, Looper.getMainLooper(), this)
         }
-        completable.await()
+
+        logger(Log.DEBUG, "$logPrefix startWifiDirectGroup: Requesting WifiP2PGroup", null)
+        wifiP2pManager?.createGroup(channel, object: WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                logger(Log.DEBUG, "$logPrefix startWifiDirectGroup: WifiP2PGroup:onSuccess", null)
+                wifiP2pManager?.requestGroupInfo(channel, wifiP2pGroupInfoListener)
+            }
+
+            override fun onFailure(reason: Int) {
+                logger(
+                    Log.ERROR,
+                    "$logPrefix: startWifiDirectGroup: ONFailure ${(WifiDirectError(reason)) }",
+                    null
+                )
+
+                _state.update { prev ->
+                    prev.copy(
+                        wifiDirectGroupState = WifiDirectGroupState(
+                            hotspotStatus = HotspotStatus.STOPPED,
+                            error = reason,
+                        ),
+                    )
+                }
+            }
+        })
+
+        return withTimeoutOrNull(HOTSPOT_TIMEOUT) {
+            state.filter { it.wifiDirectGroupState.hotspotStatus.isSettled() }.first()
+        }?.wifiDirectGroupState?.hotspotStatus == HotspotStatus.STARTED
     }
 
-    fun startLocalOnlyHotspot() {
-        if(_state.value.localOnlyHotspotStatus == LocalHotspotStatus.STOPPED){
-            wifiManager.startLocalOnlyHotspot(localOnlyHotspotCallback, null)
+    suspend fun stopWifiDirectGroup(): Boolean {
+        logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup", null)
+        if(
+            //Use atomic update on state flow. If group was started, then stop it now.
+            _state.getAndUpdate { prev ->
+                if(prev.wifiDirectGroupState.hotspotStatus == HotspotStatus.STARTED) {
+                    prev.copy(
+                        wifiDirectGroupState = prev.wifiDirectGroupState.copy(
+                            hotspotStatus = HotspotStatus.STOPPING
+                        )
+                    )
+                }else {
+                    prev
+                }
+            }.wifiDirectGroupState.hotspotStatus == HotspotStatus.STARTED
+        ) {
+            withContext(Dispatchers.Main) {
+                val channelVal = channel
+                if(channelVal != null) {
+                    logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup - requesting group removal",null)
+                    wifiP2pManager?.removeGroup(channel, object : WifiP2pManager.ActionListener {
+                        override fun onSuccess() {
+                            logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup: successful", null)
+                            _state.update { prev ->
+                                prev.copy(
+                                    wifiRole = if(prev.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER) {
+                                        WifiRole.NONE
+                                    }else {
+                                        prev.wifiRole
+                                    },
+                                    wifiDirectGroupState = WifiDirectGroupState(
+                                        hotspotStatus = HotspotStatus.STOPPED
+                                    )
+                                )
+                            }
+
+                            if(Build.VERSION.SDK_INT >= 27) {
+                                logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup: closing wifi p2p channel", null)
+                                channelVal.close()
+                            }
+                            channel = null
+                        }
+
+                        override fun onFailure(reason: Int) {
+                            logger(Log.ERROR, "$logPrefix stopWifiDirectGroup: onFailure: " +
+                                    "${WifiDirectError(reason)}", null)
+                        }
+                    })
+                }else {
+                    logger(Log.ERROR, "INVALID STATE: wifidirect group status = STARTED but channel is null", null)
+                    false
+                }
+            }
         }
 
+        return withTimeoutOrNull(HOTSPOT_TIMEOUT) {
+            _state.filter { it.wifiDirectGroupState.hotspotStatus.isSettled() }.first()
+        }?.wifiDirectGroupState?.hotspotStatus == HotspotStatus.STOPPED
+    }
+
+    private suspend fun startLocalOnlyHotspot() {
+        logger(Log.DEBUG, "$logPrefix startLocalOnlyHotspot", null)
+        stopWifiDirectGroup()
+        logger(Log.DEBUG, "$logPrefix startLocalOnlyHotspot: requesting WifiManager to " +
+                "start local only hotspot", null)
+        wifiManager.startLocalOnlyHotspot(localOnlyHotspotCallback, null)
+    }
+
+    suspend fun stopLocalOnlyHotspot(): Boolean {
+        logger(Log.DEBUG, "$logPrefix stopLocalOnlyHotspot", null)
+        if(
+            _state.getAndUpdate { prev ->
+                if(prev.localOnlyHotspotState.status == HotspotStatus.STARTED) {
+                    prev.copy(
+                        localOnlyHotspotState = prev.localOnlyHotspotState.copy(
+                            status = HotspotStatus.STOPPING
+                        )
+                    )
+                }else {
+                    prev
+                }
+            }.localOnlyHotspotState.status == HotspotStatus.STARTED
+        ) {
+            logger(Log.DEBUG, "$logPrefix stopLocalOnlyHotspot: closing reservation", null)
+            localOnlyHotspotReservation?.close()
+        }
+
+        return withTimeoutOrNull(HOTSPOT_TIMEOUT) {
+            state.filter { it.localOnlyHotspotState.status.isSettled() }.first()
+        }?.localOnlyHotspotState?.status == HotspotStatus.STOPPED
     }
 
     override suspend fun requestHotspot(
@@ -268,31 +400,44 @@ class MeshrabiyaWifiManagerAndroid(
         if(closed.get())
             throw IllegalStateException("$logPrefix is closed!")
 
-        requestMutex.withLock {
-            withContext(Dispatchers.Main) {
-                if(
-                    _state.value.config != null ||
-                    _state.value.wifiDirectGroupStatus == LocalHotspotStatus.STARTING ||
-                    _state.value.localOnlyHotspotStatus == LocalHotspotStatus.STARTING
-                ) {
-                    //config is ready or hotspot of some kind is already being started
-                    return@withContext
-                }else if(_state.value.wifiRole == WifiRole.NONE) {
-                    //nothing has been started yet, so this device will become the local only hotspot
+        logger(Log.DEBUG, "$logPrefix requestHotspot requestId=$requestMessageId", null)
+        withContext(Dispatchers.Main) {
+            val prevState = _state.getAndUpdate { prev ->
+                when(prev.hotspotTypeToCreate) {
+                    HotspotType.LOCALONLY_HOTSPOT ->  prev.copy(
+                        localOnlyHotspotState = prev.localOnlyHotspotState.copy(
+                            status = HotspotStatus.STARTING
+                        )
+                    )
+
+                    HotspotType.WIFIDIRECT_GROUP -> prev.copy(
+                        wifiDirectGroupState = prev.wifiDirectGroupState.copy(
+                            hotspotStatus = HotspotStatus.STARTING
+                        )
+                    )
+
+                    else -> prev
+                }
+            }
+
+            when(prevState.hotspotTypeToCreate) {
+                HotspotType.LOCALONLY_HOTSPOT -> {
                     startLocalOnlyHotspot()
-                }else if(_state.value.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER) {
+                }
+                HotspotType.WIFIDIRECT_GROUP -> {
                     startWifiDirectGroup()
+                }
+                else -> {
+                    //Do nothing
                 }
             }
         }
 
         val configResult = _state.filter {
-            (it.wifiDirectGroupStatus == LocalHotspotStatus.STARTED ||
-                    it.localOnlyHotspotStatus == LocalHotspotStatus.STARTED) ||
+            (it.wifiDirectGroupState.hotspotStatus == HotspotStatus.STARTED ||
+                    it.localOnlyHotspotState.status == HotspotStatus.STARTED) ||
                     it.errorCode != 0
         }.first()
-
-        //now observe a flow of the datagramsocket that is bound to this network
 
         return LocalHotspotResponse(
             responseToMessageId = requestMessageId,
@@ -310,6 +455,9 @@ class MeshrabiyaWifiManagerAndroid(
     private suspend fun connectToHotspot(ssid: String, passphrase: String): NetworkAndDhcpServer? {
         logger(Log.INFO, "$logPrefix Connecting to hotspot: ssid=$ssid passphrase=$passphrase", null)
 
+        //Local Hotspot (on most devices) cannot run at the same time as being connected as a station
+        stopLocalOnlyHotspot()
+
         val completable = CompletableDeferred<NetworkAndDhcpServer?>()
         val networkCallback = object: ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
@@ -323,7 +471,8 @@ class MeshrabiyaWifiManagerAndroid(
                             ByteBuffer.wrap(ByteArray(4))
                             .order(ByteOrder.LITTLE_ENDIAN)
                             .putInt(it)
-                            .array())
+                            .array()
+                        )
                     }
                 }
 
@@ -466,14 +615,21 @@ class MeshrabiyaWifiManagerAndroid(
 
     override fun close() {
         if(!closed.getAndSet(true)) {
+            //Channel close is only allowed on SDK27+
             if(Build.VERSION.SDK_INT >= 27) {
                 channel?.close()
             }
-            appContext.unregisterReceiver(wifiDirectBroadcastReceiver)
-
             channel = null
+
+            appContext.unregisterReceiver(wifiDirectBroadcastReceiver)
+            localOnlyHotspotReservation?.close()
         }
     }
 
+    companion object {
+
+        const val HOTSPOT_TIMEOUT = 10000L
+
+    }
 
 }

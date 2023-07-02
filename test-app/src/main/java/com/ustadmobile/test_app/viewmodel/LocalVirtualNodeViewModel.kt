@@ -3,7 +3,7 @@ package com.ustadmobile.test_app.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
-import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
+import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.test_app.appstate.AppUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

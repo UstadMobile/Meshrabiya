@@ -15,7 +15,7 @@ import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
-import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiState
+import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
