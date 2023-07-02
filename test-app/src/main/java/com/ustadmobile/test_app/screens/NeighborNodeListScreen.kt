@@ -1,7 +1,7 @@
 package com.ustadmobile.test_app.screens
 
 import android.Manifest
-import android.content.pm.PackageManager
+
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,18 +27,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.vnet.MeshrabiyaConnectLink
-import com.ustadmobile.test_app.NEARBY_WIFI_PERMISSION_NAME
 import com.ustadmobile.test_app.ViewModelFactory
 import com.ustadmobile.test_app.appstate.AppUiState
-import com.ustadmobile.test_app.hasNearbyWifiDevicesOrLocationPermission
+import com.ustadmobile.test_app.composable.rememberConnectLauncher
 import com.ustadmobile.test_app.viewmodel.NeighborNodeListUiState
 import com.ustadmobile.test_app.viewmodel.NeighborNodeListViewModel
 import org.kodein.di.compose.localDI
@@ -61,23 +58,15 @@ fun NeighborNodeListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState(NeighborNodeListUiState())
     val di = localDI()
-    val context = LocalContext.current
 
-    var connectAfterPermissionGrantedLink: MeshrabiyaConnectLink? by remember {
-        mutableStateOf(null)
-    }
-
-    val requestNearbyWifiPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if(granted) {
-            connectAfterPermissionGrantedLink?.hotspotConfig?.also { hotspotConfig ->
-                viewModel.onConnectWifi(hotspotConfig)
-            }
+    val connectLauncher = rememberConnectLauncher(
+        onConnectBluetooth = {
+            viewModel.onConnectBluetooth(it.address)
+        },
+        onConnectWifi = {
+            viewModel.onConnectWifi(it)
         }
-
-        connectAfterPermissionGrantedLink = null
-    }
+    )
 
     val qrCodeScannerLauncher = rememberLauncherForActivityResult(
         contract = ScanContract()
@@ -90,15 +79,7 @@ fun NeighborNodeListScreen(
                     json = di.direct.instance(),
                 )
 
-                if(context.hasNearbyWifiDevicesOrLocationPermission()) {
-                    connectLink.hotspotConfig?.also { hotspotConfig ->
-                        viewModel.onConnectWifi(hotspotConfig)
-                    }
-                }else {
-                    connectAfterPermissionGrantedLink = connectLink
-                    requestNearbyWifiPermissionLauncher.launch(NEARBY_WIFI_PERMISSION_NAME)
-                }
-
+                connectLauncher.launch(connectLink)
 
             }catch(e: Exception) {
                 Log.e("TestApp", "Exception", e)
@@ -118,25 +99,12 @@ fun NeighborNodeListScreen(
         }
     }
 
-
-
     LaunchedEffect(uiState.appUiState) {
         onSetAppUiState(
             uiState.appUiState.copy(
                 fabState = uiState.appUiState.fabState.copy(
                     onClick = {
-                        if(
-                            ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.CAMERA
-                            ) == PackageManager.PERMISSION_GRANTED
-                        ) {
-                            qrCodeScannerLauncher.launch(ScanOptions().apply {
-                                setOrientationLocked(false)
-                                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                            })
-                        }else {
-                            requestCameraPermission.launch(Manifest.permission.CAMERA)
-                        }
+                        requestCameraPermission.launch(Manifest.permission.CAMERA)
                     }
                 )
             )

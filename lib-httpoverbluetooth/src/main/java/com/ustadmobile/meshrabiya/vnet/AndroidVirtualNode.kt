@@ -4,19 +4,25 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.util.Log
 import com.ustadmobile.meshrabiya.client.UuidAllocationClient
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.server.UuidAllocationServer
+import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
@@ -25,6 +31,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AndroidVirtualNode(
     val appContext: Context,
@@ -65,6 +72,43 @@ class AndroidVirtualNode(
         ioExecutor = connectionExecutor,
         onNewWifiConnectionListener = newWifiConnectionListener,
     )
+
+    private val _bluetoothState = MutableStateFlow(MeshrabiyaBluetoothState())
+
+    private fun updateBluetoothState() {
+        try {
+            val deviceName = bluetoothAdapter?.name
+            _bluetoothState.takeIf { it.value.deviceName != deviceName }?.update { prev ->
+                MeshrabiyaBluetoothState(deviceName = deviceName)
+
+            }
+        }catch(e: SecurityException) {
+            logger(Log.WARN, "Could not get device name", e)
+        }
+    }
+
+    private val bluetoothStateBroadcastReceiver: BroadcastReceiver = object: BroadcastReceiver() {
+
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if(intent != null && intent.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                when(state) {
+                    BluetoothAdapter.STATE_ON -> {
+                        updateBluetoothState()
+                    }
+
+                    BluetoothAdapter.STATE_OFF -> {
+                        _bluetoothState.value = MeshrabiyaBluetoothState(
+                            deviceName = null
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private val receiverRegistered = AtomicBoolean(false)
+
 
     /**
      * Listener that opens a bluetooth server socket
@@ -109,18 +153,26 @@ class AndroidVirtualNode(
         clientNodeAddr = localNodeAddress
     )
 
-
-
     init {
         uuidAllocationServer.start()
+        appContext.registerReceiver(
+            bluetoothStateBroadcastReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        )
+        updateBluetoothState()
+
+        receiverRegistered.set(true)
 
         coroutineScope.launch {
-            hotspotManager.state.collect {
+            hotspotManager.state.combine(_bluetoothState) { wifiState, bluetoothState ->
+                wifiState to bluetoothState
+            }.collect {
                 _state.update { prev ->
                     prev.copy(
-                        wifiState = it,
+                        wifiState = it.first,
+                        bluetoothState = it.second,
                         connectUri = generateConnectLink(
-                            hotspot = it.config
+                            hotspot = it.first.config,
+                            bluetoothConfig = it.second,
                         ).uri
                     )
                 }
@@ -193,8 +245,22 @@ class AndroidVirtualNode(
         }
     }
 
+
+    override fun close() {
+        super.close()
+
+        if(receiverRegistered.getAndSet(false)) {
+            appContext.unregisterReceiver(bluetoothStateBroadcastReceiver)
+        }
+    }
+
     suspend fun addWifiConnection(config: HotspotConfig) {
         hotspotManager.connectToHotspot(config)
     }
 
+    override suspend fun setWifiHotspotEnabled(enabled: Boolean) {
+        updateBluetoothState()
+        super.setWifiHotspotEnabled(enabled)
+
+    }
 }

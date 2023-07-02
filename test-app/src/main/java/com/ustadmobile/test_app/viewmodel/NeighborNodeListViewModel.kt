@@ -61,7 +61,25 @@ class NeighborNodeListViewModel(
         hotspotConfig: HotspotConfig
     ) {
         viewModelScope.launch {
-            virtualNode.addWifiConnection(hotspotConfig)
+            try {
+                virtualNode.addWifiConnection(hotspotConfig)
+            }catch(e: Exception) {
+                e.printStackTrace()
+            }
+
+        }
+    }
+
+    fun onConnectBluetooth(
+        deviceAddr: String
+    ) {
+        viewModelScope.launch {
+            try{
+                virtualNode.addBluetoothConnection(deviceAddr)
+            }catch(e: Exception) {
+                e.printStackTrace()
+            }
+
         }
     }
 

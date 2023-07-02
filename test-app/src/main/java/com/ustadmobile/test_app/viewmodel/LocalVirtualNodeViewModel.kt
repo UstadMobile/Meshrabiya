@@ -3,6 +3,7 @@ package com.ustadmobile.test_app.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
+import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.test_app.appstate.AppUiState
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,7 @@ import org.kodein.di.instance
 data class LocalVirtualNodeUiState(
     val localAddress: Int = 0,
     val wifiState: MeshrabiyaWifiState? = null,
+    val bluetoothState: MeshrabiyaBluetoothState? = null,
     val connectUri: String? = null,
     val appUiState: AppUiState = AppUiState(),
 ){
@@ -40,6 +42,7 @@ class LocalVirtualNodeViewModel(
                     prev.copy(
                         localAddress = it.address,
                         wifiState = it.wifiState,
+                        bluetoothState = it.bluetoothState,
                         connectUri = it.connectUri,
                         appUiState = AppUiState(
                             title = "This node"

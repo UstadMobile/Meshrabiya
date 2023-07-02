@@ -12,6 +12,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
+import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -165,12 +166,13 @@ abstract class VirtualNode(
 
     protected fun generateConnectLink(
         hotspot: HotspotConfig?,
+        bluetoothConfig: MeshrabiyaBluetoothState? = null,
     ) : MeshrabiyaConnectLink {
         return MeshrabiyaConnectLink.fromComponents(
             nodeAddr = localNodeAddress,
             port = localDatagramPort,
             hotspotConfig = hotspot,
-            bluetoothConfig = null,
+            bluetoothConfig = bluetoothConfig,
             json = json,
         )
     }
@@ -389,7 +391,7 @@ abstract class VirtualNode(
         ))
     }
 
-    suspend fun setWifiHotspotEnabled(enabled: Boolean) {
+    open suspend fun setWifiHotspotEnabled(enabled: Boolean) {
         if(enabled){
             hotspotManager.requestHotspot(
                 requestMessageId = nextMmcpMessageId(),

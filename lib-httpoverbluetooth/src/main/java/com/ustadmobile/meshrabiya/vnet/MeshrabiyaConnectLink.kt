@@ -1,7 +1,7 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
-import com.ustadmobile.meshrabiya.vnet.bluetooth.BluetoothConfig
+import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
 import kotlinx.serialization.json.Json
 import java.net.InetAddress
@@ -16,7 +16,7 @@ data class MeshrabiyaConnectLink(
     val uri: String,
     val virtualAddress: Int,
     val hotspotConfig: HotspotConfig?,
-    val bluetoothConfig: BluetoothConfig?
+    val bluetoothConfig: MeshrabiyaBluetoothState?
 ) {
 
     companion object {
@@ -29,11 +29,11 @@ data class MeshrabiyaConnectLink(
             nodeAddr: Int,
             port: Int,
             hotspotConfig: HotspotConfig?,
-            bluetoothConfig: BluetoothConfig?,
+            bluetoothConfig: MeshrabiyaBluetoothState?,
             json: Json,
         ) : MeshrabiyaConnectLink {
             val uri = buildString {
-                append("$PROTO_PREFIX${nodeAddr.addressToDotNotation()}:$port}/?")
+                append("$PROTO_PREFIX${nodeAddr.addressToDotNotation()}:$port/?")
                 if(hotspotConfig != null) {
                     append("hotspot=")
                     append(
@@ -49,7 +49,7 @@ data class MeshrabiyaConnectLink(
                     append("bluetooth=")
                     append(
                         URLEncoder.encode(json.encodeToString(
-                            BluetoothConfig.serializer(), bluetoothConfig
+                            MeshrabiyaBluetoothState.serializer(), bluetoothConfig
                         ), "UTF-8")
                     )
                 }
@@ -82,7 +82,7 @@ data class MeshrabiyaConnectLink(
             }
 
             val bluetoothConfig = searchComponents["bluetooth"]?.let {
-                json.decodeFromString(BluetoothConfig.serializer(), it)
+                json.decodeFromString(MeshrabiyaBluetoothState.serializer(), it)
             }
 
             return MeshrabiyaConnectLink(

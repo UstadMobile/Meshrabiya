@@ -1,6 +1,9 @@
 package com.ustadmobile.test_app.screens
 
 import android.Manifest
+import android.app.Activity
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import android.content.res.Resources
 import android.os.Build
 import android.util.TypedValue
@@ -111,6 +114,15 @@ fun LocalVirtualNodeScreen(
         BarcodeEncoder()
     }
 
+    val launchMakeDiscoverablePrompt = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = {
+            if(it.resultCode > 0){
+                onSetIncomingConnectionsEnabled(true)
+            }
+        }
+    )
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -128,7 +140,19 @@ fun LocalVirtualNodeScreen(
                     .toggleable(
                         role = Role.Switch,
                         value = uiState.incomingConnectionsEnabled,
-                        onValueChange = onSetIncomingConnectionsEnabled,
+                        onValueChange = {
+                            if(it){
+                                val discoverableIntent: Intent = Intent(
+                                    BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE
+                                ).apply {
+                                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
+                                }
+
+                                launchMakeDiscoverablePrompt.launch(discoverableIntent)
+                            }else {
+                                onSetIncomingConnectionsEnabled(it)
+                            }
+                        },
                     )
             ) {
                 Switch(checked = uiState.incomingConnectionsEnabled, onCheckedChange = null)
@@ -169,7 +193,8 @@ fun LocalVirtualNodeScreen(
                 text = "Wifi Role ${uiState.wifiState?.wifiRole}\n" +
                         "Local Hotspot: ${uiState.wifiState?.config?.ssid}\n" +
                         "Passphrase: ${uiState.wifiState?.config?.passphrase}\n" +
-                        "Port: ${uiState.wifiState?.config?.port}"
+                        "Port: ${uiState.wifiState?.config?.port}\n" +
+                        "Bluetooth Name: ${uiState.bluetoothState?.deviceName}"
             )
         }
     }
