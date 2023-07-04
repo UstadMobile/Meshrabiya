@@ -48,19 +48,17 @@ fun rememberConnectLauncher(
         mutableStateOf(null)
     }
 
-    var pendingHotspotConfig: HotspotConfig? by remember {
+    var pendingHotspotConnect: HotspotConfig? by remember {
         mutableStateOf(null)
     }
 
     val context = LocalContext.current
 
     val connectWifiLauncher = rememberConnectWifiLauncher {
-        val hotspotConfigVal = pendingHotspotConfig ?: return@rememberConnectWifiLauncher
-        if(it.scanResult != null) {
-            val hotspotConfigWithBssid = hotspotConfigVal.copy(
-                bssid = it.scanResult.BSSID
-            )
-            onConnectWifi(hotspotConfigWithBssid)
+        val pendingHotspotConnectVal = pendingHotspotConnect ?: return@rememberConnectWifiLauncher
+        val hotspotConfigVal = it.hotspotConfig
+        if(hotspotConfigVal != null) {
+            onConnectWifi(hotspotConfigVal)
             pendingBluetoothConfig = null
         }else {
             Toast.makeText(context, "Companion Device Manager: network not found", Toast.LENGTH_LONG).show()
@@ -73,7 +71,7 @@ fun rememberConnectLauncher(
         }
         pendingBluetoothConfig = null
 
-        pendingHotspotConfig = pendingConnectLink?.hotspotConfig
+        pendingHotspotConnect = pendingConnectLink?.hotspotConfig
     }
 
     LaunchedEffect(pendingBluetoothConfig) {
@@ -82,8 +80,8 @@ fun rememberConnectLauncher(
         connectBluetoothLauncher.launch(btConfig)
     }
 
-    LaunchedEffect(pendingHotspotConfig) {
-        val hotspotConfig = pendingHotspotConfig ?: return@LaunchedEffect
+    LaunchedEffect(pendingHotspotConnect) {
+        val hotspotConfig = pendingHotspotConnect ?: return@LaunchedEffect
         connectWifiLauncher.launch(hotspotConfig)
     }
 
@@ -93,7 +91,7 @@ fun rememberConnectLauncher(
         val linkVal = pendingConnectLink ?: return@LaunchedEffect
 
         //pendingBluetoothConfig = linkVal.bluetoothConfig
-        pendingHotspotConfig = linkVal.hotspotConfig
+        pendingHotspotConnect = linkVal.hotspotConfig
     }
 
     return ConnectLauncher {

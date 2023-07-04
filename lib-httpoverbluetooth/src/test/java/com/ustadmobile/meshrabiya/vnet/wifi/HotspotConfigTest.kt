@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
+import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import kotlinx.serialization.json.Json
 import org.junit.Assert
 import org.junit.Test
@@ -9,6 +10,7 @@ class HotspotConfigTest {
     @Test
     fun givenHotspotConfigWithSsidAndPassphrase_whenConvertedToAndFromBytes_thenWillBeEqual() {
         val hotspotConfig = HotspotConfig(
+            nodeVirtualAddr = randomApipaAddr(),
             ssid = "test",
             passphrase = "secret",
             port = 8042,
@@ -27,6 +29,7 @@ class HotspotConfigTest {
     @Test
     fun givenHotspotConfigSerialized_whenSerialized_thenWillMatch() {
         val hotspotConfig = HotspotConfig(
+            nodeVirtualAddr = randomApipaAddr(),
             ssid = "test",
             passphrase = "secret",
             port = 8042,

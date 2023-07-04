@@ -192,6 +192,7 @@ class VirtualNodeTest {
                     responseToMessageId = messageId,
                     errorCode = 0,
                     config = HotspotConfig(
+                        nodeVirtualAddr = randomApipaAddr(),
                         ssid = "networkname",
                         passphrase = "secret123",
                         port = 8042,

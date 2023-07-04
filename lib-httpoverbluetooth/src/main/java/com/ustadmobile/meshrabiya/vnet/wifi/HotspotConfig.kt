@@ -8,8 +8,13 @@ import kotlinx.serialization.Serializable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/**
+ * Node virtual address should be known before connecting. This is required to lookup previously
+ * stored BSSIDs for the network (to see if we need to use companiondevicemanager dialog or not).
+ */
 @Serializable
 data class HotspotConfig(
+    val nodeVirtualAddr: Int,
     val ssid: String,
     val passphrase: String,
     val port: Int,
@@ -25,9 +30,17 @@ data class HotspotConfig(
         passphrase.encodeToByteArray()
     }
 
-    //Add 4 bytes for each string ... where the length is encoded stored and 4 bytes for the port
+    /* Size =
+     * nodeVirtualAddress: 4 bytes
+     * ssid: 4 bytes (string length int) plus string bytes length
+     * passphrase: 4 bytes ( string length int) plus string bytes length
+     * port: 4 bytes
+     * hotspotType: 4 bytes
+     *
+
+     */
     val sizeInBytes: Int
-        get() = (ssidBytes?.size ?: 0) + (passphraseBytes?.size ?: 0) + 16
+        get() = 4 + (4 + (ssidBytes?.size ?: 0) ) + (4 + (passphraseBytes?.size ?: 0)) + 4 + 4
 
     fun toBytes(
         byteArray: ByteArray,
@@ -36,6 +49,7 @@ data class HotspotConfig(
 
         ByteBuffer.wrap(byteArray, offset, sizeInBytes)
             .order(ByteOrder.BIG_ENDIAN)
+            .putInt(nodeVirtualAddr)
             .putStringFromBytes(ssidBytes)
             .putStringFromBytes(passphraseBytes)
             .putInt(port)
@@ -59,12 +73,14 @@ data class HotspotConfig(
         ): HotspotConfig {
             val byteBuf = ByteBuffer.wrap(byteArray, offset, byteArray.size - offset)
                 .order(ByteOrder.BIG_ENDIAN)
+            val nodeVirtualAddr = byteBuf.int
             val ssid = byteBuf.getStringOrThrow()
             val passphrase = byteBuf.getStringOrThrow()
             val port = byteBuf.int
             val hotspotType = HotspotType.fromFlag(byteBuf.int)
 
             return HotspotConfig(
+                nodeVirtualAddr = nodeVirtualAddr,
                 ssid = ssid,
                 passphrase = passphrase,
                 port = port,
@@ -78,6 +94,7 @@ data class HotspotConfig(
 }
 
 fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
+    nodeVirtualAddr: Int,
     port: Int,
 ): HotspotConfig? {
     return if(Build.VERSION.SDK_INT >= 30) {
@@ -94,6 +111,7 @@ fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
         val bssid = softApConfig.bssid
         if(ssid != null && passphrase != null) {
             HotspotConfig(
+                nodeVirtualAddr = nodeVirtualAddr,
                 ssid = ssid,
                 passphrase = passphrase,
                 port = port,
@@ -110,6 +128,7 @@ fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
         val bssid = wifiConfig?.BSSID
         if(ssid != null && passphrase != null) {
             HotspotConfig(
+                nodeVirtualAddr = nodeVirtualAddr,
                 ssid = ssid,
                 passphrase = passphrase,
                 port = port,

@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
+import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import org.junit.Assert
 import org.junit.Test
 import kotlin.random.Random
@@ -12,6 +13,7 @@ class HotspotResponseTest {
             responseToMessageId = Random.nextInt(),
             errorCode = 0,
             config = HotspotConfig(
+                nodeVirtualAddr = randomApipaAddr(),
                 ssid = "test",
                 passphrase = "world",
                 port = 8042,

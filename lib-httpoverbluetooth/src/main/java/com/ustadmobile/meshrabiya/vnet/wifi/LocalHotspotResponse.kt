@@ -30,7 +30,7 @@ data class LocalHotspotResponse(
         byteBuf.putInt(errorCode)
         byteBuf.put(if(config != null) 1.toByte() else 0.toByte())
         if(config != null) {
-            val configOffset = offset + 5 //Add 5:  4 bytes error code, 1 byte if config is present
+            val configOffset = offset + CONFIG_OFFSET
             val configSize = config.toBytes(byteArray, configOffset)
             byteBuf.position(byteBuf.position() + configSize)
         }
@@ -51,8 +51,7 @@ data class LocalHotspotResponse(
             val errorCode = byteBuf.int
             val hasHotspotConfig = byteBuf.get() != 0.toByte()
             val config = if(hasHotspotConfig) {
-                //offset = 4 bytes for errorcode, 1 byte indicating if there is or is not a config
-                HotspotConfig.fromBytes(byteArray, offset + 5).also {
+                HotspotConfig.fromBytes(byteArray, offset + CONFIG_OFFSET).also {
                     byteBuf.position(byteBuf.position() + it.sizeInBytes)
                 }
             }else {
@@ -67,6 +66,10 @@ data class LocalHotspotResponse(
                 redirectAddr = redirectAddr,
             )
         }
+
+        //offset = 9 (4 bytes for responseToMessageId, 4 bytes for errorcode, 1 byte indicating if there is or is not a config)
+        //This must be incremented if other content is added before the config
+        private const val CONFIG_OFFSET = 9
 
     }
 

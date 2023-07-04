@@ -17,8 +17,11 @@ import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Looper
 import android.util.Log
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addOrLookupNetwork
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.bssidDataStore
 import com.ustadmobile.meshrabiya.ext.toPrettyString
 import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
@@ -34,6 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
@@ -113,6 +117,7 @@ class MeshrabiyaWifiManagerAndroid(
         _state.update { prev ->
             val hotspotConfig = if(ssid != null && passphrase != null) {
                 HotspotConfig(
+                    nodeVirtualAddr = localNodeAddr,
                     ssid = ssid,
                     passphrase = passphrase,
                     port = router.localDatagramPort,
@@ -160,7 +165,10 @@ class MeshrabiyaWifiManagerAndroid(
                     wifiRole = WifiRole.LOCAL_ONLY_HOTSPOT,
                     localOnlyHotspotState = LocalOnlyHotspotState(
                         status = HotspotStatus.STARTED,
-                        config = reservation?.toLocalHotspotConfig(router.localDatagramPort),
+                        config = reservation?.toLocalHotspotConfig(
+                            nodeVirtualAddr = localNodeAddr,
+                            port = router.localDatagramPort
+                        ),
                     ),
                 )
             }
@@ -597,7 +605,9 @@ class MeshrabiyaWifiManagerAndroid(
         return completable.await()
     }
 
-    override suspend fun connectToHotspot(config: HotspotConfig) {
+    override suspend fun connectToHotspot(
+        config: HotspotConfig,
+    ) {
         val networkAndServerAddr = connectToHotspot(
             ssid = config.ssid,
             passphrase = config.passphrase,
@@ -605,6 +615,13 @@ class MeshrabiyaWifiManagerAndroid(
         )
 
         if(networkAndServerAddr != null) {
+            val bssid = config.bssid
+            if(bssid != null) {
+                storeBssidForAddress(config.nodeVirtualAddr, bssid)
+                logger(Log.INFO, "$logPrefix connectToHotspot: saved bssid = $bssid for " +
+                        config.nodeVirtualAddr.addressToDotNotation(), null)
+            }
+
             withContext(Dispatchers.IO) {
                 val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
                     port = 0,
@@ -667,6 +684,20 @@ class MeshrabiyaWifiManagerAndroid(
 
             appContext.unregisterReceiver(wifiDirectBroadcastReceiver)
             localOnlyHotspotReservation?.close()
+        }
+    }
+
+    suspend fun lookupStoredBssid(addr: Int) : String? {
+        val prefKey = stringPreferencesKey(addr.addressToDotNotation())
+        return appContext.bssidDataStore.data.map {
+            it[prefKey]
+        }.first()
+    }
+
+    suspend fun storeBssidForAddress(addr: Int, bssid: String) {
+        val prefKey = stringPreferencesKey(addr.addressToDotNotation())
+        appContext.bssidDataStore.edit {
+            it[prefKey] = bssid
         }
     }
 

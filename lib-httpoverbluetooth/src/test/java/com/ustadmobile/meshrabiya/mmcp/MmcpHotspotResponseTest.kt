@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.mmcp
 
+import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
@@ -17,6 +18,7 @@ class MmcpHotspotResponseTest {
                 responseToMessageId = Random.nextInt(),
                 errorCode = 0,
                 config = HotspotConfig(
+                    nodeVirtualAddr = randomApipaAddr(),
                     ssid = "test",
                     passphrase = "secret",
                     port = 8042,

@@ -38,6 +38,7 @@ dependencies {
     implementation "com.athaydes.rawhttp:rawhttp-core:2.5.2"
     implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
+    implementation "androidx.datastore:datastore-preferences:$version_datastore"
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"

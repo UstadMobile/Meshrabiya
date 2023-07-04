@@ -20,18 +20,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
+import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.test_app.NEARBY_WIFI_PERMISSION_NAME
+import org.kodein.di.DI
+import org.kodein.di.compose.localDI
+import org.kodein.di.direct
+import org.kodein.di.instance
 import java.util.regex.Pattern
 
 
 fun interface ConnectWifiLauncher {
 
-    fun launch(hotspotConfig: HotspotConfig)
+    fun launch(config: HotspotConfig)
 
 }
 
 data class ConnectWifiLauncherResult(
-    val scanResult: ScanResult?
+    val hotspotConfig: HotspotConfig?
 ) {
 
 }
@@ -45,8 +50,14 @@ fun rememberConnectWifiLauncher(
 ): ConnectWifiLauncher {
 
     val context = LocalContext.current
+    val di: DI = localDI()
 
-    var pendingPermissionHotspot: HotspotConfig? by remember {
+
+    var pendingPermissionHotspotConfig: HotspotConfig? by remember {
+        mutableStateOf(null)
+    }
+
+    var pendingAssociateHotspotConfig: HotspotConfig? by remember {
         mutableStateOf(null)
     }
 
@@ -66,13 +77,22 @@ fun rememberConnectWifiLauncher(
 
 
             Log.i(LOG_TAG, "rememberConnectWifiLauncher: Got scan result: bssid = ${scanResult?.BSSID}")
+            val bssid = scanResult?.BSSID
 
-            onResult(ConnectWifiLauncherResult(
-                scanResult = scanResult
-            ))
+            if(bssid != null) {
+                onResult(ConnectWifiLauncherResult(
+                    hotspotConfig = pendingAssociateHotspotConfig?.copy(
+                        bssid = bssid
+                    )
+                ))
+            }else {
+                onResult(ConnectWifiLauncherResult(
+                    hotspotConfig = null
+                ))
+            }
         }else {
             onResult(ConnectWifiLauncherResult(
-                scanResult = null
+                hotspotConfig = null
             ))
         }
     }
@@ -80,10 +100,32 @@ fun rememberConnectWifiLauncher(
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        val hotspotConfigVal = pendingPermissionHotspot ?: return@rememberLauncherForActivityResult
+        val hotspotConfigVal = pendingPermissionHotspotConfig ?: return@rememberLauncherForActivityResult
         if(granted) {
+            pendingAssociateHotspotConfig = hotspotConfigVal
+        }else {
+            onResult(ConnectWifiLauncherResult(
+                hotspotConfig = null
+            ))
+        }
+    }
+
+    LaunchedEffect(pendingAssociateHotspotConfig) {
+        val connectLinkVal = pendingPermissionHotspotConfig ?: return@LaunchedEffect
+        val node: AndroidVirtualNode = di.direct.instance()
+        val storedBssid = node.lookupStoredBssid(connectLinkVal.nodeVirtualAddr)
+
+        if(storedBssid != null) {
+            onResult(
+                ConnectWifiLauncherResult(
+                    hotspotConfig = connectLinkVal.copy(
+                        bssid = storedBssid
+                    )
+                )
+            )
+        }else {
             val deviceFilter = WifiDeviceFilter.Builder()
-                .setNamePattern(Pattern.compile(Pattern.quote(hotspotConfigVal.ssid)))
+                .setNamePattern(Pattern.compile(Pattern.quote(connectLinkVal.ssid)))
                 .build()
 
             val associationRequest: AssociationRequest = AssociationRequest.Builder()
@@ -104,22 +146,16 @@ fun rememberConnectWifiLauncher(
                     }
 
                     override fun onFailure(reason: CharSequence?) {
-                        onResult(ConnectWifiLauncherResult(scanResult = null))
+                        onResult(ConnectWifiLauncherResult(hotspotConfig = null))
                     }
                 },
                 null
             )
-        }else {
-            onResult(ConnectWifiLauncherResult(
-                scanResult = null
-            ))
         }
-
-        pendingPermissionHotspot = null
     }
 
-    LaunchedEffect(pendingPermissionHotspot) {
-        if(pendingPermissionHotspot == null)
+    LaunchedEffect(pendingPermissionHotspotConfig) {
+        if(pendingPermissionHotspotConfig == null)
             return@LaunchedEffect
 
         requestPermissionLauncher.launch(NEARBY_WIFI_PERMISSION_NAME)
@@ -128,8 +164,8 @@ fun rememberConnectWifiLauncher(
 
     return ConnectWifiLauncher {
         //Note: setting this using a state variable ensures that when the permission callback
-        // returns the correct value is already set.
+        // returns the state value is set. This has to be done as an effect.
 
-        pendingPermissionHotspot = it
+        pendingPermissionHotspotConfig = it
     }
 }

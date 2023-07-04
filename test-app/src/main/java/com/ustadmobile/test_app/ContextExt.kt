@@ -7,6 +7,9 @@ import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
 
 fun Context.getActivityContext(): Activity = when (this) {
     is Activity -> this
@@ -40,3 +43,6 @@ fun Context.hasBluetoothConnectPermission(): Boolean {
         true
     }
 }
+
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+

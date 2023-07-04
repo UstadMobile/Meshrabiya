@@ -64,7 +64,7 @@ class AndroidVirtualNode(
         addNewDatagramNeighborConnection(it.neighborInetAddress, it.neighborPort, it.socket)
     }
 
-    override val hotspotManager: MeshrabiyaWifiManager = MeshrabiyaWifiManagerAndroid(
+    override val hotspotManager: MeshrabiyaWifiManagerAndroid = MeshrabiyaWifiManagerAndroid(
         appContext = appContext,
         logger = logger,
         localNodeAddr = localMNodeAddress,
@@ -254,13 +254,22 @@ class AndroidVirtualNode(
         }
     }
 
-    suspend fun addWifiConnection(config: HotspotConfig) {
+    suspend fun addWifiConnection(
+        config: HotspotConfig,
+    ) {
         hotspotManager.connectToHotspot(config)
     }
 
     override suspend fun setWifiHotspotEnabled(enabled: Boolean) {
         updateBluetoothState()
         super.setWifiHotspotEnabled(enabled)
+    }
 
+    suspend fun lookupStoredBssid(addr: Int) : String? {
+        return hotspotManager.lookupStoredBssid(addr)
+    }
+
+    suspend fun storeBssidForAddress(addr: Int, bssid: String) {
+        hotspotManager.storeBssidForAddress(addr, bssid)
     }
 }

@@ -15,6 +15,7 @@ class MeshrabiyaConnectLinkTest {
             nodeAddr = randomApipaAddr(),
             port = 8087,
             hotspotConfig = HotspotConfig(
+                nodeVirtualAddr = randomApipaAddr(),
                 ssid = "test",
                 passphrase = "testpass",
                 port = 8087,
