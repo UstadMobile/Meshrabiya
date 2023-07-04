@@ -2,8 +2,7 @@ package com.ustadmobile.test_app.composable
 
 import android.bluetooth.BluetoothDevice
 import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -11,10 +10,10 @@ import androidx.compose.runtime.remember
 import com.ustadmobile.meshrabiya.vnet.MeshrabiyaConnectLink
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
-import com.ustadmobile.test_app.NEARBY_WIFI_PERMISSION_NAME
 
 fun interface ConnectLauncher {
     fun launch(connectLink: MeshrabiyaConnectLink)
@@ -53,15 +52,19 @@ fun rememberConnectLauncher(
         mutableStateOf(null)
     }
 
-    val requestWifiPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        val hotspotConfigVal = pendingHotspotConfig
-        if(granted) {
-            hotspotConfigVal?.also(onConnectWifi)
+    val context = LocalContext.current
+
+    val connectWifiLauncher = rememberConnectWifiLauncher {
+        val hotspotConfigVal = pendingHotspotConfig ?: return@rememberConnectWifiLauncher
+        if(it.scanResult != null) {
+            val hotspotConfigWithBssid = hotspotConfigVal.copy(
+                bssid = it.scanResult.BSSID
+            )
+            onConnectWifi(hotspotConfigWithBssid)
+            pendingBluetoothConfig = null
+        }else {
+            Toast.makeText(context, "Companion Device Manager: network not found", Toast.LENGTH_LONG).show()
         }
-        pendingHotspotConfig = null
-        pendingConnectLink = null
     }
 
     val connectBluetoothLauncher = rememberBluetoothConnectLauncher {
@@ -80,10 +83,8 @@ fun rememberConnectLauncher(
     }
 
     LaunchedEffect(pendingHotspotConfig) {
-        if(pendingHotspotConfig == null)
-            return@LaunchedEffect
-
-        requestWifiPermissionLauncher.launch(NEARBY_WIFI_PERMISSION_NAME)
+        val hotspotConfig = pendingHotspotConfig ?: return@LaunchedEffect
+        connectWifiLauncher.launch(hotspotConfig)
     }
 
     LaunchedEffect(pendingConnectLink) {
@@ -91,8 +92,8 @@ fun rememberConnectLauncher(
                 "bluetooth=${pendingConnectLink?.bluetoothConfig}")
         val linkVal = pendingConnectLink ?: return@LaunchedEffect
 
-        pendingBluetoothConfig = linkVal.bluetoothConfig
-
+        //pendingBluetoothConfig = linkVal.bluetoothConfig
+        pendingHotspotConfig = linkVal.hotspotConfig
     }
 
     return ConnectLauncher {

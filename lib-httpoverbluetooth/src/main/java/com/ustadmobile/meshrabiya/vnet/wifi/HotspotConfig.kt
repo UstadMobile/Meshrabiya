@@ -14,6 +14,7 @@ data class HotspotConfig(
     val passphrase: String,
     val port: Int,
     val hotspotType: HotspotType,
+    val bssid: String? = null,
 ) {
 
     private val ssidBytes: ByteArray? by lazy {
@@ -81,14 +82,23 @@ fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
 ): HotspotConfig? {
     return if(Build.VERSION.SDK_INT >= 30) {
         val softApConfig = softApConfiguration
-        val ssid = softApConfig.ssid
+        val ssid = if(Build.VERSION.SDK_INT >= 33) {
+            //As per https://developer.android.com/reference/android/net/wifi/WifiSsid#toString()
+            // Any WiFi ssid that is in UTF-8 will be as a string with quotes.
+            // No support for ssid with non UTF-8 SSID.
+            softApConfig.wifiSsid.toString().removeSurrounding("\"")
+        }else {
+            softApConfig.ssid
+        }
         val passphrase = softApConfig.passphrase
+        val bssid = softApConfig.bssid
         if(ssid != null && passphrase != null) {
             HotspotConfig(
                 ssid = ssid,
                 passphrase = passphrase,
                 port = port,
                 hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+                bssid = bssid?.toString()
             )
         }else {
             null
@@ -97,12 +107,14 @@ fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
         val wifiConfig = wifiConfiguration
         val ssid = wifiConfig?.SSID
         val passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\"")
+        val bssid = wifiConfig?.BSSID
         if(ssid != null && passphrase != null) {
             HotspotConfig(
                 ssid = ssid,
                 passphrase = passphrase,
                 port = port,
                 hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+                bssid = bssid,
             )
         }else {
             null

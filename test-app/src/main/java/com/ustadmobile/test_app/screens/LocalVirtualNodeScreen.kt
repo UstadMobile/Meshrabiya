@@ -1,7 +1,6 @@
 package com.ustadmobile.test_app.screens
 
 import android.Manifest
-import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.res.Resources
@@ -171,7 +170,7 @@ fun LocalVirtualNodeScreen(
                     screenWidth.toFloat(),
                     Resources.getSystem().displayMetrics,
                 )
-                val width = mathmin(screenWidthPx.toInt(), 600)
+                val width = mathmin(screenWidthPx.toInt(), 900)
 
                 val qrCodeBitmap = remember(connectUri) {
                     barcodeEncoder.encodeBitmap(

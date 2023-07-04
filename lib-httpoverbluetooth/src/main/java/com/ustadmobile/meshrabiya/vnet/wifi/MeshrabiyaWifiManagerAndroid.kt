@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.ConnectivityManager
+import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -361,6 +362,25 @@ class MeshrabiyaWifiManagerAndroid(
         }?.wifiDirectGroupState?.hotspotStatus == HotspotStatus.STOPPED
     }
 
+    /**
+     * On starting hotspot with custom configuration see:
+     * WifiManager source:
+     * https://cs.android.com/android/platform/superproject/+/master:packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java;drc=08124f52b883c61f3e17bc57dc28eca4c7f7bb72;bpv=1;bpt=1;l=3226?q=WifiManager&ss=android%2Fplatform%2Fsuperproject
+     *
+     * WifiService implementation source:
+     * https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/java/com/android/server/wifi/WifiServiceImpl.java;l=843?q=wifiserviceimpl&sq=
+     *
+     * On Android 12+ we should be able to provide a custom AP config when we have nearby wifi permission
+     *  https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/java/com/android/server/wifi/WifiServiceImpl.java;l=2480?q=wifiserviceimpl
+     *
+     * The function is not blocklisted:
+     * Landroid/net/wifi/WifiManager;->startLocalOnlyHotspot(Landroid/net/wifi/SoftApConfiguration;Ljava/util/concurrent/Executor;Landroid/net/wifi/WifiManager$LocalOnlyHotspotCallback;)V	sdk	system-api	test-api
+     *
+     * Not on Android 11 or lower:
+     * https://cs.android.com/android/platform/superproject/+/android-11.0.0_r48:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiServiceImpl.java
+     * Because the permission check on WifiServiceImpl will only accept requests with a custom config
+     * from settings or setup wizard
+     */
     private suspend fun startLocalOnlyHotspot() {
         logger(Log.DEBUG, "$logPrefix startLocalOnlyHotspot", null)
         stopWifiDirectGroup()
@@ -452,7 +472,11 @@ class MeshrabiyaWifiManagerAndroid(
      * Connect to the given hotspot as a station.
      */
     @Suppress("DEPRECATION") //Must use deprecated classes to support pre-SDK29
-    private suspend fun connectToHotspot(ssid: String, passphrase: String): NetworkAndDhcpServer? {
+    private suspend fun connectToHotspot(
+        ssid: String,
+        passphrase: String,
+        bssid: String? = null,
+    ): NetworkAndDhcpServer? {
         logger(Log.INFO, "$logPrefix Connecting to hotspot: ssid=$ssid passphrase=$passphrase", null)
 
         //Local Hotspot (on most devices) cannot run at the same time as being connected as a station
@@ -501,10 +525,28 @@ class MeshrabiyaWifiManagerAndroid(
 
         if(Build.VERSION.SDK_INT >= 29) {
             //Use the suggestion API as per https://developer.android.com/guide/topics/connectivity/wifi-bootstrap
+            /*
+             * Dialog behavior notes
+             *
+             * On Android 11+ if the network is in the CompanionDeviceManager approved list (which
+             * works on the basis of BSSID only), then no approval dialog will be shown:
+             * See:
+             * https://cs.android.com/android/platform/superproject/+/android-11.0.0_r1:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1321
+             *
+             * On Android 10:
+             * No WifiNetworkFactory uses a list of approved access points. The BSSID, SSID, and
+             * network type must match.
+             * See:
+             * https://cs.android.com/android/platform/superproject/+/android-10.0.0_r47:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1224
+             */
             val specifier = WifiNetworkSpecifier.Builder()
-                .setSsid(ssid)
+                .apply {
+                    setSsid(ssid)
+                    if(bssid != null) {
+                        setBssid(MacAddress.fromString(bssid))
+                    }
+                }
                 .setWpa2Passphrase(passphrase)
-                .setIsHiddenSsid(true) //not really hidden, but may have just been created, so will not be in scan results yet
                 .build()
 
             val request = NetworkRequest.Builder()
@@ -557,7 +599,9 @@ class MeshrabiyaWifiManagerAndroid(
 
     override suspend fun connectToHotspot(config: HotspotConfig) {
         val networkAndServerAddr = connectToHotspot(
-            config.ssid, config.passphrase
+            ssid = config.ssid,
+            passphrase = config.passphrase,
+            bssid = config.bssid
         )
 
         if(networkAndServerAddr != null) {
