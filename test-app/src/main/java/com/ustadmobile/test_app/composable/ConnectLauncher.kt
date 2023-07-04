@@ -13,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 
 fun interface ConnectLauncher {
     fun launch(connectLink: MeshrabiyaConnectLink)
@@ -38,7 +38,7 @@ fun interface ConnectLauncher {
 @Composable
 fun rememberConnectLauncher(
     onConnectBluetooth: (BluetoothDevice) -> Unit,
-    onConnectWifi: (HotspotConfig) -> Unit,
+    onConnectWifi: (WifiConnectConfig) -> Unit,
 ) : ConnectLauncher {
     var pendingConnectLink: MeshrabiyaConnectLink? by remember {
         mutableStateOf(null)
@@ -48,7 +48,7 @@ fun rememberConnectLauncher(
         mutableStateOf(null)
     }
 
-    var pendingHotspotConnect: HotspotConfig? by remember {
+    var pendingHotspotConnect: WifiConnectConfig? by remember {
         mutableStateOf(null)
     }
 

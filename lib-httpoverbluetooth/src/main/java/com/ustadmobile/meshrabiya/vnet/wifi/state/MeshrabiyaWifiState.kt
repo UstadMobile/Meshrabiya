@@ -1,7 +1,7 @@
 package com.ustadmobile.meshrabiya.vnet.wifi.state
 
 import com.ustadmobile.meshrabiya.vnet.WifiRole
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotStatus
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 
@@ -12,7 +12,7 @@ data class MeshrabiyaWifiState(
     val localOnlyHotspotState: LocalOnlyHotspotState = LocalOnlyHotspotState(),
     val errorCode: Int = 0,
 ) {
-    val config: HotspotConfig?
+    val config: WifiConnectConfig?
         get() = if(wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER) {
             wifiDirectGroupState.config
         }else if(wifiRole == WifiRole.LOCAL_ONLY_HOTSPOT) {

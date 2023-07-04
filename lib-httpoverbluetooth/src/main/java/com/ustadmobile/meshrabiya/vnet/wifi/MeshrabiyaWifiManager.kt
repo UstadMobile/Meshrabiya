@@ -17,7 +17,7 @@ interface MeshrabiyaWifiManager {
 
 
     suspend fun connectToHotspot(
-        config: HotspotConfig,
+        config: WifiConnectConfig,
     )
 
 }

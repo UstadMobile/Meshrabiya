@@ -116,7 +116,7 @@ class MeshrabiyaWifiManagerAndroid(
 
         _state.update { prev ->
             val hotspotConfig = if(ssid != null && passphrase != null) {
-                HotspotConfig(
+                WifiConnectConfig(
                     nodeVirtualAddr = localNodeAddr,
                     ssid = ssid,
                     passphrase = passphrase,
@@ -606,7 +606,7 @@ class MeshrabiyaWifiManagerAndroid(
     }
 
     override suspend fun connectToHotspot(
-        config: HotspotConfig,
+        config: WifiConnectConfig,
     ) {
         val networkAndServerAddr = connectToHotspot(
             ssid = config.ssid,

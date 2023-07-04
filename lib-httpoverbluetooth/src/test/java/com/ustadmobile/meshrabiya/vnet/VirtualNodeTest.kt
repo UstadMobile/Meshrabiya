@@ -7,7 +7,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -191,7 +191,7 @@ class VirtualNodeTest {
                 LocalHotspotResponse(
                     responseToMessageId = messageId,
                     errorCode = 0,
-                    config = HotspotConfig(
+                    config = WifiConnectConfig(
                         nodeVirtualAddr = randomApipaAddr(),
                         ssid = "networkname",
                         passphrase = "secret123",

@@ -1,6 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import kotlinx.serialization.json.Json
 import org.junit.Assert
@@ -14,7 +14,7 @@ class MeshrabiyaConnectLinkTest {
         val link = MeshrabiyaConnectLink.fromComponents(
             nodeAddr = randomApipaAddr(),
             port = 8087,
-            hotspotConfig = HotspotConfig(
+            hotspotConfig = WifiConnectConfig(
                 nodeVirtualAddr = randomApipaAddr(),
                 ssid = "test",
                 passphrase = "testpass",

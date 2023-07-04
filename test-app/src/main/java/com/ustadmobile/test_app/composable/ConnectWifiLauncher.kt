@@ -15,7 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
@@ -31,18 +31,18 @@ import java.util.regex.Pattern
 
 fun interface ConnectWifiLauncher {
 
-    fun launch(config: HotspotConfig)
+    fun launch(config: WifiConnectConfig)
 
 }
 
 data class ConnectWifiLauncherResult(
-    val hotspotConfig: HotspotConfig?
+    val hotspotConfig: WifiConnectConfig?
 ) {
 
 }
 
 /**
- * Handle asking for permission and using companion device manager to connect to a hotspot.
+ * Handle asking for permission and using companion device manager (if needed) to connect to a hotspot.
  */
 @Composable
 fun rememberConnectWifiLauncher(
@@ -53,11 +53,11 @@ fun rememberConnectWifiLauncher(
     val di: DI = localDI()
 
 
-    var pendingPermissionHotspotConfig: HotspotConfig? by remember {
+    var pendingPermissionHotspotConfig: WifiConnectConfig? by remember {
         mutableStateOf(null)
     }
 
-    var pendingAssociateHotspotConfig: HotspotConfig? by remember {
+    var pendingAssociateHotspotConfig: WifiConnectConfig? by remember {
         mutableStateOf(null)
     }
 
@@ -111,21 +111,21 @@ fun rememberConnectWifiLauncher(
     }
 
     LaunchedEffect(pendingAssociateHotspotConfig) {
-        val connectLinkVal = pendingPermissionHotspotConfig ?: return@LaunchedEffect
+        val hotspotConfigVal = pendingPermissionHotspotConfig ?: return@LaunchedEffect
         val node: AndroidVirtualNode = di.direct.instance()
-        val storedBssid = node.lookupStoredBssid(connectLinkVal.nodeVirtualAddr)
+        val storedBssid = node.lookupStoredBssid(hotspotConfigVal.nodeVirtualAddr)
 
         if(storedBssid != null) {
             onResult(
                 ConnectWifiLauncherResult(
-                    hotspotConfig = connectLinkVal.copy(
+                    hotspotConfig = hotspotConfigVal.copy(
                         bssid = storedBssid
                     )
                 )
             )
         }else {
             val deviceFilter = WifiDeviceFilter.Builder()
-                .setNamePattern(Pattern.compile(Pattern.quote(connectLinkVal.ssid)))
+                .setNamePattern(Pattern.compile(Pattern.quote(hotspotConfigVal.ssid)))
                 .build()
 
             val associationRequest: AssociationRequest = AssociationRequest.Builder()
@@ -163,8 +163,10 @@ fun rememberConnectWifiLauncher(
 
 
     return ConnectWifiLauncher {
-        //Note: setting this using a state variable ensures that when the permission callback
-        // returns the state value is set. This has to be done as an effect.
+        //Note: If the permission is already granted, requestPermission can call back immediately
+        // synchronously to the launcher's onResult. This would cause a problem because the mutable
+        // state wouldn't be updated until the next function invocation.
+
 
         pendingPermissionHotspotConfig = it
     }

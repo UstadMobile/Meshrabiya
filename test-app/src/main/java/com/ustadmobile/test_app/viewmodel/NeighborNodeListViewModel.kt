@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.test_app.appstate.AppUiState
 import com.ustadmobile.test_app.appstate.FabState
 import kotlinx.coroutines.flow.Flow
@@ -58,7 +58,7 @@ class NeighborNodeListViewModel(
     }
 
     fun onConnectWifi(
-        hotspotConfig: HotspotConfig
+        hotspotConfig: WifiConnectConfig
     ) {
         viewModelScope.launch {
             try {

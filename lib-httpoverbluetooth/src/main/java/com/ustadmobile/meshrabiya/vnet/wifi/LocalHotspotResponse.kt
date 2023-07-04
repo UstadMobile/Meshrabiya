@@ -6,7 +6,7 @@ import java.nio.ByteOrder
 data class LocalHotspotResponse(
     val responseToMessageId: Int,
     val errorCode: Int,
-    val config: HotspotConfig?,
+    val config: WifiConnectConfig?,
     val redirectAddr: Int,
 ) {
 
@@ -51,7 +51,7 @@ data class LocalHotspotResponse(
             val errorCode = byteBuf.int
             val hasHotspotConfig = byteBuf.get() != 0.toByte()
             val config = if(hasHotspotConfig) {
-                HotspotConfig.fromBytes(byteArray, offset + CONFIG_OFFSET).also {
+                WifiConnectConfig.fromBytes(byteArray, offset + CONFIG_OFFSET).also {
                     byteBuf.position(byteBuf.position() + it.sizeInBytes)
                 }
             }else {

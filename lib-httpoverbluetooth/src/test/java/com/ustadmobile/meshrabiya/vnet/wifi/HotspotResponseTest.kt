@@ -12,7 +12,7 @@ class HotspotResponseTest {
         val response = LocalHotspotResponse(
             responseToMessageId = Random.nextInt(),
             errorCode = 0,
-            config = HotspotConfig(
+            config = WifiConnectConfig(
                 nodeVirtualAddr = randomApipaAddr(),
                 ssid = "test",
                 passphrase = "world",

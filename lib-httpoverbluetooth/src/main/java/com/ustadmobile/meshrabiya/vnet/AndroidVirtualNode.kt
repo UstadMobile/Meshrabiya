@@ -15,8 +15,7 @@ import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.server.UuidAllocationServer
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
-import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -255,7 +254,7 @@ class AndroidVirtualNode(
     }
 
     suspend fun addWifiConnection(
-        config: HotspotConfig,
+        config: WifiConnectConfig,
     ) {
         hotspotManager.connectToHotspot(config)
     }

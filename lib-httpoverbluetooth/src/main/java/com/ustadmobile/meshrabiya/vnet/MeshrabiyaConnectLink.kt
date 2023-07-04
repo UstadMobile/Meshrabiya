@@ -2,7 +2,7 @@ package com.ustadmobile.meshrabiya.vnet
 
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import kotlinx.serialization.json.Json
 import java.net.InetAddress
 import java.net.URLDecoder
@@ -15,7 +15,7 @@ import java.net.URLEncoder
 data class MeshrabiyaConnectLink(
     val uri: String,
     val virtualAddress: Int,
-    val hotspotConfig: HotspotConfig?,
+    val hotspotConfig: WifiConnectConfig?,
     val bluetoothConfig: MeshrabiyaBluetoothState?
 ) {
 
@@ -28,7 +28,7 @@ data class MeshrabiyaConnectLink(
         fun fromComponents(
             nodeAddr: Int,
             port: Int,
-            hotspotConfig: HotspotConfig?,
+            hotspotConfig: WifiConnectConfig?,
             bluetoothConfig: MeshrabiyaBluetoothState?,
             json: Json,
         ) : MeshrabiyaConnectLink {
@@ -38,7 +38,7 @@ data class MeshrabiyaConnectLink(
                     append("hotspot=")
                     append(
                         URLEncoder.encode(json.encodeToString(
-                            HotspotConfig.serializer(), hotspotConfig
+                            WifiConnectConfig.serializer(), hotspotConfig
                         ), "UTF-8")
                     )
                 }
@@ -78,7 +78,7 @@ data class MeshrabiyaConnectLink(
                 }
             }.toMap()
             val hotspotConfig = searchComponents["hotspot"]?.let {
-                json.decodeFromString(HotspotConfig.serializer(), it)
+                json.decodeFromString(WifiConnectConfig.serializer(), it)
             }
 
             val bluetoothConfig = searchComponents["bluetooth"]?.let {

@@ -13,7 +13,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
@@ -165,7 +165,7 @@ abstract class VirtualNode(
 
 
     protected fun generateConnectLink(
-        hotspot: HotspotConfig?,
+        hotspot: WifiConnectConfig?,
         bluetoothConfig: MeshrabiyaBluetoothState? = null,
     ) : MeshrabiyaConnectLink {
         return MeshrabiyaConnectLink.fromComponents(

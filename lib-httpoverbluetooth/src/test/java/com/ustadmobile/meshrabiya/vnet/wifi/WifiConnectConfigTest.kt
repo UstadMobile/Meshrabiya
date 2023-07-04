@@ -5,11 +5,11 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert
 import org.junit.Test
 
-class HotspotConfigTest {
+class WifiConnectConfigTest {
 
     @Test
     fun givenHotspotConfigWithSsidAndPassphrase_whenConvertedToAndFromBytes_thenWillBeEqual() {
-        val hotspotConfig = HotspotConfig(
+        val hotspotConfig = WifiConnectConfig(
             nodeVirtualAddr = randomApipaAddr(),
             ssid = "test",
             passphrase = "secret",
@@ -21,14 +21,14 @@ class HotspotConfigTest {
 
         val byteArr = ByteArray(hotspotConfig.sizeInBytes + someOffset)
         hotspotConfig.toBytes(byteArr, someOffset)
-        val hotspotConfigFromBytes = HotspotConfig.fromBytes(byteArr, someOffset)
+        val hotspotConfigFromBytes = WifiConnectConfig.fromBytes(byteArr, someOffset)
 
         Assert.assertEquals(hotspotConfig, hotspotConfigFromBytes)
     }
 
     @Test
     fun givenHotspotConfigSerialized_whenSerialized_thenWillMatch() {
-        val hotspotConfig = HotspotConfig(
+        val hotspotConfig = WifiConnectConfig(
             nodeVirtualAddr = randomApipaAddr(),
             ssid = "test",
             passphrase = "secret",
@@ -40,10 +40,10 @@ class HotspotConfigTest {
             encodeDefaults = true
         }
 
-        val configJsonStr = json.encodeToString(HotspotConfig.serializer(), hotspotConfig)
+        val configJsonStr = json.encodeToString(WifiConnectConfig.serializer(), hotspotConfig)
 
         val hotspotConfigFromJson = json.decodeFromString(
-            HotspotConfig.serializer(), configJsonStr
+            WifiConnectConfig.serializer(), configJsonStr
         )
 
         Assert.assertEquals(hotspotConfig, hotspotConfigFromJson)

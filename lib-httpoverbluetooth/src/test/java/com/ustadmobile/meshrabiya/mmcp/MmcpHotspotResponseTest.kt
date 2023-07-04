@@ -1,7 +1,7 @@
 package com.ustadmobile.meshrabiya.mmcp
 
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 import org.junit.Assert
@@ -17,7 +17,7 @@ class MmcpHotspotResponseTest {
             result = LocalHotspotResponse(
                 responseToMessageId = Random.nextInt(),
                 errorCode = 0,
-                config = HotspotConfig(
+                config = WifiConnectConfig(
                     nodeVirtualAddr = randomApipaAddr(),
                     ssid = "test",
                     passphrase = "secret",

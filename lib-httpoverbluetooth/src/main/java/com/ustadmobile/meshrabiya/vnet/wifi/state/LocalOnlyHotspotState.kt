@@ -1,12 +1,12 @@
 package com.ustadmobile.meshrabiya.vnet.wifi.state
 
 import android.net.wifi.WifiManager.LocalOnlyHotspotCallback
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotStatus
 
 data class LocalOnlyHotspotState(
     val status: HotspotStatus = HotspotStatus.STOPPED,
-    val config: HotspotConfig? = null,
+    val config: WifiConnectConfig? = null,
     val errorCode: Int = 0,
 ) {
 

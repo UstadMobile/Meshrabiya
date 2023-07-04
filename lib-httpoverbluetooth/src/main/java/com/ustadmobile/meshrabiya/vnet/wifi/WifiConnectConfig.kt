@@ -13,7 +13,7 @@ import java.nio.ByteOrder
  * stored BSSIDs for the network (to see if we need to use companiondevicemanager dialog or not).
  */
 @Serializable
-data class HotspotConfig(
+data class WifiConnectConfig(
     val nodeVirtualAddr: Int,
     val ssid: String,
     val passphrase: String,
@@ -70,7 +70,7 @@ data class HotspotConfig(
         fun fromBytes(
             byteArray: ByteArray,
             offset: Int
-        ): HotspotConfig {
+        ): WifiConnectConfig {
             val byteBuf = ByteBuffer.wrap(byteArray, offset, byteArray.size - offset)
                 .order(ByteOrder.BIG_ENDIAN)
             val nodeVirtualAddr = byteBuf.int
@@ -79,7 +79,7 @@ data class HotspotConfig(
             val port = byteBuf.int
             val hotspotType = HotspotType.fromFlag(byteBuf.int)
 
-            return HotspotConfig(
+            return WifiConnectConfig(
                 nodeVirtualAddr = nodeVirtualAddr,
                 ssid = ssid,
                 passphrase = passphrase,
@@ -96,7 +96,7 @@ data class HotspotConfig(
 fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
     nodeVirtualAddr: Int,
     port: Int,
-): HotspotConfig? {
+): WifiConnectConfig? {
     return if(Build.VERSION.SDK_INT >= 30) {
         val softApConfig = softApConfiguration
         val ssid = if(Build.VERSION.SDK_INT >= 33) {
@@ -110,7 +110,7 @@ fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
         val passphrase = softApConfig.passphrase
         val bssid = softApConfig.bssid
         if(ssid != null && passphrase != null) {
-            HotspotConfig(
+            WifiConnectConfig(
                 nodeVirtualAddr = nodeVirtualAddr,
                 ssid = ssid,
                 passphrase = passphrase,
@@ -127,7 +127,7 @@ fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
         val passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\"")
         val bssid = wifiConfig?.BSSID
         if(ssid != null && passphrase != null) {
-            HotspotConfig(
+            WifiConnectConfig(
                 nodeVirtualAddr = nodeVirtualAddr,
                 ssid = ssid,
                 passphrase = passphrase,
