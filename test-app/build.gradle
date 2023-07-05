@@ -87,6 +87,11 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     androidTestImplementation platform("androidx.compose:compose-bom:$version_compose_bom")
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+
+    androidTestImplementation "androidx.test:runner:$version_android_junit_runner"
+    androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
+    androidTestUtil "androidx.test:orchestrator:$version_androidx_orchestrator"
+
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }
