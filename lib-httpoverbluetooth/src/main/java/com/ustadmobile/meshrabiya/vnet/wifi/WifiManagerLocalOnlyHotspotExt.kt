@@ -34,7 +34,13 @@ fun generateRandomMacAddress(): MacAddress {
  * device and target SDK is Android 13 or higher) when a configuration is provided:
  * https://cs.android.com/android/platform/superproject/+/android-13.0.0_r1:packages/modules/Wifi/service/java/com/android/server/wifi/WifiServiceImpl.java;l=2472
  *
- * ===It is NOT possible to workaround the random MAC problem on Android 11/12.===
+ * ===It is NOT possible to avoid a random MAC for LocalOnlyHotspot on Android 11/12.===
+ *
+ * It might be possible to use the accessibility service to automatically dismiss accept dialogs
+ * to mitigate this for large deployments etc.
+ *
+ * see: https://developer.android.com/guide/topics/ui/accessibility/service
+ * e.g. https://tooploox.com/unusual-ways-using-android-accessibility-services
  *
  * Avenues explored:
  *
@@ -60,6 +66,7 @@ fun generateRandomMacAddress(): MacAddress {
  * settings app itself does not change this:
  * https://cs.android.com/android/platform/superproject/+/master:packages/apps/Settings/src/com/android/settings/wifi/tether/WifiTetherSettings.java;l=231
  * adb shell cmd wifi also does not support changing this.
+ *
  */
 @RequiresApi(33)
 fun WifiManager.startLocalOnlyHotspotWithConfig(
