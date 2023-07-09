@@ -1,7 +1,8 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
 class WifiDirectException(
-    message: String, reason: Int
+    message: String,
+    val wifiDirectFailReason: Int
 ): Exception(
-    message + ": " + WifiDirectError(reason).toString()
+    message + ": " + WifiDirectError(wifiDirectFailReason).toString()
 )

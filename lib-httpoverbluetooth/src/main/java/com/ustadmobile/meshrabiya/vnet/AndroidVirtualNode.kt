@@ -48,12 +48,14 @@ class AndroidVirtualNode(
 ) {
 
 
-    private val bluetoothManager: BluetoothManager = appContext.getSystemService(
-        BluetoothManager::class.java
-    )
+    private val bluetoothManager: BluetoothManager by lazy {
+        appContext.getSystemService(BluetoothManager::class.java)
+    }
 
 
-    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
+    private val bluetoothAdapter: BluetoothAdapter? by lazy {
+        bluetoothManager.adapter
+    }
 
     /**
      * Listen to the WifiManager for new wifi connections being established.. When they are
@@ -139,25 +141,24 @@ class AndroidVirtualNode(
         }
     }
 
-    private val uuidAllocationServer = UuidAllocationServer(
-        appContext = appContext,
-        allocationServiceUuid = allocationServiceUuid,
-        allocationCharacteristicUuid = allocationCharacteristicUuid,
-        onUuidAllocated = onUuidAllocatedListener,
-    )
+//    private val uuidAllocationServer = UuidAllocationServer(
+//        appContext = appContext,
+//        allocationServiceUuid = allocationServiceUuid,
+//        allocationCharacteristicUuid = allocationCharacteristicUuid,
+//        onUuidAllocated = onUuidAllocatedListener,
+//    )
 
-    private val uuidAllocationClient = UuidAllocationClient(
-        appContext = appContext,
-        onLog = logger,
-        clientNodeAddr = localNodeAddress
-    )
+//    private val uuidAllocationClient = UuidAllocationClient(
+//        appContext = appContext,
+//        onLog = logger,
+//        clientNodeAddr = localNodeAddress
+//    )
 
     init {
-        uuidAllocationServer.start()
+        //uuidAllocationServer.start()
         appContext.registerReceiver(
             bluetoothStateBroadcastReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
         )
-        updateBluetoothState()
 
         receiverRegistered.set(true)
 
@@ -184,6 +185,7 @@ class AndroidVirtualNode(
         remoteBluetooothAddr: String,
     ) {
         logger(Log.DEBUG, "AddBluetoothConnection to $remoteBluetooothAddr", null)
+        /*
         withContext(Dispatchers.IO) {
             val dataUuid = uuidAllocationClient.requestUuidAllocation(
                 remoteAddress = remoteBluetooothAddr,
@@ -214,6 +216,7 @@ class AndroidVirtualNode(
                 logger(Log.ERROR, "addBluetoothConnection: other exception", e)
             }
         }
+         */
     }
 
     suspend fun addWifiConnection(remoteVirtualAddr: Int) {

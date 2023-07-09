@@ -1,9 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.MacAddress
 import android.net.Network
@@ -12,21 +9,13 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
-import android.net.wifi.p2p.WifiP2pConfig
-import android.net.wifi.p2p.WifiP2pGroup
-import android.net.wifi.p2p.WifiP2pManager
-import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
-import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
 import android.os.Build
-import android.os.Looper
 import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addOrLookupNetwork
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.bssidDataStore
-import com.ustadmobile.meshrabiya.ext.encodeAsHex
-import com.ustadmobile.meshrabiya.ext.toPrettyString
 import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.WifiRole
@@ -35,14 +24,12 @@ import com.ustadmobile.meshrabiya.vnet.wifi.UnhiddenSoftApConfigurationBuilder.C
 import com.ustadmobile.meshrabiya.vnet.wifi.UnhiddenSoftApConfigurationBuilder.Companion.SECURITY_TYPE_WPA2_PSK
 import com.ustadmobile.meshrabiya.vnet.wifi.state.LocalOnlyHotspotState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
-import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiDirectGroupState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
@@ -73,7 +60,13 @@ class MeshrabiyaWifiManagerAndroid(
     private val router: VirtualRouter,
     private val ioExecutor: ExecutorService,
     private val onNewWifiConnectionListener: OnNewWifiConnectionListener = OnNewWifiConnectionListener { },
-) : Closeable, MeshrabiyaWifiManager, WifiP2pManager.ChannelListener {
+    private val wifiDirectManager: WifiDirectManager = WifiDirectManager(
+        appContext = appContext,
+        logger = logger,
+        localNodeAddr = localNodeAddr,
+        router = router,
+    )
+) : Closeable, MeshrabiyaWifiManager {
 
     private val logPrefix = "[LocalHotspotManagerAndroid: ${localNodeAddr.addressToDotNotation()}] "
 
@@ -85,102 +78,8 @@ class MeshrabiyaWifiManagerAndroid(
         val dhcpServer: InetAddress
     )
 
-
     fun interface OnNewWifiConnectionListener {
         fun onNewWifiConnection(connectEvent: WifiConnectEvent)
-    }
-
-
-    private val wifiDirectBroadcastReceiver = object: BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when(intent.action) {
-                WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
-                    val state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1)
-                    logger(
-                        Log.DEBUG, "$logPrefix p2p state changed: " +
-                            "enabled=${state == WifiP2pManager.WIFI_P2P_STATE_ENABLED} ", null
-                    )
-
-                    //If Wifi has been disabled, make sure to
-                    _state.takeIf { state == WifiP2pManager.WIFI_P2P_STATE_DISABLED }?.update { prev ->
-                        prev.copy(
-                            wifiDirectGroupState = WifiDirectGroupState(
-                                hotspotStatus = HotspotStatus.STOPPED
-                            ),
-                        )
-                    }
-
-                }
-                WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-                    val extraGroup: WifiP2pGroup? = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_GROUP)
-                    logger(Log.DEBUG, "wifi p2p connection changed action: group=${extraGroup?.toPrettyString()}", null)
-                    if(extraGroup != null)
-                        onNewWifiP2pGroupInfoReceived(extraGroup)
-                }
-            }
-        }
-    }
-
-    private val dnsSdResponseListener = WifiP2pManager.DnsSdServiceResponseListener { instanceName, registrationType, device ->
-        logger(Log.DEBUG, "DNS SD Service Response: instance=$instanceName device=${device.deviceAddress}", null)
-        dnsSdResponseFlow.tryEmit(DnsSdResponse(instanceName, registrationType, device))
-    }
-
-    private val dnsSdTxtRecordListener = WifiP2pManager.DnsSdTxtRecordListener { fullDomainName, txtRecordMap, wifiP2pDevice ->
-        //Do nothing
-    }
-
-    private val dnsSdResponseFlow = MutableSharedFlow<DnsSdResponse>(
-        replay = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
-
-    /**
-     * This function can be called by the WIFI_P2P_CONNECTION_CHANGED_ACTION or groupInfoListener.
-     * Sometimes the info only comes with the callback, sometimes it only comes in the broadcast.
-     */
-    private fun onNewWifiP2pGroupInfoReceived(group: WifiP2pGroup) {
-        val ssid = group.networkName
-        val passphrase = group.passphrase
-
-        _state.update { prev ->
-            val hotspotConfig = if(ssid != null && passphrase != null) {
-                WifiConnectConfig(
-                    nodeVirtualAddr = localNodeAddr,
-                    ssid = ssid,
-                    passphrase = passphrase,
-                    port = router.localDatagramPort,
-                    hotspotType = HotspotType.WIFIDIRECT_GROUP
-                )
-            }else {
-                null
-            }
-
-            prev.copy(
-                wifiRole = if(hotspotConfig != null) {
-                    WifiRole.WIFI_DIRECT_GROUP_OWNER
-                } else {
-                    prev.wifiRole
-                },
-                wifiDirectGroupState = WifiDirectGroupState(
-                    hotspotStatus = HotspotStatus.STARTED,
-                    config = hotspotConfig,
-                ),
-                errorCode = 0,
-            )
-        }
-    }
-
-    private val wifiP2pGroupInfoListener = WifiP2pManager.GroupInfoListener { group: WifiP2pGroup? ->
-        logger(Log.DEBUG, "P2P Group Info Available: ${group?.toPrettyString()} ", null)
-
-        /*
-         * Group = null does not necessarily mean that the group is gone.
-         */
-        if(group == null)
-            return@GroupInfoListener
-
-        onNewWifiP2pGroupInfoReceived(group)
     }
 
     private var localOnlyHotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
@@ -244,12 +143,6 @@ class MeshrabiyaWifiManagerAndroid(
 
     private val wifiManager: WifiManager = appContext.getSystemService(WifiManager::class.java)
 
-    val wifiP2pManager: WifiP2pManager? by lazy {
-        appContext.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager?
-    }
-
-    var channel: WifiP2pManager.Channel? = null
-
     private val _state = MutableStateFlow(MeshrabiyaWifiState())
 
     override val state: Flow<MeshrabiyaWifiState> = _state.asStateFlow()
@@ -267,177 +160,35 @@ class MeshrabiyaWifiManagerAndroid(
     private val closed = AtomicBoolean(false)
 
     init {
-        logger(Log.DEBUG, "$logPrefix init", null)
-        val intentFilter = IntentFilter().apply {
-            addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
-            addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
-            addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
-            addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
+        wifiDirectManager.onBeforeGroupStart = WifiDirectManager.OnBeforeGroupStart {
+            stopLocalOnlyHotspot()
         }
 
-        appContext.registerReceiver(wifiDirectBroadcastReceiver, intentFilter)
-    }
-
-    //WifiDirect Channel Listener
-    override fun onChannelDisconnected() {
-        logger(Log.DEBUG, "$logPrefix onChannelDisconnected", null)
-        channel = null
-
-        _state.update { prev ->
-            prev.copy(
-                wifiRole = if(prev.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER){
-                    WifiRole.NONE
-                }else {
-                    prev.wifiRole
-                },
-                wifiDirectGroupState = WifiDirectGroupState(
-                    hotspotStatus = HotspotStatus.STOPPED,
-                )
-            )
+        nodeScope.launch {
+            wifiDirectManager.state.collect {
+                _state.update { prev ->
+                    prev.copy(
+                        wifiDirectState = it,
+                        wifiRole = if(it.config != null) {
+                            WifiRole.WIFI_DIRECT_GROUP_OWNER
+                        }else if(prev.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER) {
+                            WifiRole.NONE
+                        }else {
+                            prev.wifiRole
+                        }
+                    )
+                }
+            }
         }
     }
+
 
     override val is5GhzSupported: Boolean
         get() = wifiManager.is5GHzBandSupported
 
 
-    private fun makeWifiP2pServiceInfo(addr: Int): WifiP2pDnsSdServiceInfo {
-        return WifiP2pDnsSdServiceInfo.newInstance(
-            addr.encodeAsHex(), WIFI_DIRECT_SERVICE_TYPE, emptyMap()
-        )
-    }
-
-    private suspend fun addWifiDirectService() {
-        val servInfo = makeWifiP2pServiceInfo(localNodeAddr)
-
-        logger(Log.DEBUG, "$logPrefix addWifiDirectService instance=${localNodeAddr.encodeAsHex()}", null)
-        val completable = CompletableDeferred<Boolean>()
-
-        wifiP2pManager?.addLocalService(channel, servInfo, object: WifiP2pManager.ActionListener {
-            override fun onSuccess() {
-                logger(Log.DEBUG, "$logPrefix addWifiDirectService: success", null)
-                completable.complete(true)
-            }
-
-            override fun onFailure(reason: Int) {
-                logger(Log.ERROR, "$logPrefix addWifiDirectService: failed ${WifiDirectError(reason)}", null)
-                completable.completeExceptionally(WifiDirectException("Failed to add service", reason))
-            }
-        })
-
-        completable.await()
-
-//        val pnpServiceInfo = WifiP2pUpnpServiceInfo.newInstance(
-//
-//        )
 
 
-    }
-
-    private fun initWifiDirectChannel(){
-        if(channel == null) {
-            channel = wifiP2pManager?.initialize(appContext, Looper.getMainLooper(), this)
-            wifiP2pManager?.setDnsSdResponseListeners(channel, dnsSdResponseListener, dnsSdTxtRecordListener)
-        }
-    }
-
-    private suspend fun startWifiDirectGroup(): Boolean {
-        logger(Log.DEBUG, "$logPrefix startWifiDirectGroup", null)
-        stopLocalOnlyHotspot()
-
-        initWifiDirectChannel()
-
-        addWifiDirectService()
-
-        logger(Log.DEBUG, "$logPrefix startWifiDirectGroup: Requesting WifiP2PGroup", null)
-        wifiP2pManager?.createGroup(channel, object: WifiP2pManager.ActionListener {
-            override fun onSuccess() {
-                logger(Log.DEBUG, "$logPrefix startWifiDirectGroup: WifiP2PGroup:onSuccess", null)
-                wifiP2pManager?.requestGroupInfo(channel, wifiP2pGroupInfoListener)
-            }
-
-            override fun onFailure(reason: Int) {
-                logger(
-                    Log.ERROR,
-                    "$logPrefix: startWifiDirectGroup: ONFailure ${(WifiDirectError(reason)) }",
-                    null
-                )
-
-                _state.update { prev ->
-                    prev.copy(
-                        wifiDirectGroupState = WifiDirectGroupState(
-                            hotspotStatus = HotspotStatus.STOPPED,
-                            error = reason,
-                        ),
-                    )
-                }
-            }
-        })
-
-        return withTimeoutOrNull(HOTSPOT_TIMEOUT) {
-            state.filter { it.wifiDirectGroupState.hotspotStatus.isSettled() }.first()
-        }?.wifiDirectGroupState?.hotspotStatus == HotspotStatus.STARTED
-    }
-
-    suspend fun stopWifiDirectGroup(): Boolean {
-        logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup", null)
-        if(
-            //Use atomic update on state flow. If group was started, then stop it now.
-            _state.getAndUpdate { prev ->
-                if(prev.wifiDirectGroupState.hotspotStatus == HotspotStatus.STARTED) {
-                    prev.copy(
-                        wifiDirectGroupState = prev.wifiDirectGroupState.copy(
-                            hotspotStatus = HotspotStatus.STOPPING
-                        )
-                    )
-                }else {
-                    prev
-                }
-            }.wifiDirectGroupState.hotspotStatus == HotspotStatus.STARTED
-        ) {
-            withContext(Dispatchers.Main) {
-                val channelVal = channel
-                if(channelVal != null) {
-                    logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup - requesting group removal",null)
-                    wifiP2pManager?.removeGroup(channel, object : WifiP2pManager.ActionListener {
-                        override fun onSuccess() {
-                            logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup: successful", null)
-                            _state.update { prev ->
-                                prev.copy(
-                                    wifiRole = if(prev.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER) {
-                                        WifiRole.NONE
-                                    }else {
-                                        prev.wifiRole
-                                    },
-                                    wifiDirectGroupState = WifiDirectGroupState(
-                                        hotspotStatus = HotspotStatus.STOPPED
-                                    )
-                                )
-                            }
-
-                            if(Build.VERSION.SDK_INT >= 27) {
-                                logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup: closing wifi p2p channel", null)
-                                channelVal.close()
-                            }
-                            channel = null
-                        }
-
-                        override fun onFailure(reason: Int) {
-                            logger(Log.ERROR, "$logPrefix stopWifiDirectGroup: onFailure: " +
-                                    "${WifiDirectError(reason)}", null)
-                        }
-                    })
-                }else {
-                    logger(Log.ERROR, "INVALID STATE: wifidirect group status = STARTED but channel is null", null)
-                    false
-                }
-            }
-        }
-
-        return withTimeoutOrNull(HOTSPOT_TIMEOUT) {
-            _state.filter { it.wifiDirectGroupState.hotspotStatus.isSettled() }.first()
-        }?.wifiDirectGroupState?.hotspotStatus == HotspotStatus.STOPPED
-    }
 
     /**
      * On starting hotspot with custom configuration see:
@@ -460,7 +211,7 @@ class MeshrabiyaWifiManagerAndroid(
      */
     private suspend fun startLocalOnlyHotspot() {
         logger(Log.DEBUG, "$logPrefix startLocalOnlyHotspot", null)
-        stopWifiDirectGroup()
+        wifiDirectManager.stopWifiDirectGroup()
         logger(Log.DEBUG, "$logPrefix startLocalOnlyHotspot: requesting WifiManager to " +
                 "start local only hotspot", null)
         if(Build.VERSION.SDK_INT >= 33) {
@@ -520,7 +271,7 @@ class MeshrabiyaWifiManagerAndroid(
                     )
 
                     HotspotType.WIFIDIRECT_GROUP -> prev.copy(
-                        wifiDirectGroupState = prev.wifiDirectGroupState.copy(
+                        wifiDirectState = prev.wifiDirectState.copy(
                             hotspotStatus = HotspotStatus.STARTING
                         )
                     )
@@ -534,7 +285,7 @@ class MeshrabiyaWifiManagerAndroid(
                     startLocalOnlyHotspot()
                 }
                 HotspotType.WIFIDIRECT_GROUP -> {
-                    startWifiDirectGroup()
+                    wifiDirectManager.startWifiDirectGroup()
                 }
                 else -> {
                     //Do nothing
@@ -543,7 +294,7 @@ class MeshrabiyaWifiManagerAndroid(
         }
 
         val configResult = _state.filter {
-            (it.wifiDirectGroupState.hotspotStatus == HotspotStatus.STARTED ||
+            (it.wifiDirectState.hotspotStatus == HotspotStatus.STARTED ||
                     it.localOnlyHotspotState.status == HotspotStatus.STARTED) ||
                     it.errorCode != 0
         }.first()
@@ -690,159 +441,84 @@ class MeshrabiyaWifiManagerAndroid(
     override suspend fun connectToHotspot(
         config: WifiConnectConfig,
     ) {
-        if(config.hotspotType == HotspotType.WIFIDIRECT_GROUP) {
-            connectWifiDirect(config)
+        val networkAndServerAddr = connectToHotspot(
+            ssid = config.ssid,
+            passphrase = config.passphrase,
+            bssid = config.bssid
+        )
+
+        if(networkAndServerAddr != null) {
+            val bssid = config.bssid
+            if(bssid != null) {
+                storeBssidForAddress(config.nodeVirtualAddr, bssid)
+                logger(Log.INFO, "$logPrefix connectToHotspot: saved bssid = $bssid for " +
+                        config.nodeVirtualAddr.addressToDotNotation(), null)
+            }
+
+            withContext(Dispatchers.IO) {
+                val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
+                    port = 0,
+                    localNodeVirtualAddress = localNodeAddr,
+                    ioExecutorService = ioExecutor,
+                    router = router,
+                    onMmcpHelloReceivedListener = {
+                        //Do nothing - this will never receive an incoming hello.
+                    },
+                    logger = logger,
+                    name = "network bound to ${config.ssid}"
+                )
+
+                val previousSocket = stationNetworkBoundDatagramSocket.getAndUpdate {
+                    networkBoundDatagramSocket
+                }
+
+                previousSocket?.close()
+
+                //Binding something to the network helps to avoid older versions of Android
+                //deciding to disconnect from this network.
+                networkAndServerAddr.network.bindSocket(networkBoundDatagramSocket)
+                logger(Log.INFO, "$logPrefix : addWifiConnection:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
+                val newState = _state.updateAndGet { prev ->
+                    prev.copy(
+                        wifiRole = if(config.hotspotType == HotspotType.LOCALONLY_HOTSPOT) {
+                            WifiRole.WIFI_DIRECT_GROUP_OWNER
+                        }else {
+                            WifiRole.CLIENT
+                        }
+                    )
+                }
+
+                logger(
+                    Log.INFO, "$logPrefix : addWifiConnectionConnect:Sending " +
+                            "hello to ${networkAndServerAddr.dhcpServer}:${config.port} " +
+                            "from local:${networkBoundDatagramSocket.localPort}", null
+                )
+
+                //Once connected,
+                onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
+                    neighborPort = config.port,
+                    neighborInetAddress = networkAndServerAddr.dhcpServer,
+                    socket = networkBoundDatagramSocket,
+                ))
+
+                //If we are connected and now expected to act as a Wifi Direct group, setup the group and add service for discovery.
+                nodeScope.takeIf { newState.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER }?.launch {
+                    wifiDirectManager.startWifiDirectGroup()
+                }
+            }
         }else {
-            val networkAndServerAddr = connectToHotspot(
-                ssid = config.ssid,
-                passphrase = config.passphrase,
-                bssid = config.bssid
-            )
-
-            if(networkAndServerAddr != null) {
-                val bssid = config.bssid
-                if(bssid != null) {
-                    storeBssidForAddress(config.nodeVirtualAddr, bssid)
-                    logger(Log.INFO, "$logPrefix connectToHotspot: saved bssid = $bssid for " +
-                            config.nodeVirtualAddr.addressToDotNotation(), null)
-                }
-
-                withContext(Dispatchers.IO) {
-                    val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
-                        port = 0,
-                        localNodeVirtualAddress = localNodeAddr,
-                        ioExecutorService = ioExecutor,
-                        router = router,
-                        onMmcpHelloReceivedListener = {
-                            //Do nothing - this will never receive an incoming hello.
-                        },
-                        logger = logger,
-                        name = "network bound to ${config.ssid}"
-                    )
-
-                    val previousSocket = stationNetworkBoundDatagramSocket.getAndUpdate {
-                        networkBoundDatagramSocket
-                    }
-
-                    previousSocket?.close()
-
-                    //Binding something to the network helps to avoid older versions of Android
-                    //deciding to disconnect from this network.
-                    networkAndServerAddr.network.bindSocket(networkBoundDatagramSocket)
-                    logger(Log.INFO, "$logPrefix : addWifiConnection:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
-                    val newState = _state.updateAndGet { prev ->
-                        prev.copy(
-                            wifiRole = if(config.hotspotType == HotspotType.LOCALONLY_HOTSPOT) {
-                                WifiRole.WIFI_DIRECT_GROUP_OWNER
-                            }else {
-                                WifiRole.CLIENT
-                            }
-                        )
-                    }
-
-                    logger(
-                        Log.INFO, "$logPrefix : addWifiConnectionConnect:Sending " +
-                                "hello to ${networkAndServerAddr.dhcpServer}:${config.port} " +
-                                "from local:${networkBoundDatagramSocket.localPort}", null
-                    )
-
-                    //Once connected,
-                    onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
-                        neighborPort = config.port,
-                        neighborInetAddress = networkAndServerAddr.dhcpServer,
-                        socket = networkBoundDatagramSocket,
-                    ))
-
-                    //If we are connected and now expected to act as a Wifi Direct group, setup the group and add service for discovery.
-                    nodeScope.takeIf { newState.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER }?.launch {
-                        startWifiDirectGroup()
-                    }
-                }
-            }else {
-                logger(Log.ERROR, "$logPrefix : addWifiConnectionConnect: to hotspot: returned null network", null)
-            }
+            logger(Log.ERROR, "$logPrefix : addWifiConnectionConnect: to hotspot: returned null network", null)
         }
     }
 
-    suspend fun connectWifiDirect(config: WifiConnectConfig) {
-        initWifiDirectChannel()
-
-        val instanceName = config.nodeVirtualAddr.encodeAsHex()
-
-
-        //Note: specifying the instance name leads to a failure to discover anything (thanks Google).
-        val request = WifiP2pDnsSdServiceRequest.newInstance()
-
-        var requestAdded = false
-
-        try {
-            val addRequestActionListener = WifiP2pActionListenerAdapter(
-                failMessage = "$logPrefix : connectWifiDirect: Failed to add service request"
-            )
-            logger(Log.DEBUG, "$logPrefix : connectWifiDirect : Adding service request instance =$instanceName", null)
-            wifiP2pManager?.addServiceRequest(channel, request, addRequestActionListener)
-            addRequestActionListener.await()
-            requestAdded = true
-
-            val discoverServicesActionListener = WifiP2pActionListenerAdapter(
-                failMessage = "$logPrefix : connectWifiDirect : failed to request discover services"
-            )
-
-            logger(Log.DEBUG, "$logPrefix : connectWifiDirect : requesting service discovery", null)
-            wifiP2pManager?.discoverServices(channel, discoverServicesActionListener)
-            discoverServicesActionListener.await()
-            logger(Log.DEBUG, "$logPrefix : connectWifiDirect : discovery requested, waiting for responses", null)
-
-            val response = withTimeoutOrNull(30000){
-                dnsSdResponseFlow.filter {
-                    it.instanceName == instanceName
-                }.first()
-            }
-
-            if(response != null) {
-                logger(Log.DEBUG, "$logPrefix : connectWifiDirect : found device ${response.device.deviceName} - ${response.device.deviceAddress}", null)
-                val p2pConfig = WifiP2pConfig().apply {
-                    groupOwnerIntent = 0
-                    deviceAddress = response.device.deviceAddress
-                }
-
-                val connectActionListener = WifiP2pActionListenerAdapter(
-                    failMessage = "$logPrefix : connectWifiDirect : fail to connect"
-                )
-                wifiP2pManager?.connect(channel, p2pConfig, connectActionListener)
-                connectActionListener.await()
-                logger(Log.DEBUG, "$logPrefix : connectWifiDirect : CONNECTED! ${response.device.deviceAddress}", null)
-            }else {
-                logger(Log.DEBUG, "$logPrefix : connectWifiDirect : device not found", null)
-            }
-
-
-
-        }catch(e: Exception) {
-            logger(Log.ERROR, "$logPrefix : ConnectWifiDirect: Exception!", e)
-        }finally {
-            if(requestAdded) {
-                val removeActionListener = WifiP2pActionListenerAdapter(
-                    failMessage = "$logPrefix : connectWifiDirect : failed to remove service request"
-                )
-                wifiP2pManager?.removeServiceRequest(channel, request, removeActionListener)
-                logger(Log.DEBUG, "$logPrefix : connectWifiDirect: removed service request", null)
-            }
-        }
-
-    }
 
     override fun close() {
         if(!closed.getAndSet(true)) {
-            //Channel close is only allowed on SDK27+
-            if(Build.VERSION.SDK_INT >= 27) {
-                channel?.close()
-            }
-            channel = null
 
-            appContext.unregisterReceiver(wifiDirectBroadcastReceiver)
             localOnlyHotspotReservation?.close()
+            nodeScope.cancel()
         }
+
     }
 
     suspend fun lookupStoredBssid(addr: Int) : String? {
@@ -864,8 +540,6 @@ class MeshrabiyaWifiManagerAndroid(
         const val HOTSPOT_TIMEOUT = 10000L
 
         const val WIFI_DIRECT_SERVICE_TYPE = "_meshr._tcp"
-
-        const val WIFI_DIRECT_PNP_UUID = "0b21fa02-6184-49f3-a397-f2832279c47c"
 
     }
 

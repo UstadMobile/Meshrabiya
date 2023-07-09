@@ -67,6 +67,9 @@ fun generateRandomMacAddress(): MacAddress {
  * https://cs.android.com/android/platform/superproject/+/master:packages/apps/Settings/src/com/android/settings/wifi/tether/WifiTetherSettings.java;l=231
  * adb shell cmd wifi also does not support changing this.
  *
+ * Public API request:
+ * https://issuetracker.google.com/issues/290173137
+ *
  */
 @RequiresApi(33)
 fun WifiManager.startLocalOnlyHotspotWithConfig(

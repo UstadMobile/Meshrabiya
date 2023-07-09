@@ -14,7 +14,7 @@ import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotStatus
-import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiDirectGroupState
+import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiDirectState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.runBlocking
@@ -181,7 +181,7 @@ class VirtualNodeTest {
     fun givenMmcpHotspotRequestReceived_whenPacketRouted_thenWillRequestFromHotspotManagerAndReplyWithConfig() {
         val hotspotState = MutableStateFlow(
             MeshrabiyaWifiState(
-                wifiDirectGroupState = WifiDirectGroupState(hotspotStatus = HotspotStatus.STOPPED)
+                wifiDirectState = WifiDirectState(hotspotStatus = HotspotStatus.STOPPED)
             )
         )
         val mockHotspotManager = mock<MeshrabiyaWifiManager> {
