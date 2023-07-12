@@ -39,4 +39,41 @@ class VirtualPacketTest {
         }
     }
 
+
+    @Test
+    fun givenVirtualPacket_whenLastHopAddrSet_whenConvertedToDatagramAndBackToVirtualPacket_thenShouldMatch() {
+        val payloadSize = 1000
+        val payload = Random.nextBytes(ByteArray(payloadSize + VirtualPacketHeader.HEADER_SIZE))
+        val header = VirtualPacketHeader(
+            toAddr = 1000,
+            toPort = 8080,
+            fromAddr = 1002,
+            fromPort = 8072,
+            lastHopAddr = 0,
+            hopCount = 1,
+            maxHops = 4,
+            payloadSize = payloadSize,
+        )
+
+        val virtualPacket = VirtualPacket.fromHeaderAndPayloadData(
+            header = header,
+            data = payload,
+            payloadOffset = VirtualPacketHeader.HEADER_SIZE,
+        )
+        val lastHopAddr = 1042
+        virtualPacket.updateLastHopAddrAndIncrementHopCountInData(lastHopAddr)
+
+        val datagramPacket = virtualPacket.toDatagramPacket()
+        val virtualPacketFromDatagramPacket = VirtualPacket.fromDatagramPacket(datagramPacket)
+        Assert.assertEquals(virtualPacket.header.toAddr, virtualPacketFromDatagramPacket.header.toAddr)
+
+        Assert.assertEquals(lastHopAddr, virtualPacketFromDatagramPacket.header.lastHopAddr)
+        for(i in 0 until virtualPacket.header.payloadSize) {
+            Assert.assertEquals(
+                virtualPacket.data[i + virtualPacket.dataOffset],
+                virtualPacketFromDatagramPacket.data[i + virtualPacketFromDatagramPacket.dataOffset]
+            )
+        }
+    }
+
 }

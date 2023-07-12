@@ -240,11 +240,12 @@ abstract class VirtualNode(
             val neighborManager = neighborNodeManagers[packet.header.toAddr]
             if(neighborManager != null) {
                 logger(Log.DEBUG, "$logPrefix ${packet.header.toAddr.addressToDotNotation()}", null)
+                packet.updateLastHopAddrAndIncrementHopCountInData(localNodeAddress)
                 neighborManager.send(packet)
             }else {
                 //not routeable
                 logger(Log.ERROR,
-                    "${logPrefix }Cannot route packet to ${packet.header.toAddr.addressToDotNotation()}",
+                    "$logPrefix Cannot route packet to ${packet.header.toAddr.addressToDotNotation()}",
                 null)
             }
         }

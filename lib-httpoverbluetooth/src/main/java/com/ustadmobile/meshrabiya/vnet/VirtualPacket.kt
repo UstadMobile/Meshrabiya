@@ -1,6 +1,7 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import java.net.DatagramPacket
+import java.nio.ByteBuffer
 
 
 /**
@@ -66,11 +67,32 @@ class VirtualPacket private constructor(
         return result
     }
 
+    /**
+     * Update the data array to set the last hop address and increment hop count. This would typically
+     * be called by the route function just before the packet is sent.
+     *
+     * @param lastHopAddr the value to set for the last hop address
+     */
+    internal fun updateLastHopAddrAndIncrementHopCountInData(
+        lastHopAddr: Int
+    ) {
+        val byteBuffer = ByteBuffer.wrap(data, dataOffset + LAST_HOP_ADDR_OFFSET, 5)
+        byteBuffer.putInt(lastHopAddr)
+        byteBuffer.put((header.hopCount + 1.toByte()).toByte())
+    }
+
     companion object {
 
         const val MAX_PAYLOAD_SIZE = 1500
 
         const val VIRTUAL_PACKET_BUF_SIZE = MAX_PAYLOAD_SIZE + VirtualPacketHeader.HEADER_SIZE
+
+        /**
+         * Offset from start of header until the bytes that contain the last hop address - see fields
+         * on header to check
+         */
+        private const val LAST_HOP_ADDR_OFFSET = 12
+
 
         fun fromDatagramPacket(
             datagramPacket: DatagramPacket,
