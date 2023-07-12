@@ -46,8 +46,8 @@ data class MeshrabiyaWifiState(
                 HotspotType.WIFIDIRECT_GROUP
             }else {
                 //TEMPORARY for wifi direct testing ONLY
-                HotspotType.WIFIDIRECT_GROUP
                 //HotspotType.LOCALONLY_HOTSPOT
+                HotspotType.WIFIDIRECT_GROUP
             }
 
         }

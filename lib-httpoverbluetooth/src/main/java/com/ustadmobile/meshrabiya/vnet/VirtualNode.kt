@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.io.Closeable
 import java.io.IOException
+import java.net.DatagramSocket
 import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -105,7 +106,7 @@ abstract class VirtualNode(
     protected val logPrefix: String = "[VirtualNode ${localNodeAddress.addressToDotNotation()}]"
 
     internal val datagramSocket = VirtualNodeDatagramSocket(
-        port = port,
+        socket = DatagramSocket(0),
         ioExecutorService = connectionExecutor,
         router = this,
         localNodeVirtualAddress = localNodeAddress,

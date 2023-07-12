@@ -4,15 +4,27 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pManager
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.os.Build
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.encodeAsHex
+import com.ustadmobile.meshrabiya.ext.requireAsIpv6
+import com.ustadmobile.meshrabiya.ext.requireHostAddress
 import com.ustadmobile.meshrabiya.ext.toPrettyString
+import com.ustadmobile.meshrabiya.ext.unspecifiedIpv6Address
+import com.ustadmobile.meshrabiya.ext.withoutScope
+import com.ustadmobile.meshrabiya.util.randomString
+import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiDirectState
 import kotlinx.coroutines.CompletableDeferred
@@ -27,11 +39,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
 import java.io.Closeable
+import java.net.Inet6Address
+import java.net.NetworkInterface
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  *
@@ -45,6 +66,9 @@ class WifiDirectManager(
     private val logger: com.ustadmobile.meshrabiya.MNetLogger,
     private val localNodeAddr: Int,
     private val router: VirtualRouter,
+    private val dataStore: DataStore<Preferences>,
+    private val json: Json,
+    private val ioExecutorService: ExecutorService,
 ): WifiP2pManager.ChannelListener, Closeable  {
 
     fun interface OnBeforeGroupStart {
@@ -72,6 +96,41 @@ class WifiDirectManager(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
+    private val dataStoreConfigKey = stringPreferencesKey("wfd_group_config")
+
+    private val groupUpdateMutex = Mutex()
+
+    @RequiresApi(29)
+    suspend fun getOrCreateWifiGroupFromPrefs(): WifiConnectConfig {
+        val existingConfig = dataStore.data.map {
+           it[dataStoreConfigKey]
+        }.first()?.let {
+            json.decodeFromString(WifiConnectConfig.serializer(), it)
+        }
+
+        if(existingConfig != null) {
+            return existingConfig
+        }
+
+        //BSSID will be persistent as long as the ssid stays the same but cannot be set directly.
+        val newGroupConfig = WifiConnectConfig(
+            nodeVirtualAddr = localNodeAddr,
+            ssid = "DIRECT-${randomString(length = 2, charPool = WIFIDIRECT_TWO_LETTER_CHARPOOL)}-${localNodeAddr.encodeAsHex()}",
+            passphrase = randomString(length = 10),
+            port = router.localDatagramPort,
+            hotspotType = HotspotType.WIFIDIRECT_GROUP,
+            persistenceType = HotspotPersistenceType.FULL,
+            linkLocalAddr = unspecifiedIpv6Address(),
+        )
+
+        dataStore.edit {
+            it[dataStoreConfigKey] = json.encodeToString(
+                WifiConnectConfig.serializer(), newGroupConfig
+            )
+        }
+
+        return newGroupConfig
+    }
 
     private val wifiDirectBroadcastReceiver = object: BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -115,28 +174,45 @@ class WifiDirectManager(
     private fun onNewWifiP2pGroupInfoReceived(group: WifiP2pGroup?) {
         val ssid = group?.networkName
         val passphrase = group?.passphrase
-
-        _state.update { prev ->
-            val hotspotConfig = if(ssid != null && passphrase != null) {
-                WifiConnectConfig(
-                    nodeVirtualAddr = localNodeAddr,
-                    ssid = ssid,
-                    passphrase = passphrase,
-                    port = router.localDatagramPort,
-                    hotspotType = HotspotType.WIFIDIRECT_GROUP
-                )
-            }else {
-                null
+        val interfaceName = group?.`interface`
+        val linkInterface = NetworkInterface.getNetworkInterfaces()
+            .toList()
+            .firstOrNull {
+                it.name == interfaceName
             }
 
-            prev.copy(
-                hotspotStatus = if(hotspotConfig != null) {
-                    HotspotStatus.STARTED
-                } else {
-                    HotspotStatus.STOPPED
-                },
-                config = hotspotConfig,
-            )
+        val linkLocalAddr = linkInterface?.inetAddresses?.toList()
+            ?.firstOrNull { it.isLinkLocalAddress && it is Inet6Address } as? Inet6Address
+        logger(Log.INFO, "$logPrefix : onNewWifiP2pGroupInfoReceived : Found link local addr = $linkLocalAddr", null)
+
+        nodeScope.launch {
+            groupUpdateMutex.withLock {
+                val hotspotConfig = if(ssid != null && passphrase != null &&
+                    linkLocalAddr != null
+                ) {
+                    WifiConnectConfig(
+                        nodeVirtualAddr = localNodeAddr,
+                        ssid = ssid,
+                        passphrase = passphrase,
+                        port = router.localDatagramPort,
+                        linkLocalAddr = linkLocalAddr.withoutScope(),
+                        hotspotType = HotspotType.WIFIDIRECT_GROUP
+                    )
+                }else {
+                    null
+                }
+
+                _state.update {prev ->
+                    prev.copy(
+                        config = hotspotConfig,
+                        hotspotStatus = if(hotspotConfig != null) {
+                            HotspotStatus.STARTED
+                        } else {
+                            HotspotStatus.STOPPED
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -244,9 +320,23 @@ class WifiDirectManager(
                     prev.copy(hotspotStatus = HotspotStatus.STARTING)
                 }
 
-                wifiP2pManager?.createGroupAsync(
-                    channel, "$logPrefix startWifiDirectGroup ", logger
-                )
+                if(Build.VERSION.SDK_INT >= 29) {
+                    val config = getOrCreateWifiGroupFromPrefs()
+                    val p2pConfig = WifiP2pConfig.Builder()
+                        .enablePersistentMode(true)
+                        .setNetworkName(config.ssid)
+                        .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
+                        .setPassphrase(config.passphrase)
+                        .build()
+                    val channelVal = channel ?: throw IllegalStateException("Create group: Null channel!")
+                    logger(Log.DEBUG, "$logPrefix startWifiDirectGroup: Create WifiDirect Group with preferences bssid = " +
+                            "${p2pConfig.deviceAddress} networkname = ${config.ssid}", null)
+                    wifiP2pManager?.createGroupAsync(channelVal, p2pConfig, logPrefix, logger)
+                }else {
+                    wifiP2pManager?.createGroupAsync(
+                        channel, "$logPrefix startWifiDirectGroup ", logger
+                    )
+                }
 
                 // Can wait for the BroadcastReceiver WIFI_P2P_STATE_CHANGED_ACTION to pickup
                 // the new group info via state flow
@@ -337,5 +427,11 @@ class WifiDirectManager(
 
             appContext.unregisterReceiver(wifiDirectBroadcastReceiver)
         }
+    }
+
+    companion object {
+
+        const val WIFIDIRECT_TWO_LETTER_CHARPOOL = "abcdefghijklmnopqrstuvwyxz"
+
     }
 }

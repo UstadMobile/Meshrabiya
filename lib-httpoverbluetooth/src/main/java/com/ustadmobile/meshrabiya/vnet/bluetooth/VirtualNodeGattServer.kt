@@ -1,4 +1,4 @@
-package com.ustadmobile.meshrabiya.server
+package com.ustadmobile.meshrabiya.vnet.bluetooth
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -15,7 +15,7 @@ import android.content.IntentFilter
 import android.util.Log
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.UUID_BUSY
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.toBytes
 import java.io.Closeable
 import java.util.UUID
@@ -33,7 +33,7 @@ import kotlin.concurrent.withLock
  * @param onUuidAllocated listener that will use the given UUID allocation. When the function is
  * finished the UUID is de-allocated.
  */
-class UuidAllocationServer(
+class VirtualNodeGattServer(
     private val appContext: Context,
     allocationServiceUuid: UUID,
     private val allocationCharacteristicUuid: UUID,

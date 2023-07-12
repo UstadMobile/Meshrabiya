@@ -11,11 +11,14 @@ import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.util.Log
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addOrLookupNetwork
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.bssidDataStore
+import com.ustadmobile.meshrabiya.ext.requireHostAddress
 import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.WifiRole
@@ -42,8 +45,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
 import java.io.Closeable
+import java.net.DatagramSocket
+import java.net.Inet6Address
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
@@ -60,11 +67,16 @@ class MeshrabiyaWifiManagerAndroid(
     private val router: VirtualRouter,
     private val ioExecutor: ExecutorService,
     private val onNewWifiConnectionListener: OnNewWifiConnectionListener = OnNewWifiConnectionListener { },
+    private val dataStore: DataStore<Preferences>,
+    private val json: Json,
     private val wifiDirectManager: WifiDirectManager = WifiDirectManager(
         appContext = appContext,
         logger = logger,
         localNodeAddr = localNodeAddr,
         router = router,
+        dataStore = dataStore,
+        json = json,
+        ioExecutorService = ioExecutor,
     )
 ) : Closeable, MeshrabiyaWifiManager {
 
@@ -456,8 +468,15 @@ class MeshrabiyaWifiManagerAndroid(
             }
 
             withContext(Dispatchers.IO) {
+                val linkProperties = connectivityManager
+                    .getLinkProperties(networkAndServerAddr.network)
+
+                logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address:", null)
+                val socket = DatagramSocket(0)
+
+                networkAndServerAddr.network.bindSocket(socket)
                 val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
-                    port = 0,
+                    socket = socket,
                     localNodeVirtualAddress = localNodeAddr,
                     ioExecutorService = ioExecutor,
                     router = router,
@@ -476,7 +495,6 @@ class MeshrabiyaWifiManagerAndroid(
 
                 //Binding something to the network helps to avoid older versions of Android
                 //deciding to disconnect from this network.
-                networkAndServerAddr.network.bindSocket(networkBoundDatagramSocket)
                 logger(Log.INFO, "$logPrefix : addWifiConnection:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
                 val newState = _state.updateAndGet { prev ->
                     prev.copy(
@@ -494,17 +512,27 @@ class MeshrabiyaWifiManagerAndroid(
                             "from local:${networkBoundDatagramSocket.localPort}", null
                 )
 
+                val networkInterface = NetworkInterface.getByName(linkProperties?.interfaceName)
+
+                //Create a scoped Inet6 address using the given local link
+                val peerAddr = Inet6Address.getByAddress(
+                    config.linkLocalAddr.requireHostAddress(), config.linkLocalAddr.address, networkInterface
+                )
+
+                logger(Log.DEBUG, "$logPrefix : addWifiConnectionConnect: Peer address is: $peerAddr", null)
+
                 //Once connected,
                 onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
                     neighborPort = config.port,
-                    neighborInetAddress = networkAndServerAddr.dhcpServer,
+                    neighborInetAddress = peerAddr,
                     socket = networkBoundDatagramSocket,
                 ))
 
-                //If we are connected and now expected to act as a Wifi Direct group, setup the group and add service for discovery.
-                nodeScope.takeIf { newState.wifiRole == WifiRole.WIFI_DIRECT_GROUP_OWNER }?.launch {
-                    wifiDirectManager.startWifiDirectGroup()
-                }
+                //If we are connected and now expected to act as a Wifi Direct group, setup the
+                // group and add service for discovery.
+
+                wifiDirectManager.startWifiDirectGroup()
+
             }
         }else {
             logger(Log.ERROR, "$logPrefix : addWifiConnectionConnect: to hotspot: returned null network", null)

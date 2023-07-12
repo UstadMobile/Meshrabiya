@@ -193,6 +193,7 @@ fun LocalVirtualNodeScreen(
                         "Local Hotspot: ${uiState.wifiState?.config?.ssid}\n" +
                         "Passphrase: ${uiState.wifiState?.config?.passphrase}\n" +
                         "Port: ${uiState.wifiState?.config?.port}\n" +
+                        "LocalLinkAddr: ${uiState.wifiState?.config?.linkLocalAddr}\n" +
                         "Bluetooth Name: ${uiState.bluetoothState?.deviceName}"
             )
         }

@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.vnet
 
 import app.cash.turbine.test
 import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.ext.requireAsIpv6
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
@@ -30,6 +31,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
+import java.net.Inet6Address
 import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -197,6 +199,7 @@ class VirtualNodeTest {
                         passphrase = "secret123",
                         port = 8042,
                         hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+                        linkLocalAddr = Inet6Address.getByName("2001:0db8:85a3:0000:0000:8a2e:0370:7334").requireAsIpv6(),
                     ),
                     redirectAddr = 0,
                 )

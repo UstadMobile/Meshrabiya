@@ -7,7 +7,7 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.vnet.bluetooth.VirtualNodeGattServer
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
@@ -29,7 +29,7 @@ abstract class AbstractHttpOverBluetoothServer(
         vnetLogger: com.ustadmobile.meshrabiya.MNetLogger,
         maxClients: Int,
         onUuidAllocated: OnUuidAllocatedListener,
-    ) -> UuidAllocationServer = ::UuidAllocationServer,
+    ) -> VirtualNodeGattServer = ::VirtualNodeGattServer,
 ) {
 
     private val isClosed = AtomicBoolean(false)

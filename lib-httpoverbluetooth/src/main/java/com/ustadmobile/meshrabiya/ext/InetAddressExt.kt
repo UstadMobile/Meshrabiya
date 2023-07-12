@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.ext
 
+import java.net.Inet6Address
 import java.net.InetAddress
 
 fun InetAddress.requireAddressAsInt(): Int {
@@ -9,3 +10,9 @@ fun InetAddress.requireAddressAsInt(): Int {
 
     return addrData.ip4AddressToInt()
 }
+
+fun InetAddress.requireAsIpv6() : Inet6Address {
+    return this as? Inet6Address ?: throw IllegalStateException("$this not an ipv6 address")
+}
+
+fun unspecifiedIpv6Address() = Inet6Address.getByName("::").requireAsIpv6()

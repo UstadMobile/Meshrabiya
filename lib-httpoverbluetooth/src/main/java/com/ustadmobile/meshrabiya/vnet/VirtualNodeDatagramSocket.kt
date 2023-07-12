@@ -8,6 +8,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHello
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -21,22 +22,25 @@ import java.util.concurrent.Future
  * to run a thread that will receive all packets, convert them from a DatagramPacket into a
  * VirtualPacket, and then give them to the VirtualRouter.
  *
+ * @param socket - the underlying DatagramSocket to use - this can be bound to a network, interface etc if required
  * @param onMmcpHelloReceivedListener - Receives the Hello Event. This will be triggered when a new
  * neighbor connects.
  */
 class VirtualNodeDatagramSocket(
-    port: Int,
+    private val socket: DatagramSocket,
     private val localNodeVirtualAddress: Int,
     ioExecutorService: ExecutorService,
     private val router: VirtualRouter,
     private val onMmcpHelloReceivedListener: OnMmcpHelloReceivedListener,
     private val logger: MNetLogger,
     name: String? = null
-) : DatagramSocket(port), Runnable {
+):  Runnable, Closeable {
 
     private val future: Future<*>
 
     private val logPrefix: String
+
+    val localPort: Int = socket.localPort
 
     data class NeighborMmcpPacketReceivedEvent(
         val datagramPacket: DatagramPacket,
@@ -78,11 +82,11 @@ class VirtualNodeDatagramSocket(
 
     override fun run() {
         val buffer = ByteArray(VirtualPacket.MAX_PAYLOAD_SIZE)
-        logger(Log.DEBUG, "$logPrefix Started on $localPort waiting for first packet", null)
+        logger(Log.DEBUG, "$logPrefix Started on ${socket.localPort} waiting for first packet", null)
 
         while(!Thread.interrupted()) {
             val rxPacket = DatagramPacket(buffer, 0, buffer.size)
-            receive(rxPacket)
+            socket.receive(rxPacket)
 
             val rxVirtualPacket = VirtualPacket.fromDatagramPacket(rxPacket)
 
@@ -115,7 +119,7 @@ class VirtualNodeDatagramSocket(
 
                         replyDatagram.address = rxPacket.address
                         replyDatagram.port = rxPacket.port
-                        send(replyDatagram)
+                        socket.send(replyDatagram)
 
                         onMmcpHelloReceivedListener.onMmcpHelloReceived(
                             HelloEvent(
@@ -139,7 +143,7 @@ class VirtualNodeDatagramSocket(
                         replyPongPacket.address = rxPacket.address
                         replyPongPacket.port = rxPacket.port
 
-                        send(replyPongPacket)
+                        socket.send(replyPongPacket)
                     }
 
                     else -> {
@@ -193,13 +197,13 @@ class VirtualNodeDatagramSocket(
         val datagramPacket = virtualPacket.toDatagramPacket()
         datagramPacket.address = nextHopAddress
         datagramPacket.port = nextHopPort
-        send(datagramPacket)
+        socket.send(datagramPacket)
     }
 
 
     override fun close() {
         future.cancel(true)
-        super.close()
+        socket.close()
         listeners.clear()
     }
 }

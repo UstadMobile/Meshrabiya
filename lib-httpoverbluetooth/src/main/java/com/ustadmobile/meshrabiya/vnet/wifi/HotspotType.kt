@@ -8,11 +8,11 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 @Serializable(with = HotspotTypeSerializer::class)
-enum class HotspotType(val flag: Int) {
+enum class HotspotType(val flag: Byte) {
     LOCALONLY_HOTSPOT(1), WIFIDIRECT_GROUP(2);
 
     companion object {
-        fun fromFlag(flag: Int): HotspotType {
+        fun fromFlag(flag: Byte): HotspotType {
             return values().first { it.flag == flag }
         }
     }
@@ -20,13 +20,13 @@ enum class HotspotType(val flag: Int) {
 
 object HotspotTypeSerializer: KSerializer<HotspotType> {
     override fun deserialize(decoder: Decoder): HotspotType {
-        return HotspotType.fromFlag(decoder.decodeInt())
+        return HotspotType.fromFlag(decoder.decodeByte())
     }
 
     override val descriptor: SerialDescriptor
-        get() = PrimitiveSerialDescriptor("hotspotType", PrimitiveKind.INT)
+        get() = PrimitiveSerialDescriptor("hotspotType", PrimitiveKind.BYTE)
 
     override fun serialize(encoder: Encoder, value: HotspotType) {
-        encoder.encodeInt(value.flag)
+        encoder.encodeByte(value.flag)
     }
 }

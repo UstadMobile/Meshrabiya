@@ -8,6 +8,7 @@ import org.junit.Test
 import org.mockito.kotlin.argWhere
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
+import java.net.DatagramSocket
 import java.net.InetAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -37,7 +38,7 @@ class VirtualNodeDatagramSocketTest {
         val socket2IncomingHelloListener: VirtualNodeDatagramSocket.OnMmcpHelloReceivedListener = mock { }
 
         val socket1 = VirtualNodeDatagramSocket(
-            port = 0,
+            socket = DatagramSocket(0),
             localNodeVirtualAddress = socket1VirtualNodeAddr,
             ioExecutorService = executorService,
             router = createMockRouter(),
@@ -46,7 +47,7 @@ class VirtualNodeDatagramSocketTest {
         )
 
         val socket2 = VirtualNodeDatagramSocket(
-            port = 0,
+            socket = DatagramSocket(0),
             localNodeVirtualAddress = socket2VirtualNodeAddr,
             ioExecutorService = executorService,
             router = createMockRouter(),

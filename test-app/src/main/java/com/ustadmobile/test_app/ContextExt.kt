@@ -44,5 +44,5 @@ fun Context.hasBluetoothConnectPermission(): Boolean {
     }
 }
 
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "meshr_settings")
 

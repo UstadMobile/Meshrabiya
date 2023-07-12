@@ -62,6 +62,7 @@ class App: Application(), DIAware {
                 logger = instance(),
                 json = instance(),
                 localMNodeAddress = instance(tag = TAG_VIRTUAL_ADDRESS),
+                dataStore = applicationContext.dataStore
             )
         }
     }

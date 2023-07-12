@@ -9,16 +9,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
-import com.ustadmobile.meshrabiya.client.UuidAllocationClient
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
-import com.ustadmobile.meshrabiya.server.UuidAllocationServer
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,7 +25,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.util.UUID
@@ -39,6 +37,7 @@ class AndroidVirtualNode(
     logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _ -> },
     localMNodeAddress: Int = randomApipaAddr(),
     json: Json,
+    private val dataStore: DataStore<Preferences>,
 ): VirtualNode(
     uuidMask = uuidMask,
     port = port,
@@ -71,6 +70,8 @@ class AndroidVirtualNode(
         localNodeAddr = localMNodeAddress,
         router = this,
         ioExecutor = connectionExecutor,
+        dataStore = dataStore,
+        json = json,
         onNewWifiConnectionListener = newWifiConnectionListener,
     )
 

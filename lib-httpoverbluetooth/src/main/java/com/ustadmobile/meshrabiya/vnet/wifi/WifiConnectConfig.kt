@@ -4,11 +4,35 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import com.ustadmobile.meshrabiya.ext.getStringOrThrow
 import com.ustadmobile.meshrabiya.ext.putStringFromBytes
+import com.ustadmobile.meshrabiya.ext.requireHostAddress
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Serializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import java.lang.IllegalStateException
+import java.net.Inet6Address
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
+ * This data class represents the information needed to connect to the WiFi of a given node.
+ *
+ * @param nodeVirtualAddr The virtual address of the node itself
+ * @param ssid the Wifi ssid to connect to
+ * @param passphrase the passphrase for the Wifi to connect to
+ * @param linkLocalAddr the ipv6 link local address of the node on the interface that provides the
+ *                      hotspot. See architecture docs for why this is important.
+ * @param port the UDP port that is used for virtualpackets
+ * @param hotspotType the type of connection being offered - currently only Wifi Direct group is
+ *                    supported. Wifi Aware may be added in future.
+ * @param persistenceType the expected persistence of this config. This helps the client decide
+ *        whether or not to prompt the user to save the config via companiondevicemanager.
+ * @param bssid the expected bssid (if known), optional
+ *
  * Node virtual address should be known before connecting. This is required to lookup previously
  * stored BSSIDs for the network (to see if we need to use companiondevicemanager dialog or not).
  */
@@ -17,8 +41,11 @@ data class WifiConnectConfig(
     val nodeVirtualAddr: Int,
     val ssid: String,
     val passphrase: String,
+    @Serializable(with = Inet6AddressSerializer::class)
+    val linkLocalAddr: Inet6Address,
     val port: Int,
     val hotspotType: HotspotType,
+    val persistenceType: HotspotPersistenceType = HotspotPersistenceType.NONE,
     val bssid: String? = null,
 ) {
 
@@ -35,17 +62,20 @@ data class WifiConnectConfig(
      * ssid: 4 bytes (string length int) plus string bytes length
      * passphrase: 4 bytes ( string length int) plus string bytes length
      * port: 4 bytes
-     * hotspotType: 4 bytes
+     * hotspotType: 1 byte
+     * persistenceType: 1 byte
+     * linkLocalAddr: 16 bytes (IPv6 address)
      *
-
      */
     val sizeInBytes: Int
-        get() = 4 + (4 + (ssidBytes?.size ?: 0) ) + (4 + (passphraseBytes?.size ?: 0)) + 4 + 4
+        get() = 4 + (4 + (ssidBytes?.size ?: 0) ) + (4 + (passphraseBytes?.size ?: 0)) + 4 + 1 + 1 + 16
 
     fun toBytes(
         byteArray: ByteArray,
         offset: Int,
     ): Int {
+        if(linkLocalAddr.address.size != 16)
+            throw IllegalStateException("Inet6Address is not 16 bytes!")
 
         ByteBuffer.wrap(byteArray, offset, sizeInBytes)
             .order(ByteOrder.BIG_ENDIAN)
@@ -53,7 +83,9 @@ data class WifiConnectConfig(
             .putStringFromBytes(ssidBytes)
             .putStringFromBytes(passphraseBytes)
             .putInt(port)
-            .putInt(hotspotType.flag)
+            .put(hotspotType.flag)
+            .put(persistenceType.flag)
+            .put(linkLocalAddr.address)
 
         return sizeInBytes
     }
@@ -77,7 +109,10 @@ data class WifiConnectConfig(
             val ssid = byteBuf.getStringOrThrow()
             val passphrase = byteBuf.getStringOrThrow()
             val port = byteBuf.int
-            val hotspotType = HotspotType.fromFlag(byteBuf.int)
+            val hotspotType = HotspotType.fromFlag(byteBuf.get())
+            val persistenceType = HotspotPersistenceType.fromFlag(byteBuf.get())
+            val linkLocalAddr = Inet6Address
+                .getByAddress(ByteArray(16).also { byteBuf.get(it) }) as Inet6Address
 
             return WifiConnectConfig(
                 nodeVirtualAddr = nodeVirtualAddr,
@@ -85,6 +120,8 @@ data class WifiConnectConfig(
                 passphrase = passphrase,
                 port = port,
                 hotspotType = hotspotType,
+                persistenceType = persistenceType,
+                linkLocalAddr = linkLocalAddr
             )
 
         }
@@ -93,10 +130,29 @@ data class WifiConnectConfig(
 
 }
 
+object Inet6AddressSerializer: KSerializer<Inet6Address> {
+
+    override val descriptor: SerialDescriptor
+        get() = PrimitiveSerialDescriptor("Inet6Address", PrimitiveKind.STRING)
+
+
+    override fun deserialize(decoder: Decoder): Inet6Address {
+        return Inet6Address.getByName(decoder.decodeString()) as Inet6Address
+    }
+
+    override fun serialize(encoder: Encoder, value: Inet6Address) {
+        encoder.encodeString(value.requireHostAddress())
+    }
+}
+
+
+@Deprecated("Will use only WiFi Direct group")
 fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
     nodeVirtualAddr: Int,
     port: Int,
 ): WifiConnectConfig? {
+    TODO("We won't use this anymore because we don't need local only hotspot")
+    /*
     return if(Build.VERSION.SDK_INT >= 30) {
         val softApConfig = softApConfiguration
         val ssid = if(Build.VERSION.SDK_INT >= 33) {
@@ -139,4 +195,5 @@ fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
             null
         }
     }
+     */
 }

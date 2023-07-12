@@ -1,8 +1,10 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
+import com.ustadmobile.meshrabiya.ext.requireAsIpv6
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import org.junit.Assert
 import org.junit.Test
+import java.net.Inet6Address
 import kotlin.random.Random
 
 class HotspotResponseTest {
@@ -17,7 +19,8 @@ class HotspotResponseTest {
                 ssid = "test",
                 passphrase = "world",
                 port = 8042,
-                hotspotType = HotspotType.LOCALONLY_HOTSPOT
+                hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+                linkLocalAddr = Inet6Address.getByName("2001:0db8:85a3:0000:0000:8a2e:0370:7334").requireAsIpv6(),
             ),
             redirectAddr = 0,
         )
