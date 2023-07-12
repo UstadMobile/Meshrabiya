@@ -7,9 +7,11 @@ interface VirtualRouter {
 
     /**
      * Route the given incoming packet.
+     *
+     * @param packet the packet received
      */
     fun route(
-        packet: VirtualPacket
+        packet: VirtualPacket,
     )
 
     fun nextMmcpMessageId(): Int

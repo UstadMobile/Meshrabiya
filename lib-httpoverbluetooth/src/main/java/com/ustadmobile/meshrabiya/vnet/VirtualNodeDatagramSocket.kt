@@ -91,8 +91,8 @@ class VirtualNodeDatagramSocket(
             val rxVirtualPacket = VirtualPacket.fromDatagramPacket(rxPacket)
 
             //A virtual packet with toAddress = 0 means that this packet is only being sent
-            // over between two neighbors. This can include initial Hello packet and connection
-            // management e.g. pings
+            // over between two neighbors (linkLocal). This can include initial Hello packet and
+            // connection management e.g. pings
             if(rxVirtualPacket.header.toAddr == 0 && rxVirtualPacket.header.toPort == 0) {
                 val mmcpMessage = MmcpMessage.fromVirtualPacket(rxVirtualPacket)
 

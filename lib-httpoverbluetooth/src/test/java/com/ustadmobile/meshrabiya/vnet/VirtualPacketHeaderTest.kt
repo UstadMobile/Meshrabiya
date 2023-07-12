@@ -12,6 +12,7 @@ class VirtualPacketHeaderTest {
             toPort = 8080,
             fromAddr = 1002,
             fromPort = 8072,
+            lastHopAddr = 1002,
             hopCount = 1,
             maxHops = 4,
             payloadSize = 1300

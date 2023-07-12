@@ -27,6 +27,7 @@ sealed class MmcpMessage(
                 toPort = 0,
                 fromAddr = fromAddr,
                 fromPort = 0,
+                lastHopAddr = 0,
                 hopCount =  0,
                 maxHops = 0,
                 payloadSize = packetPayload.size
@@ -68,6 +69,8 @@ sealed class MmcpMessage(
         const val WHAT_HOTSPOT_REQUEST = 5.toByte()
 
         const val WHAT_HOTSPOT_RESPONSE = 6.toByte()
+
+        const val WHAT_ORIGINATOR = 7.toByte()
 
         const val MMCP_HEADER_LEN = 5 //1 byte what, 4 bytes message id
 

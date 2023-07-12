@@ -45,6 +45,7 @@ class VirtualDatagramSocketTest {
                 toPort = virtualSocket.localPort,
                 fromAddr = fromVirtualAddress,
                 fromPort = fromVirtualPort,
+                lastHopAddr = fromVirtualAddress,
                 hopCount = 0,
                 maxHops = 5,
                 payloadSize = payloadSize

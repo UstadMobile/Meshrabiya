@@ -95,6 +95,7 @@ class VirtualDatagramSocket(
                     toPort = datagramPacket.port,
                     fromAddr = localVirtualAddress,
                     fromPort = localPort,
+                    lastHopAddr = 0,
                     hopCount =  0,
                     maxHops = 5,
                     payloadSize = datagramPacket.length

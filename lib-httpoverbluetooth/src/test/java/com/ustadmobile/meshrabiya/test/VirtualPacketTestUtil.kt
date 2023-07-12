@@ -9,6 +9,7 @@ fun newVirtualPacketWithRandomPayload(
     toPort: Int,
     fromAddr: Int,
     fromPort: Int,
+    lastHopAddr: Int = fromAddr,
     payloadSize: Int
 ): VirtualPacket {
     val buffer = ByteArray(payloadSize + VirtualPacket.VIRTUAL_PACKET_BUF_SIZE)
@@ -19,6 +20,7 @@ fun newVirtualPacketWithRandomPayload(
             toPort = toPort,
             fromAddr = fromAddr,
             fromPort = fromPort,
+            lastHopAddr = lastHopAddr,
             hopCount = 0,
             maxHops = 8,
             payloadSize = payloadSize

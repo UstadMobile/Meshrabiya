@@ -98,9 +98,6 @@ abstract class VirtualNode(
 
     abstract val hotspotManager: MeshrabiyaWifiManager
 
-    val localHotSpotState: Flow<MeshrabiyaWifiState>
-        get() = hotspotManager.state
-
     private val pongListeners = CopyOnWriteArrayList<PongListener>()
 
     protected val logPrefix: String = "[VirtualNode ${localNodeAddress.addressToDotNotation()}]"
@@ -180,7 +177,7 @@ abstract class VirtualNode(
 
 
     override fun route(
-        packet: VirtualPacket
+        packet: VirtualPacket,
     ) {
         if(packet.header.toAddr == localNodeAddress) {
             if(packet.header.toPort == 0) {
@@ -386,10 +383,12 @@ abstract class VirtualNode(
         )
 
         //Send MMCP request to the other node
-        route(request.toVirtualPacket(
-            toAddr = virtualAddr,
-            fromAddr = localNodeAddress
-        ))
+        route(
+            packet = request.toVirtualPacket(
+                toAddr = virtualAddr,
+                fromAddr = localNodeAddress
+            ),
+        )
     }
 
     open suspend fun setWifiHotspotEnabled(enabled: Boolean) {
