@@ -2,7 +2,6 @@ package com.ustadmobile.meshrabiya.vnet.wifi
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -22,10 +21,7 @@ import com.ustadmobile.meshrabiya.ext.requireHostAddress
 import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.WifiRole
-import com.ustadmobile.meshrabiya.vnet.wifi.UnhiddenSoftApConfigurationBuilder.Companion.BAND_2GHZ
-import com.ustadmobile.meshrabiya.vnet.wifi.UnhiddenSoftApConfigurationBuilder.Companion.RANDOMIZATION_NONE
-import com.ustadmobile.meshrabiya.vnet.wifi.UnhiddenSoftApConfigurationBuilder.Companion.SECURITY_TYPE_WPA2_PSK
-import com.ustadmobile.meshrabiya.vnet.wifi.state.LocalOnlyHotspotState
+import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid.OnNewWifiConnectionListener
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -40,11 +36,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.io.Closeable
 import java.net.DatagramSocket
@@ -94,60 +87,6 @@ class MeshrabiyaWifiManagerAndroid(
         fun onNewWifiConnection(connectEvent: WifiConnectEvent)
     }
 
-    private var localOnlyHotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
-
-    private val localOnlyHotspotCallback = object: WifiManager.LocalOnlyHotspotCallback() {
-        override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation?) {
-            logger(Log.DEBUG, "$logPrefix localonlyhotspotcallback: onStarted", null)
-            localOnlyHotspotReservation = reservation
-            _state.takeIf { reservation != null }?.update {prev ->
-                prev.copy(
-                    wifiRole = WifiRole.LOCAL_ONLY_HOTSPOT,
-                    localOnlyHotspotState = LocalOnlyHotspotState(
-                        status = HotspotStatus.STARTED,
-                        config = reservation?.toLocalHotspotConfig(
-                            nodeVirtualAddr = localNodeAddr,
-                            port = router.localDatagramPort
-                        ),
-                    ),
-                )
-            }
-        }
-
-        override fun onStopped() {
-            logger(Log.DEBUG, "$logPrefix localonlyhotspotcallback: onStopped", null)
-            localOnlyHotspotReservation = null
-            _state.update { prev ->
-                val wasLocalOnlyHotspot = prev.wifiRole == WifiRole.LOCAL_ONLY_HOTSPOT
-                prev.copy(
-                    wifiRole = if(wasLocalOnlyHotspot) {
-                        WifiRole.NONE
-                    } else {
-                        prev.wifiRole
-                    },
-                    localOnlyHotspotState = LocalOnlyHotspotState(
-                        status = HotspotStatus.STOPPED,
-                    ),
-                )
-            }
-        }
-
-        override fun onFailed(reason: Int) {
-            logger(Log.ERROR, "$logPrefix localOnlyhotspotcallback : onFailed: " +
-                LocalOnlyHotspotState.errorCodeToString(reason), null
-            )
-
-            _state.update { prev ->
-                prev.copy(
-                    localOnlyHotspotState = LocalOnlyHotspotState(
-                        status = HotspotStatus.STOPPED,
-                        errorCode = reason,
-                    )
-                )
-            }
-        }
-    }
-
 
     private val connectivityManager: ConnectivityManager = appContext.getSystemService(
         ConnectivityManager::class.java
@@ -158,8 +97,6 @@ class MeshrabiyaWifiManagerAndroid(
     private val _state = MutableStateFlow(MeshrabiyaWifiState())
 
     override val state: Flow<MeshrabiyaWifiState> = _state.asStateFlow()
-
-    private val requestMutex = Mutex()
 
     /**
      * When this device is connected as a station, we will create a new datagramsocket that is
@@ -173,7 +110,7 @@ class MeshrabiyaWifiManagerAndroid(
 
     init {
         wifiDirectManager.onBeforeGroupStart = WifiDirectManager.OnBeforeGroupStart {
-            stopLocalOnlyHotspot()
+            // Do nothing - in future may need to stop other WiFi stuff
         }
 
         nodeScope.launch {
@@ -199,72 +136,6 @@ class MeshrabiyaWifiManagerAndroid(
         get() = wifiManager.is5GHzBandSupported
 
 
-
-
-
-    /**
-     * On starting hotspot with custom configuration see:
-     * WifiManager source:
-     * https://cs.android.com/android/platform/superproject/+/master:packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java;drc=08124f52b883c61f3e17bc57dc28eca4c7f7bb72;bpv=1;bpt=1;l=3226?q=WifiManager&ss=android%2Fplatform%2Fsuperproject
-     *
-     * WifiService implementation source:
-     * https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/java/com/android/server/wifi/WifiServiceImpl.java;l=843?q=wifiserviceimpl&sq=
-     *
-     * On Android 12+ we should be able to provide a custom AP config when we have nearby wifi permission
-     *  https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/java/com/android/server/wifi/WifiServiceImpl.java;l=2480?q=wifiserviceimpl
-     *
-     * The function is not blocklisted:
-     * Landroid/net/wifi/WifiManager;->startLocalOnlyHotspot(Landroid/net/wifi/SoftApConfiguration;Ljava/util/concurrent/Executor;Landroid/net/wifi/WifiManager$LocalOnlyHotspotCallback;)V	sdk	system-api	test-api
-     *
-     * Not on Android 11 or lower:
-     * https://cs.android.com/android/platform/superproject/+/android-11.0.0_r48:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiServiceImpl.java
-     * Because the permission check on WifiServiceImpl will only accept requests with a custom config
-     * from settings or setup wizard
-     */
-    private suspend fun startLocalOnlyHotspot() {
-        logger(Log.DEBUG, "$logPrefix startLocalOnlyHotspot", null)
-        wifiDirectManager.stopWifiDirectGroup()
-        logger(Log.DEBUG, "$logPrefix startLocalOnlyHotspot: requesting WifiManager to " +
-                "start local only hotspot", null)
-        if(Build.VERSION.SDK_INT >= 33) {
-            val config = UnhiddenSoftApConfigurationBuilder()
-                .setAutoshutdownEnabled(false)
-                .setBand(BAND_2GHZ) //TODO: check supported bands, if 5Ghz is desired, etc.
-                .setSsid("meshrabiya2")
-                .setPassphrase("meshtest12", SECURITY_TYPE_WPA2_PSK)
-                .setBssid(MacAddress.fromString("a4:64:83:68:c2:76"))
-                .setMacRandomizationSetting(RANDOMIZATION_NONE)
-                .build()
-            wifiManager.startLocalOnlyHotspotWithConfig(config, null, localOnlyHotspotCallback)
-        }else {
-            wifiManager.startLocalOnlyHotspot(localOnlyHotspotCallback, null)
-        }
-    }
-
-    suspend fun stopLocalOnlyHotspot(): Boolean {
-        logger(Log.DEBUG, "$logPrefix stopLocalOnlyHotspot", null)
-        if(
-            _state.getAndUpdate { prev ->
-                if(prev.localOnlyHotspotState.status == HotspotStatus.STARTED) {
-                    prev.copy(
-                        localOnlyHotspotState = prev.localOnlyHotspotState.copy(
-                            status = HotspotStatus.STOPPING
-                        )
-                    )
-                }else {
-                    prev
-                }
-            }.localOnlyHotspotState.status == HotspotStatus.STARTED
-        ) {
-            logger(Log.DEBUG, "$logPrefix stopLocalOnlyHotspot: closing reservation", null)
-            localOnlyHotspotReservation?.close()
-        }
-
-        return withTimeoutOrNull(HOTSPOT_TIMEOUT) {
-            state.filter { it.localOnlyHotspotState.status.isSettled() }.first()
-        }?.localOnlyHotspotState?.status == HotspotStatus.STOPPED
-    }
-
     override suspend fun requestHotspot(
         requestMessageId: Int,
         request: LocalHotspotRequest
@@ -276,12 +147,6 @@ class MeshrabiyaWifiManagerAndroid(
         withContext(Dispatchers.Main) {
             val prevState = _state.getAndUpdate { prev ->
                 when(prev.hotspotTypeToCreate) {
-                    HotspotType.LOCALONLY_HOTSPOT ->  prev.copy(
-                        localOnlyHotspotState = prev.localOnlyHotspotState.copy(
-                            status = HotspotStatus.STARTING
-                        )
-                    )
-
                     HotspotType.WIFIDIRECT_GROUP -> prev.copy(
                         wifiDirectState = prev.wifiDirectState.copy(
                             hotspotStatus = HotspotStatus.STARTING
@@ -293,9 +158,6 @@ class MeshrabiyaWifiManagerAndroid(
             }
 
             when(prevState.hotspotTypeToCreate) {
-                HotspotType.LOCALONLY_HOTSPOT -> {
-                    startLocalOnlyHotspot()
-                }
                 HotspotType.WIFIDIRECT_GROUP -> {
                     wifiDirectManager.startWifiDirectGroup()
                 }
@@ -306,9 +168,7 @@ class MeshrabiyaWifiManagerAndroid(
         }
 
         val configResult = _state.filter {
-            (it.wifiDirectState.hotspotStatus == HotspotStatus.STARTED ||
-                    it.localOnlyHotspotState.status == HotspotStatus.STARTED) ||
-                    it.errorCode != 0
+            it.wifiDirectState.hotspotStatus == HotspotStatus.STARTED || it.errorCode != 0
         }.first()
 
         return LocalHotspotResponse(
@@ -331,8 +191,6 @@ class MeshrabiyaWifiManagerAndroid(
     ): NetworkAndDhcpServer? {
         logger(Log.INFO, "$logPrefix Connecting to hotspot: ssid=$ssid passphrase=$passphrase bssid=$bssid", null)
 
-        //Local Hotspot (on most devices) cannot run at the same time as being connected as a station
-        stopLocalOnlyHotspot()
 
         val completable = CompletableDeferred<NetworkAndDhcpServer?>()
         val networkCallback = object: ConnectivityManager.NetworkCallback() {
@@ -496,7 +354,7 @@ class MeshrabiyaWifiManagerAndroid(
                 //Binding something to the network helps to avoid older versions of Android
                 //deciding to disconnect from this network.
                 logger(Log.INFO, "$logPrefix : addWifiConnection:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
-                val newState = _state.updateAndGet { prev ->
+                _state.update { prev ->
                     prev.copy(
                         wifiRole = if(config.hotspotType == HotspotType.LOCALONLY_HOTSPOT) {
                             WifiRole.WIFI_DIRECT_GROUP_OWNER
@@ -542,11 +400,9 @@ class MeshrabiyaWifiManagerAndroid(
 
     override fun close() {
         if(!closed.getAndSet(true)) {
-
-            localOnlyHotspotReservation?.close()
             nodeScope.cancel()
+            wifiDirectManager.close()
         }
-
     }
 
     suspend fun lookupStoredBssid(addr: Int) : String? {
