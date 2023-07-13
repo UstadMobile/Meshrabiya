@@ -8,15 +8,16 @@ import com.ustadmobile.meshrabiya.ext.writeAddress
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
+import com.ustadmobile.meshrabiya.mmcp.MmcpMessageAndPacketHeader
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
+import com.ustadmobile.meshrabiya.vnet.VirtualRouter.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
-import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -74,7 +75,8 @@ abstract class VirtualNode(
     val localNodeAddress: Int = randomApipaAddr(),
     val autoForwardInbound: Boolean = true,
     val json: Json,
-): NeighborNodeManager.RemoteMNodeManagerListener, VirtualRouter, Closeable {
+    val config: NodeConfig,
+): NeighborNodeManager.NeighborNodeStateChangedListener, VirtualRouter, Closeable {
 
     //This executor is used for direct I/O activities
     protected val connectionExecutor = Executors.newCachedThreadPool()
@@ -130,12 +132,12 @@ abstract class VirtualNode(
         uuidForMaskAndPort(uuidMask, datagramSocket.localPort + 1)
     }
 
-    private val _incomingMmcpMessages = MutableSharedFlow<MmcpMessage>(
+    private val _incomingMmcpMessages = MutableSharedFlow<MmcpMessageAndPacketHeader>(
         replay = 8,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    val incomingMmcpMessages: Flow<MmcpMessage> = _incomingMmcpMessages.asSharedFlow()
+    val incomingMmcpMessages: Flow<MmcpMessageAndPacketHeader> = _incomingMmcpMessages.asSharedFlow()
 
     init {
         _state.update { prev ->
@@ -146,7 +148,7 @@ abstract class VirtualNode(
         }
     }
 
-    override fun onNodeStateChanged(remoteMNodeState: NeighborNodeState) {
+    override fun onNeighborNodeStateChanged(remoteMNodeState: NeighborNodeState) {
         _neighborNodesState.update { prev ->
             prev.appendOrReplace(remoteMNodeState) { it.remoteAddress == remoteMNodeState.remoteAddress }
         }
@@ -175,78 +177,112 @@ abstract class VirtualNode(
         )
     }
 
+    private fun onIncomingMmcpMessage(
+        packet: VirtualPacket,
+    ) {
+
+        //This is an Mmcp message
+        val mmcpMessage = MmcpMessage.fromVirtualPacket(packet)
+        val from = packet.header.fromAddr
+        val isBroadcast = packet.isBroadcast()
+
+        when {
+            mmcpMessage is MmcpPing && !isBroadcast -> {
+                logger(Log.DEBUG, "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}", null)
+                //send pong
+                val pongMessage = MmcpPong(
+                    messageId = nextMmcpMessageId(),
+                    replyToMessageId = mmcpMessage.messageId
+                )
+
+                val replyPacket = pongMessage.toVirtualPacket(
+                    toAddr = from,
+                    fromAddr = localNodeAddress
+                )
+
+                logger(Log.DEBUG, "$logPrefix Sending pong to ${from.addressToDotNotation()}", null)
+                route(replyPacket)
+            }
+
+            mmcpMessage is MmcpPong && !isBroadcast -> {
+                logger(Log.DEBUG, "$logPrefix Received pong(id=${mmcpMessage.messageId})}", null)
+                pongListeners.forEach {
+                    it.onPongReceived(from, mmcpMessage)
+                }
+            }
+
+            mmcpMessage is MmcpHotspotRequest && !isBroadcast -> {
+                logger(Log.INFO, "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})", null)
+                coroutineScope.launch {
+                    val hotspotResult = hotspotManager.requestHotspot(
+                        mmcpMessage.messageId, mmcpMessage.hotspotRequest
+                    )
+
+                    if(from != localNodeAddress) {
+                        val replyPacket = MmcpHotspotResponse(
+                            messageId = mmcpMessage.messageId,
+                            result = hotspotResult
+                        ).toVirtualPacket(
+                            toAddr = from,
+                            fromAddr = localNodeAddress
+                        )
+                        logger(Log.INFO, "$logPrefix sending hotspotresponse to ${from.addressToDotNotation()}", null)
+                        route(replyPacket)
+                    }
+                }
+            }
+            else -> {
+                // do nothing
+            }
+        }
+
+        _incomingMmcpMessages.tryEmit(MmcpMessageAndPacketHeader(mmcpMessage, packet.header))
+    }
+
 
     override fun route(
         packet: VirtualPacket,
     ) {
-        if(packet.header.toAddr == localNodeAddress) {
-            if(packet.header.toPort == 0) {
-                //This is an Mmcp message
-                val mmcpMessage = MmcpMessage.fromVirtualPacket(packet)
-                val from = packet.header.fromAddr
-
-                when(mmcpMessage) {
-                    is MmcpPing -> {
-                        logger(Log.DEBUG, "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}", null)
-                        //send pong
-                        val pongMessage = MmcpPong(
-                            messageId = nextMmcpMessageId(),
-                            replyToMessageId = mmcpMessage.messageId
-                        )
-
-                        val replyPacket = pongMessage.toVirtualPacket(
-                            toAddr = from,
-                            fromAddr = localNodeAddress
-                        )
-
-                        logger(Log.DEBUG, "$logPrefix Sending pong to ${from.addressToDotNotation()}", null)
-                        route(replyPacket)
-                    }
-                    is MmcpPong -> {
-                        logger(Log.DEBUG, "$logPrefix Received pong(id=${mmcpMessage.messageId})}", null)
-                        pongListeners.forEach {
-                            it.onPongReceived(from, mmcpMessage)
-                        }
-                    }
-                    is MmcpHotspotRequest -> {
-                        logger(Log.INFO, "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})", null)
-                        coroutineScope.launch {
-                            val hotspotResult = hotspotManager.requestHotspot(
-                                mmcpMessage.messageId, mmcpMessage.hotspotRequest
-                            )
-
-                            if(from != localNodeAddress) {
-                                val replyPacket = MmcpHotspotResponse(
-                                    messageId = mmcpMessage.messageId,
-                                    result = hotspotResult
-                                ).toVirtualPacket(
-                                    toAddr = from,
-                                    fromAddr = localNodeAddress
-                                )
-                                logger(Log.INFO, "$logPrefix sending hotspotresponse to ${from.addressToDotNotation()}", null)
-                                route(replyPacket)
-                            }
-                        }
-                    }
-                    else -> {
-                        // do nothing
-                    }
-                }
-
-                _incomingMmcpMessages.tryEmit(mmcpMessage)
-            }
-        }else {
-            //packet needs to be sent to nexthop
-            val neighborManager = neighborNodeManagers[packet.header.toAddr]
-            if(neighborManager != null) {
-                logger(Log.DEBUG, "$logPrefix ${packet.header.toAddr.addressToDotNotation()}", null)
-                packet.updateLastHopAddrAndIncrementHopCountInData(localNodeAddress)
-                neighborManager.send(packet)
-            }else {
-                //not routeable
-                logger(Log.ERROR,
-                    "$logPrefix Cannot route packet to ${packet.header.toAddr.addressToDotNotation()}",
+        if(packet.header.hopCount >= config.maxHops) {
+            logger(Log.DEBUG,
+                "Drop packet from ${packet.header.fromAddr.addressToDotNotation()} - " +
+                        "${packet.header.hopCount} exceeds ${config.maxHops}",
                 null)
+            return
+        }
+
+        if(packet.header.toPort == 0 && packet.header.fromAddr != localNodeAddress){
+            //this is an MMCP message
+            onIncomingMmcpMessage(packet)
+        }
+
+        if(packet.header.toAddr == localNodeAddress) {
+            //this is an incoming packet - give to the destination virtual socket/forwarding
+        }else {
+            //packet needs to be sent to next hop / destination
+            val toAddr = packet.header.toAddr
+            val fromLastHop = packet.header.lastHopAddr
+
+            packet.updateLastHopAddrAndIncrementHopCountInData(localNodeAddress)
+            if(toAddr == ADDR_BROADCAST) {
+                neighborNodeManagers.values
+                    .filter {
+                        it.remoteAddress != fromLastHop && it.remoteAddress != packet.header.fromAddr
+                    }.forEach {
+                        it.send(packet)
+                    }
+            }else {
+                val neighborManager = neighborNodeManagers[packet.header.toAddr]
+                if(neighborManager != null) {
+                    logger(Log.DEBUG, "$logPrefix ${packet.header.toAddr.addressToDotNotation()}", null)
+                    packet.updateLastHopAddrAndIncrementHopCountInData(localNodeAddress)
+                    neighborManager.send(packet)
+                }else {
+                    //not routeable
+                    logger(Log.ERROR,
+                        "$logPrefix Cannot route packet to ${packet.header.toAddr.addressToDotNotation()}",
+                        null)
+                }
             }
         }
     }
@@ -333,7 +369,7 @@ abstract class VirtualNode(
         val neighborVirtualAddr = AtomicInteger(0)
         val helloMessageId = nextMmcpMessageId()
 
-        val packetReceivedListener = VirtualNodeDatagramSocket.NeighborMmcpMessageReceivedListener {
+        val packetReceivedListener = VirtualNodeDatagramSocket.LinkLocalMmcpListener {
             if(it.datagramPacket.address == address && it.datagramPacket.port == port) {
                 neighborVirtualAddr.set(it.virtualPacket.header.fromAddr)
                 addrResponseLatch.countDown()
@@ -346,7 +382,7 @@ abstract class VirtualNode(
                 "$logPrefix addNewDatagramNeighborConnection Sending hello to $address:$port",
                 null
             )
-            socket.addPacketReceivedListener(packetReceivedListener)
+            socket.addLinkLocalMmmcpListener(packetReceivedListener)
             socket.sendHello(helloMessageId, address, port)
             addrResponseLatch.await(10, TimeUnit.SECONDS)
 
@@ -360,7 +396,7 @@ abstract class VirtualNode(
                 throw exception
             }
         }finally {
-            socket.removePacketReceivedListener(packetReceivedListener)
+            socket.removeLinkLocalMmcpListener(packetReceivedListener)
         }
     }
 

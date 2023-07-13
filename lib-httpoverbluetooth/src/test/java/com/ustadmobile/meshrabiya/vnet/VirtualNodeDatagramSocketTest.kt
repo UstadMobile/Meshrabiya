@@ -60,7 +60,7 @@ class VirtualNodeDatagramSocketTest {
             val helloLatch = CountDownLatch(1)
             val responseMessage = AtomicReference<VirtualPacket>()
 
-            val socket1Listener = VirtualNodeDatagramSocket.NeighborMmcpMessageReceivedListener {
+            val socket1Listener = VirtualNodeDatagramSocket.LinkLocalMmcpListener {
                 val message = it.mmcpMessage
                 if(message is MmcpAck && message.ackOfMessageId == helloMessageId) {
                     responseMessage.set(it.virtualPacket)
@@ -68,7 +68,7 @@ class VirtualNodeDatagramSocketTest {
                 }
             }
 
-            socket1.addPacketReceivedListener(socket1Listener)
+            socket1.addLinkLocalMmmcpListener(socket1Listener)
             socket1.sendHello(helloMessageId, InetAddress.getLoopbackAddress(), socket2.localPort)
 
             helloLatch.await(500, TimeUnit.SECONDS)

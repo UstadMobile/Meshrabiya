@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import com.ustadmobile.meshrabiya.vnet.VirtualRouter.Companion.ADDR_BROADCAST
 import java.net.DatagramPacket
 import java.nio.ByteBuffer
 
@@ -139,4 +140,9 @@ class VirtualPacket private constructor(
             )
         }
     }
+
+    fun isBroadcast() : Boolean {
+        return header.toAddr == ADDR_BROADCAST
+    }
+
 }

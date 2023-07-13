@@ -28,15 +28,15 @@ class StreamConnectionNeighborNodeConnectionManager(
     remoteNodeAddr: Int,
     private val socket: ISocket,
     private val logger: com.ustadmobile.meshrabiya.MNetLogger,
-    private val stateListener: RemoteMNodeConnectionListener,
     executor: ExecutorService,
     scheduledExecutor: ScheduledExecutorService,
-    //to add: connection type, etc.
+    stateChangeListener: OnNeighborNodeConnectionStateChangedListener = OnNeighborNodeConnectionStateChangedListener { },
 ): AbstractNeighborNodeConnectionManager(
     connectionId = connectionId,
     router = router,
     localNodeVirtualAddr = localNodeAddr,
     remoteNodeVirtualAddr = remoteNodeAddr,
+    stateChangeListener = stateChangeListener,
 ) {
 
     enum class ConnectionState{
@@ -76,7 +76,7 @@ class StreamConnectionNeighborNodeConnectionManager(
             try {
 
                 logger(Log.DEBUG, "RemoteMNodeConnectionManager: running: ", null)
-                stateListener.onConnectionStateChanged(_connectionState.value)
+                //stateListener.onConnectionStateChanged(_connectionState.value)
 
                 val buffer = ByteArray(1600)
                 lateinit var packet: VirtualPacket
@@ -171,7 +171,8 @@ class StreamConnectionNeighborNodeConnectionManager(
             val newState = _connectionState.updateAndGet { prev ->
                 prev.copy(connectionState = ConnectionState.DISCONNECTED)
             }
-            stateListener.onConnectionStateChanged(newState)
+
+            stateChangeListener.onNeighborNodeConnectionStateChanged(newState)
         }
     }
 

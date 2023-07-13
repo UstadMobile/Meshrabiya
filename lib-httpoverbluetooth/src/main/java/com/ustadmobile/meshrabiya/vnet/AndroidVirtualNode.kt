@@ -38,12 +38,14 @@ class AndroidVirtualNode(
     localMNodeAddress: Int = randomApipaAddr(),
     json: Json,
     private val dataStore: DataStore<Preferences>,
+    config: NodeConfig = NodeConfig.DEFAULT_CONFIG,
 ): VirtualNode(
     uuidMask = uuidMask,
     port = port,
     logger = logger,
     localNodeAddress = localMNodeAddress,
     json = json,
+    config = config,
 ) {
 
 

@@ -2,12 +2,15 @@ package com.ustadmobile.meshrabiya.vnet
 
 import app.cash.turbine.test
 import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.requireAsIpv6
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.test.connectTo
+import com.ustadmobile.meshrabiya.vnet.VirtualRouter.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
@@ -16,8 +19,15 @@ import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotStatus
 import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiDirectState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert
@@ -32,13 +42,13 @@ import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.net.Inet6Address
-import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class VirtualNodeTest {
@@ -49,11 +59,13 @@ class VirtualNodeTest {
         logger: MNetLogger,
         override val hotspotManager: MeshrabiyaWifiManager = mock { },
         json: Json,
+        config: NodeConfig = NodeConfig(maxHops = 5),
     ) : VirtualNode(
         uuidMask = uuidMask,
         port = port,
         logger = logger,
         json = json,
+        config = config,
     )
 
     class PipeSocket(
@@ -74,6 +86,10 @@ class VirtualNodeTest {
                 append(exception.stackTraceToString())
             }
         })
+    }
+
+    private val json = Json {
+        encodeDefaults = true
     }
 
     @Test
@@ -146,11 +162,7 @@ class VirtualNodeTest {
             json = json,
         )
 
-        node1.addNewDatagramNeighborConnection(
-            InetAddress.getLoopbackAddress(),
-            node2.localDatagramPort,
-            node1.datagramSocket,
-        )
+        node1.connectTo(node2)
 
         val latch = CountDownLatch(1)
         val pongMessage = AtomicReference<MmcpPong>()
@@ -222,11 +234,7 @@ class VirtualNodeTest {
             json = json,
         )
 
-        node1.addNewDatagramNeighborConnection(
-            InetAddress.getLoopbackAddress(),
-            node2.localDatagramPort,
-            node1.datagramSocket,
-        )
+        node1.connectTo(node2)
 
         //Wait for connection to be established
         runBlocking {
@@ -251,7 +259,7 @@ class VirtualNodeTest {
 
         runBlocking {
             node2.incomingMmcpMessages.filter {
-                it.what == MmcpMessage.WHAT_HOTSPOT_RESPONSE
+                it.message.what == MmcpMessage.WHAT_HOTSPOT_RESPONSE
             }.test(timeout = 5.seconds) {
                 val message = awaitItem() as MmcpHotspotResponse
                 Assert.assertEquals(requestId, message.result.responseToMessageId)
@@ -260,9 +268,102 @@ class VirtualNodeTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+    }
 
+    @Test(timeout = 10000)
+    fun givenConnectedNodes_whenBroadcastIsSent_thenAllWillReceive() {
+        val scope = CoroutineScope(Dispatchers.Default + Job())
+        val nodesToClose = mutableListOf<VirtualNode>()
 
+        try {
+            val middleNode = TestVirtualNode(
+                logger = logger,
+                json = json,
+            )
+            nodesToClose += middleNode
+
+            val connectedNodes = (0 until 3).map {
+                TestVirtualNode(
+                    logger = logger,
+                    json = json
+                ).also {
+                    nodesToClose += it
+                    it.connectTo(middleNode)
+                }
+            }
+
+            val pingMessageId = 1000042
+            val broadcastPing = MmcpPing(pingMessageId).toVirtualPacket(
+                toAddr = ADDR_BROADCAST,
+                fromAddr = connectedNodes.first().localNodeAddress
+            )
+
+            val otherJobs = (1 until 3).map {nodeIndex ->
+                scope.async {
+                    connectedNodes[nodeIndex].incomingMmcpMessages.filter {
+                        it.message.messageId == pingMessageId
+                    }.first()
+                }
+            }
+
+            val firstNode = connectedNodes.first()
+
+            firstNode.route(broadcastPing)
+
+            runBlocking { awaitAll(*otherJobs.toTypedArray()) }
+        }finally {
+            scope.cancel()
+            nodesToClose.forEach { it.close() }
+        }
+    }
+
+    /**
+     * Integration test to ensure that when there are two connected virtual node neighbors they will
+     * ping each other and update their state.
+     */
+    @Test
+    fun givenTwoNodes_whenConnected_thenPingTimesWillBeDetermined() {
+        val node1 = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { },
+            json = json,
+        )
+        val node2 = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { },
+            json = json,
+        )
+
+        fun VirtualNode.assertPingTimeDetermined(otherNode: VirtualNode) {
+            runBlocking {
+                neighborNodesState.filter { neighbors ->
+                    (neighbors.firstOrNull { it.remoteAddress == otherNode.localNodeAddress }?.pingTime ?: 0) > 0
+                }.test(timeout = 5000.milliseconds) {
+                    val pingTime = awaitItem().first { it.remoteAddress == otherNode.localNodeAddress }.pingTime
+                    Assert.assertTrue(
+                        "${localNodeAddress.addressToDotNotation()} -> " +
+                            "${otherNode.localNodeAddress.addressToDotNotation()} ping time > 0",
+                        pingTime > 0
+                    )
+                    println("Determined ping time from ${localNodeAddress.addressToDotNotation()} " +
+                            "-> ${otherNode.localNodeAddress.addressToDotNotation()} = ${pingTime}ms")
+                }
+            }
+        }
+
+        try {
+            node1.connectTo(node2)
+            node1.assertPingTimeDetermined(node2)
+            node2.assertPingTimeDetermined(node1)
+        }finally {
+            node1.close()
+            node2.close()
+        }
 
     }
+
+
 
 }

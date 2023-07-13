@@ -4,6 +4,7 @@ import android.util.Log
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.updateAndGet
+import java.io.Closeable
 import java.io.IOException
 import java.net.InetAddress
 import java.util.concurrent.CopyOnWriteArrayList
@@ -32,14 +33,14 @@ class NeighborNodeManager(
     private val connectionExecutor: ExecutorService,
     private val scheduledExecutor: ScheduledExecutorService,
     private val logger: com.ustadmobile.meshrabiya.MNetLogger,
-    private val listener: RemoteMNodeManagerListener,
-): StreamConnectionNeighborNodeConnectionManager.RemoteMNodeConnectionListener {
+    private val listener: NeighborNodeStateChangedListener,
+): AbstractNeighborNodeConnectionManager.OnNeighborNodeConnectionStateChangedListener, Closeable {
 
     private val logPrefix: String = "[NeighborNodeManager ${localNodeAddress.addressToDotNotation()}->${remoteAddress.addressToDotNotation()}]"
 
-    interface RemoteMNodeManagerListener {
+    interface NeighborNodeStateChangedListener {
 
-        fun onNodeStateChanged(
+        fun onNeighborNodeStateChanged(
             remoteMNodeState: NeighborNodeState
         )
 
@@ -63,7 +64,6 @@ class NeighborNodeManager(
             remoteNodeAddr = remoteAddress,
             socket = iSocket,
             logger = logger,
-            stateListener = this,
             executor = connectionExecutor,
             scheduledExecutor = scheduledExecutor,
         )
@@ -77,7 +77,7 @@ class NeighborNodeManager(
             )
         }
 
-        listener.onNodeStateChanged(newState)
+        listener.onNeighborNodeStateChanged(newState)
     }
 
     fun addDatagramConnection(
@@ -104,8 +104,8 @@ class NeighborNodeManager(
             neighborPort = port,
             scheduledExecutor = scheduledExecutor,
             logger = logger,
+            stateChangeListener = this,
         )
-
         connections.add(connectionManager)
 
         val newState = nodeState.updateAndGet { prev ->
@@ -115,21 +115,23 @@ class NeighborNodeManager(
             )
         }
 
-        listener.onNodeStateChanged(newState)
+        listener.onNeighborNodeStateChanged(newState)
     }
 
-    override fun onConnectionStateChanged(connectionState: NeighborNodeConnectionState) {
-        if(connectionState.connectionState == StreamConnectionNeighborNodeConnectionManager.ConnectionState.DISCONNECTED) {
-            connections.removeIf { it.connectionId == connectionState.connectionId }
+    override fun onNeighborNodeConnectionStateChanged(state: NeighborNodeConnectionState) {
+        if(state.connectionState == StreamConnectionNeighborNodeConnectionManager.ConnectionState.DISCONNECTED) {
+            connections.firstOrNull { it.connectionId == state.connectionId }?.also { connectionManager ->
+                connections.remove(connectionManager)
+            }
         }else {
             val newState = nodeState.updateAndGet { prev ->
                 prev.copy(
-                    pingTime = connectionState.pingTime,
-                    pingsSent = connectionState.pingAttempts,
-                    pingsReceived = connectionState.pingsReceived,
+                    pingTime = state.pingTime,
+                    pingsSent = state.pingAttempts,
+                    pingsReceived = state.pingsReceived,
                 )
             }
-            listener.onNodeStateChanged(newState)
+            listener.onNeighborNodeStateChanged(newState)
         }
     }
 
@@ -145,8 +147,10 @@ class NeighborNodeManager(
     }
 
 
-    fun close() {
-
+    override fun close() {
+        connections.forEach {
+            it.close()
+        }
     }
 
 }

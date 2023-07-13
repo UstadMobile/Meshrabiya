@@ -18,14 +18,16 @@ abstract class AbstractNeighborNodeConnectionManager(
     val connectionId: Int,
     protected val router: VirtualRouter,
     protected val localNodeVirtualAddr: Int,
-    protected val remoteNodeVirtualAddr: Int
+    protected val remoteNodeVirtualAddr: Int,
+    protected val stateChangeListener: OnNeighborNodeConnectionStateChangedListener,
 ) : Closeable{
+
+    fun interface OnNeighborNodeConnectionStateChangedListener {
+        fun onNeighborNodeConnectionStateChanged(state: NeighborNodeConnectionState)
+    }
 
     abstract val state: Flow<NeighborNodeConnectionState>
 
     abstract fun send(packet: VirtualPacket)
-
-
-
 
 }

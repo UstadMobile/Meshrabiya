@@ -42,15 +42,15 @@ class VirtualNodeDatagramSocket(
 
     val localPort: Int = socket.localPort
 
-    data class NeighborMmcpPacketReceivedEvent(
+    data class LinkLocalMmcpReceivedEvent(
         val datagramPacket: DatagramPacket,
         val virtualPacket: VirtualPacket,
         val mmcpMessage: MmcpMessage,
     )
 
-    fun interface NeighborMmcpMessageReceivedListener {
+    fun interface LinkLocalMmcpListener {
 
-        fun onNeighborMmcpMessageReceived(event: NeighborMmcpPacketReceivedEvent)
+        fun onLinkLocalMmcpReceived(event: LinkLocalMmcpReceivedEvent)
 
     }
 
@@ -68,7 +68,7 @@ class VirtualNodeDatagramSocket(
     }
 
 
-    private val listeners: MutableList<NeighborMmcpMessageReceivedListener> = CopyOnWriteArrayList()
+    private val listeners: MutableList<LinkLocalMmcpListener> = CopyOnWriteArrayList()
 
     init {
         logPrefix = buildString {
@@ -97,7 +97,7 @@ class VirtualNodeDatagramSocket(
                 val mmcpMessage = MmcpMessage.fromVirtualPacket(rxVirtualPacket)
 
                 listeners.forEach {
-                    it.onNeighborMmcpMessageReceived(NeighborMmcpPacketReceivedEvent(
+                    it.onLinkLocalMmcpReceived(LinkLocalMmcpReceivedEvent(
                         rxPacket, rxVirtualPacket, mmcpMessage
                     ))
                 }
@@ -162,11 +162,11 @@ class VirtualNodeDatagramSocket(
         }
     }
 
-    fun addPacketReceivedListener(listener: NeighborMmcpMessageReceivedListener) {
+    fun addLinkLocalMmmcpListener(listener: LinkLocalMmcpListener) {
         listeners += listener
     }
 
-    fun removePacketReceivedListener(listener: NeighborMmcpMessageReceivedListener) {
+    fun removeLinkLocalMmcpListener(listener: LinkLocalMmcpListener) {
         listeners -= listener
     }
 
