@@ -97,6 +97,7 @@ sealed class MmcpMessage(
                 WHAT_ACK -> MmcpAck.fromBytes(byteArray, offset, len)
                 WHAT_HOTSPOT_REQUEST -> MmcpHotspotRequest.fromBytes(byteArray, offset, len)
                 WHAT_HOTSPOT_RESPONSE -> MmcpHotspotResponse.fromBytes(byteArray, offset, len)
+                WHAT_ORIGINATOR -> MmcpOriginatorMessage.fromBytes(byteArray, offset, len)
                 else -> throw IllegalArgumentException("Mmcp: Invalid what: $what")
             }
         }
