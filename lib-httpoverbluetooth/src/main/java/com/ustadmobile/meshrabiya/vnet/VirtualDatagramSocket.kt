@@ -5,6 +5,7 @@ import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import org.apache.commons.pool2.ObjectPool
 import org.apache.commons.pool2.impl.GenericObjectPool
+import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.InetAddress
 import java.util.concurrent.LinkedBlockingDeque
@@ -17,18 +18,18 @@ import java.util.concurrent.atomic.AtomicBoolean
  * datagrampacket into a VirtualPacket, and then send using the VirtualRouter.
  */
 class VirtualDatagramSocket(
-    private val port: Int = 0,
+    port: Int = 0,
     private val localVirtualAddress: Int,
     private val router: VirtualRouter,
     private val receiveBufferSize: Int =  512,
     private val logger: MNetLogger,
-) {
+) : IDatagramSocket {
 
     private val _localPort = router.allocatePortOrThrow(Protocol.UDP, port)
 
     private val closed = AtomicBoolean(false)
 
-    val localPort: Int
+    override val localPort: Int
         get(){
             if(!closed.get())
                 return _localPort
@@ -75,7 +76,7 @@ class VirtualDatagramSocket(
     }
 
 
-    fun receive(datagramPacket: DatagramPacket) {
+    override fun receive(datagramPacket: DatagramPacket) {
         assertNotClosed()
 
         val bufferPacket = receiveQueue.take()
@@ -91,7 +92,7 @@ class VirtualDatagramSocket(
         }
     }
 
-    fun send(datagramPacket: DatagramPacket) {
+    override fun send(datagramPacket: DatagramPacket) {
         assertNotClosed()
 
         //need to borrow a buffer
@@ -121,12 +122,12 @@ class VirtualDatagramSocket(
         }
     }
 
-    fun close() {
+    override fun close() {
         if(!closed.getAndSet(true)) {
             sendBufferPool.close()
             receiveBufferPool.close()
+            router.deallocatePort(Protocol.UDP, _localPort)
         }
-
     }
 
 }

@@ -12,6 +12,8 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpMessageAndPacketHeader
 import com.ustadmobile.meshrabiya.mmcp.MmcpOriginatorMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.portforward.ListenAddressAndPort
+import com.ustadmobile.meshrabiya.portforward.UdpForwardRule
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
@@ -106,7 +108,11 @@ abstract class VirtualNode(
 
     protected val logPrefix: String = "[VirtualNode ${localNodeAddress.addressToDotNotation()}]"
 
+    protected val iDatagramSocketFactory = VirtualNodeReturnPathSocketFactory(this)
+
     private val neighborConnectionManagerLock = ReentrantLock()
+
+    private val forwardingRules: MutableMap<ListenAddressAndPort, UdpForwardRule> = ConcurrentHashMap()
 
     /**
      * @param originatorMessage the Originator message itself
@@ -216,6 +222,10 @@ abstract class VirtualNode(
         throw IllegalStateException("Could not allocate random free port")
     }
 
+    override fun deallocatePort(protocol: Protocol, portNum: Int) {
+        activeSockets.remove(portNum)
+    }
+
     fun openSocket(port: Int): VirtualDatagramSocket {
         val virtualSocket = VirtualDatagramSocket(
             port = port,
@@ -227,6 +237,30 @@ abstract class VirtualNode(
         activeSockets[virtualSocket.localPort] = virtualSocket
         return virtualSocket
     }
+
+    /**
+     *
+     */
+    fun forward(
+        listenAddress: InetAddress,
+        listenPort: Int,
+        destAddress: InetAddress,
+        destPort: Int,
+    ) : Int {
+        val localSocket = iDatagramSocketFactory.createSocket(listenAddress, listenPort)
+        val forwardRule = UdpForwardRule(
+            localSocket = localSocket,
+            ioExecutor = this.connectionExecutor,
+            toAddress = destAddress,
+            toPort = destPort,
+            logger = logger,
+            returnPathSocketFactory = iDatagramSocketFactory,
+        )
+        forwardingRules[ListenAddressAndPort(listenAddress, listenPort)] = forwardRule
+
+        return localSocket.localPort
+    }
+
 
     override val localDatagramPort: Int
         get() = datagramSocket.localPort

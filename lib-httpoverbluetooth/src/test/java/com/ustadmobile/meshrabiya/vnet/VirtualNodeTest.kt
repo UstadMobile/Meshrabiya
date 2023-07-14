@@ -11,6 +11,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.test.EchoDatagramServer
 import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
 import com.ustadmobile.meshrabiya.test.connectTo
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
@@ -41,10 +42,12 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verifyBlocking
 import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
@@ -451,6 +454,63 @@ class VirtualNodeTest {
 
     }
 
+
+    /**
+     * Test forwarding between a real socket on node 1 and a real socket on node 2 over the virtual
+     * network.
+     */
+    @Test(timeout = 5000)
+    fun givenTwoNodes_whenForwardingSetup_thenEchoWillBeReceived(){
+        val executorService = Executors.newCachedThreadPool()
+        val node1 = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { },
+            json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()).ip4AddressToInt()
+        )
+
+        val node2  = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { },
+            json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()).ip4AddressToInt()
+        )
+
+        val node1InetAddr = InetAddress.getByAddress(byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()))
+        val node2InetAddr = InetAddress.getByAddress(byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()))
+        val node2EchoServer = EchoDatagramServer(0, executorService)
+
+        try {
+            node1.connectTo(node2)
+
+            val node1ForwardingListenPort = node1.forward(
+                InetAddress.getLoopbackAddress(), 0, node2InetAddr, 8000
+            )
+
+            node2.forward(
+                node1InetAddr, 8000, InetAddress.getLoopbackAddress(), node2EchoServer.listeningPort
+            )
+
+            val client = DatagramSocket()
+            val helloBytes = "Hello".toByteArray()
+            val helloPacket = DatagramPacket(helloBytes, helloBytes.size,
+                InetAddress.getLoopbackAddress(), node1ForwardingListenPort)
+            println("Send packet to ${InetAddress.getLoopbackAddress()}:$node1ForwardingListenPort")
+            client.send(helloPacket)
+
+            val receiveBuffer = ByteArray(100)
+            val receivePacket = DatagramPacket(receiveBuffer, receiveBuffer.size)
+            client.receive(receivePacket)
+
+            val decoded = String(receivePacket.data, receivePacket.offset, receivePacket.length)
+            Assert.assertEquals("Hello", decoded)
+        }finally {
+            node1.close()
+            node2.close()
+        }
+    }
 
 
 }

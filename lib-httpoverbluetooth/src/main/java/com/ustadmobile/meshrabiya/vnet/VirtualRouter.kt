@@ -35,6 +35,11 @@ interface VirtualRouter {
         portNum: Int
     ): Int
 
+    fun deallocatePort(
+        protocol: Protocol,
+        portNum: Int
+    )
+
 
     companion object {
 
