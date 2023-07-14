@@ -46,11 +46,19 @@ class VirtualDatagramSocket(
         BufferPooledObjectFactory(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE)
     )
 
+    private fun assertNotClosed() {
+         if(closed.get())
+             throw IllegalStateException("VirtualDatagramSocket assertNotClosed fail: $_localPort is closed!")
+    }
+
     /**
      * This function is called by the VirtualRouter when a packet is routed and this socket is
      * the destination.
      */
     internal fun onIncomingPacket(virtualPacket: VirtualPacket) {
+        if(closed.get())
+            return // do nothing
+
         val buffer = receiveBufferPool.borrowObject()
 
         //Copy from the virtual packet into the pool buffer
@@ -68,6 +76,8 @@ class VirtualDatagramSocket(
 
 
     fun receive(datagramPacket: DatagramPacket) {
+        assertNotClosed()
+
         val bufferPacket = receiveQueue.take()
 
         try {
@@ -82,6 +92,8 @@ class VirtualDatagramSocket(
     }
 
     fun send(datagramPacket: DatagramPacket) {
+        assertNotClosed()
+
         //need to borrow a buffer
         //convert to virtual packet, then send using router.
         val buffer = sendBufferPool.borrowObject()
@@ -110,8 +122,11 @@ class VirtualDatagramSocket(
     }
 
     fun close() {
-        sendBufferPool.close()
-        receiveBufferPool.close()
+        if(!closed.getAndSet(true)) {
+            sendBufferPool.close()
+            receiveBufferPool.close()
+        }
+
     }
 
 }

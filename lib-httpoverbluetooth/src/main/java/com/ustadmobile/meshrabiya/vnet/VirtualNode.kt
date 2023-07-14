@@ -176,6 +176,8 @@ abstract class VirtualNode(
 
     val incomingMmcpMessages: Flow<MmcpMessageAndPacketHeader> = _incomingMmcpMessages.asSharedFlow()
 
+    private val activeSockets: MutableMap<Int, VirtualDatagramSocket> = ConcurrentHashMap()
+
     init {
         _state.update { prev ->
             prev.copy(
@@ -199,7 +201,31 @@ abstract class VirtualNode(
     override fun nextMmcpMessageId() = mmcpMessageIdAtomic.incrementAndGet()
 
     override fun allocatePortOrThrow(protocol: Protocol, portNum: Int): Int {
-        TODO("Not yet implemented")
+        if(portNum > 0 && !activeSockets.containsKey(portNum))
+            return portNum
+
+        var attemptCount = 0
+        do {
+            val randomPort = Random.nextInt(0, Short.MAX_VALUE.toInt())
+            if(!activeSockets.containsKey(randomPort))
+                return randomPort
+
+            attemptCount++
+        }while(attemptCount < 100)
+
+        throw IllegalStateException("Could not allocate random free port")
+    }
+
+    fun openSocket(port: Int): VirtualDatagramSocket {
+        val virtualSocket = VirtualDatagramSocket(
+            port = port,
+            localVirtualAddress =  localNodeAddress,
+            router = this,
+            logger = logger,
+        )
+
+        activeSockets[virtualSocket.localPort] = virtualSocket
+        return virtualSocket
     }
 
     override val localDatagramPort: Int
@@ -384,6 +410,7 @@ abstract class VirtualNode(
 
             if(packet.header.toAddr == localNodeAddress) {
                 //this is an incoming packet - give to the destination virtual socket/forwarding
+                activeSockets[packet.header.toPort]?.onIncomingPacket(packet)
             }else {
                 //packet needs to be sent to next hop / destination
                 val toAddr = packet.header.toAddr

@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.vnet
 
 import app.cash.turbine.test
 import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
 import com.ustadmobile.meshrabiya.ext.requireAsIpv6
@@ -10,6 +11,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
 import com.ustadmobile.meshrabiya.test.connectTo
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
@@ -38,9 +40,9 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verifyBlocking
-import java.io.InputStream
-import java.io.OutputStream
+import java.net.DatagramPacket
 import java.net.Inet6Address
+import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -173,39 +175,44 @@ class VirtualNodeTest {
             json = json,
         )
 
-        node1.connectTo(node2)
+        try {
+            node1.connectTo(node2)
 
-        //Wait for connection to be established
-        runBlocking {
-            node1.neighborNodesState.filter { it.isNotEmpty() }.test {
-                awaitItem()
+            //Wait for connection to be established
+            runBlocking {
+                node1.neighborNodesState.filter { it.isNotEmpty() }.test {
+                    awaitItem()
+                }
             }
-        }
 
-        val requestId = Random.nextInt()
+            val requestId = Random.nextInt()
 
-        node1.route(
-            packet = MmcpHotspotRequest(requestId, LocalHotspotRequest(is5GhzSupported = true))
-                .toVirtualPacket(
-                    toAddr = node1.localNodeAddress,
-                    fromAddr = node2.localNodeAddress
-                )
-        )
+            node1.route(
+                packet = MmcpHotspotRequest(requestId, LocalHotspotRequest(is5GhzSupported = true))
+                    .toVirtualPacket(
+                        toAddr = node1.localNodeAddress,
+                        fromAddr = node2.localNodeAddress
+                    )
+            )
 
-        verifyBlocking(mockHotspotManager, timeout(5000)) {
-            requestHotspot(eq(requestId), any())
-        }
-
-        runBlocking {
-            node2.incomingMmcpMessages.filter {
-                it.message.what == MmcpMessage.WHAT_HOTSPOT_RESPONSE
-            }.test(timeout = 5.seconds) {
-                val message = awaitItem().message as MmcpHotspotResponse
-                Assert.assertEquals(requestId, message.result.responseToMessageId)
-                Assert.assertEquals("networkname", message.result.config?.ssid)
-                Assert.assertEquals("secret123", message.result.config?.passphrase)
-                cancelAndIgnoreRemainingEvents()
+            verifyBlocking(mockHotspotManager, timeout(5000)) {
+                requestHotspot(eq(requestId), any())
             }
+
+            runBlocking {
+                node2.incomingMmcpMessages.filter {
+                    it.message.what == MmcpMessage.WHAT_HOTSPOT_RESPONSE
+                }.test(timeout = 5.seconds) {
+                    val message = awaitItem().message as MmcpHotspotResponse
+                    Assert.assertEquals(requestId, message.result.responseToMessageId)
+                    Assert.assertEquals("networkname", message.result.config?.ssid)
+                    Assert.assertEquals("secret123", message.result.config?.passphrase)
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+        }finally {
+            node1.close()
+            node2.close()
         }
     }
 
@@ -401,6 +408,49 @@ class VirtualNodeTest {
             nodes.forEach { it.close() }
         }
     }
+
+    @Test(timeout = 5000)
+    fun givenTwoNodesConnected_whenPacketSentUsingVirtualSocket_thenShouldBeReceived() {
+        val node1 = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { },
+            json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()).ip4AddressToInt()
+        )
+
+        val node2  = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            hotspotManager = mock { },
+            json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()).ip4AddressToInt()
+        )
+        try {
+            node1.connectTo(node2)
+            val node1socket  = node1.openSocket(81)
+            val node2socket = node2.openSocket(82)
+
+            val packetData = "Hello World".encodeToByteArray()
+            val txPacket = DatagramPacket(packetData, 0, packetData.size)
+            txPacket.address = InetAddress.getByAddress(node2.localNodeAddress.addressToByteArray())
+            txPacket.port = 82
+            node1socket.send(txPacket)
+
+            val rxBuffer = ByteArray(1500)
+            val rxPacket = DatagramPacket(rxBuffer, 0, rxBuffer.size)
+            node2socket.receive(rxPacket)
+            assertByteArrayEquals(
+                packetData, 0, rxBuffer, rxPacket.offset, packetData.size
+            )
+            Assert.assertEquals(txPacket.length, rxPacket.length)
+        }finally {
+            node1.close()
+            node2.close()
+        }
+
+    }
+
 
 
 }
