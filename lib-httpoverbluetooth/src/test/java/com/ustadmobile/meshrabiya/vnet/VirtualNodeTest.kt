@@ -68,16 +68,6 @@ class VirtualNodeTest {
         localNodeAddress = localNodeAddress,
     )
 
-    class PipeSocket(
-        override val inStream: InputStream,
-        override val outputStream: OutputStream,
-    ): ISocket {
-        override fun close() {
-            inStream.close()
-            outputStream.close()
-        }
-    }
-
     private val logger = MNetLogger { priority, message, exception ->
         println(buildString {
             append(message)
@@ -356,6 +346,61 @@ class VirtualNodeTest {
         }
     }
 
+    @Test(timeout = 5000)
+    fun givenThreeNodes_whenConnected_thenCanPingFromOneToOtherViaHop() {
+        val  scope = CoroutineScope(Dispatchers.Default + Job())
+        val nodes = (0 until 3).map {
+            TestVirtualNode(
+                uuidMask = UUID.randomUUID(),
+                logger = logger,
+                hotspotManager = mock { },
+                json = json,
+                localNodeAddress = byteArrayOf(
+                    169.toByte(),
+                    254.toByte(),
+                    1,
+                    (it + 1).toByte()
+                ).ip4AddressToInt()
+            )
+        }
+
+        try {
+            nodes[0].connectTo(nodes[1])
+            nodes[1].connectTo(nodes[2])
+
+            runBlocking {
+                //Wait for node 0 to discover node 2
+                println("test: wait for discovery")
+                nodes.first().state
+                    .filter {
+                        it.originatorMessages.containsKey(nodes.last().localNodeAddress)
+                    }
+                    .first()
+                println("test: node 1 knows about node 3")
+                nodes.last().state
+                    .filter { it.originatorMessages.containsKey(nodes.first().localNodeAddress) }
+                    .first()
+                println("test: node 3 knows about node 1 : discovery done")
+
+                val pingId = 1000042//Random.nextInt(0, Int.MAX_VALUE)
+                val pongReply = scope.async {
+                    nodes[0].incomingMmcpMessages.filter {
+                        (it.message as? MmcpPong)?.replyToMessageId == pingId
+                    }.first()
+                }
+
+                nodes.first().route(MmcpPing(pingId).toVirtualPacket(
+                    toAddr = nodes.last().localNodeAddress,
+                    fromAddr = nodes.first().localNodeAddress
+                ))
+
+                val pong = pongReply.await()
+                Assert.assertEquals(pingId, (pong.message as? MmcpPong)?.replyToMessageId)
+            }
+        }finally {
+            nodes.forEach { it.close() }
+        }
+    }
 
 
 }

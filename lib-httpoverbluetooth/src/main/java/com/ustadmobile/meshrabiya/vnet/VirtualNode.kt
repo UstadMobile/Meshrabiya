@@ -401,7 +401,11 @@ abstract class VirtualNode(
                             it.send(packet)
                         }
                 }else {
-                    val neighborManager = neighborNodeManagers[packet.header.toAddr]
+                    val nextHop = originatorMessages[packet.header.toAddr]?.lastHopAddr
+                    val neighborManager = nextHop?.let {
+                        neighborNodeManagers[it]
+                    }
+
                     if(neighborManager != null) {
                         logger(Log.DEBUG, "$logPrefix ${packet.header.toAddr.addressToDotNotation()}", null)
                         neighborManager.send(packet)
