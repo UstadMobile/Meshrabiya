@@ -8,6 +8,7 @@ import com.ustadmobile.meshrabiya.test.contentRangeEqual
 import org.junit.Assert
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argWhere
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.stub
@@ -101,7 +102,7 @@ class VirtualDatagramSocketTest {
                     it.header.fromPort == virtualSocket.localPort &&
                     datagramPacket.data.contentRangeEqual(datagramPacket.offset, it.data,
                         it.payloadOffset, datagramPacket.length)
-        })
+        }, anyOrNull(), anyOrNull())
     }
 
     @Test(timeout = 5000)
@@ -131,7 +132,7 @@ class VirtualDatagramSocketTest {
         )
 
         mockRouter.stub {
-            on { route(any()) }.thenAnswer {
+            on { route(any(), anyOrNull(), anyOrNull()) }.thenAnswer {
                 val packet = it.arguments.first() as VirtualPacket
                 if(packet.header.toPort == socket1.localPort && packet.header.toAddr == addr1)
                     socket1.onIncomingPacket(packet)

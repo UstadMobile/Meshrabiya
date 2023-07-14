@@ -384,6 +384,7 @@ class MeshrabiyaWifiManagerAndroid(
                     neighborPort = config.port,
                     neighborInetAddress = peerAddr,
                     socket = networkBoundDatagramSocket,
+                    neighborVirtualAddress = config.nodeVirtualAddr,
                 ))
 
                 //If we are connected and now expected to act as a Wifi Direct group, setup the

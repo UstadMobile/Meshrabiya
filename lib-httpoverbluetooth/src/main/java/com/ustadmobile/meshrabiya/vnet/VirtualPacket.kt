@@ -1,6 +1,5 @@
 package com.ustadmobile.meshrabiya.vnet
 
-import com.ustadmobile.meshrabiya.vnet.VirtualRouter.Companion.ADDR_BROADCAST
 import java.net.DatagramPacket
 import java.nio.ByteBuffer
 
@@ -93,6 +92,11 @@ class VirtualPacket private constructor(
          * on header to check
          */
         private const val LAST_HOP_ADDR_OFFSET = 12
+
+        /**
+         * Broadcast address - 255.255.255.255 (-1)
+         */
+        const val ADDR_BROADCAST = (255 shl 24).or(255 shl 16).or(255 shl 8).or(255)
 
 
         fun fromDatagramPacket(

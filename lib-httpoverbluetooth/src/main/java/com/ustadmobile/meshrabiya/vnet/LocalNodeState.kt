@@ -8,5 +8,6 @@ data class LocalNodeState(
     val wifiState: MeshrabiyaWifiState = MeshrabiyaWifiState(),
     val bluetoothState: MeshrabiyaBluetoothState = MeshrabiyaBluetoothState(deviceName = ""),
     val connectUri: String? = null,
+    val originatorMessages: Map<Int, VirtualNode.LastOriginatorMessage> = emptyMap(),
 ) {
 }

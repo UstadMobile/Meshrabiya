@@ -10,4 +10,5 @@ data class WifiConnectEvent(
     val neighborPort: Int,
     val neighborInetAddress: InetAddress,
     val socket: VirtualNodeDatagramSocket,
+    val neighborVirtualAddress: Int,
 )

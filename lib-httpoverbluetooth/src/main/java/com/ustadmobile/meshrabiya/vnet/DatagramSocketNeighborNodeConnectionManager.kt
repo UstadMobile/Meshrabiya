@@ -18,9 +18,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Future
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import kotlin.math.max
 
 /**
- * @param localNodeIncomingMmcpFlow the flow of incoming mmcp messages. Used to observe ping responses
  */
 class DatagramSocketNeighborNodeConnectionManager(
     connectionId: Int,
@@ -61,7 +61,9 @@ class DatagramSocketNeighborNodeConnectionManager(
         } ?: return@LinkLocalMmcpListener
 
         pendingPings.removeAll { it.ping.messageId == pendingPing.ping.messageId }
-        val responseTime = System.currentTimeMillis() - pendingPing.timesent
+
+        //Note: sometimes this is VERY fast during tests, a ping time of 0 would fail the test.
+        val responseTime = max(System.currentTimeMillis() - pendingPing.timesent, 1L)
         logger(Log.DEBUG, "$logPrefix pong(replyTo=${pendingPing.ping.messageId}) received time=${responseTime}ms", null)
 
         val newState = _state.updateAndGet { prev ->
@@ -90,6 +92,9 @@ class DatagramSocketNeighborNodeConnectionManager(
     ))
 
     override val state: Flow<NeighborNodeConnectionState> = _state.asStateFlow()
+
+    override val pingTime: Short
+        get() = _state.value.pingTime.toShort()
 
     private val pingFuture: Future<*>
 

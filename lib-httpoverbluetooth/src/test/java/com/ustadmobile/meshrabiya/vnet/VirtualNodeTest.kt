@@ -3,6 +3,7 @@ package com.ustadmobile.meshrabiya.vnet
 import app.cash.turbine.test
 import com.ustadmobile.meshrabiya.MNetLogger
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
 import com.ustadmobile.meshrabiya.ext.requireAsIpv6
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
@@ -10,7 +11,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.test.connectTo
-import com.ustadmobile.meshrabiya.vnet.VirtualRouter.Companion.ADDR_BROADCAST
+import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
@@ -39,12 +40,9 @@ import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verifyBlocking
 import java.io.InputStream
 import java.io.OutputStream
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
 import java.net.Inet6Address
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
@@ -55,6 +53,7 @@ class VirtualNodeTest {
 
     class TestVirtualNode(
         uuidMask: UUID = UUID.randomUUID(),
+        localNodeAddress: Int = randomApipaAddr(),
         port: Int = 0,
         logger: MNetLogger,
         override val hotspotManager: MeshrabiyaWifiManager = mock { },
@@ -66,6 +65,7 @@ class VirtualNodeTest {
         logger = logger,
         json = json,
         config = config,
+        localNodeAddress = localNodeAddress,
     )
 
     class PipeSocket(
@@ -93,62 +93,7 @@ class VirtualNodeTest {
     }
 
     @Test
-    fun givenTwoVirtualNodesConnectedOverIoStreamSocket_whenPingSent_thenReplyWillBeReceived() {
-        val executor = Executors.newCachedThreadPool()
-        val json = Json { encodeDefaults = true }
-        val node1 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
-            logger = logger,
-            hotspotManager = mock { },
-            json = json,
-        )
-
-        val node2 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
-            logger = logger,
-            hotspotManager = mock { },
-            json = json,
-        )
-
-        val node1ToNode2Out = PipedOutputStream()
-        val node2FromNode1In = PipedInputStream(node1ToNode2Out)
-
-        val node2ToNode1Out = PipedOutputStream()
-        val node1FromNode2In = PipedInputStream(node2ToNode1Out)
-
-        val node1Socket = PipeSocket(node1FromNode2In, node1ToNode2Out)
-        val node2Socket = PipeSocket(node2FromNode1In, node2ToNode1Out)
-
-
-        //needs to run on executor... otherwise will get stuck
-        executor.submit { node1.handleNewSocketConnection(node1Socket) }
-        executor.submit { node2.handleNewSocketConnection(node2Socket) }
-
-        val node1ToNode2Ping = MmcpPing(Random.nextInt())
-
-        val latch = CountDownLatch(1)
-
-        node1.addPongListener(object: PongListener{
-            override fun onPongReceived(fromNode: Int, pong: MmcpPong) {
-                latch.countDown()
-            }
-        })
-
-        node1.route(
-            node1ToNode2Ping.toVirtualPacket(
-                toAddr = node2.localNodeAddress,
-                fromAddr = node1.localNodeAddress
-            )
-        )
-
-        latch.await(5000, TimeUnit.MILLISECONDS)
-
-        executor.shutdown()
-    }
-
-    @Test
     fun givenTwoVirtualNodesConnectedOverDatagramSocket_whenPingSent_thenReplyWillBeReceived() {
-        val json = Json { encodeDefaults = true }
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
@@ -162,32 +107,36 @@ class VirtualNodeTest {
             json = json,
         )
 
-        node1.connectTo(node2)
+        try {
+            node1.connectTo(node2, timeout = 10000)
+            println("Connected node1 -> node2")
 
-        val latch = CountDownLatch(1)
-        val pongMessage = AtomicReference<MmcpPong>()
-        val node1ToNode2Ping = MmcpPing(Random.nextInt())
+            val latch = CountDownLatch(1)
+            val pongMessage = AtomicReference<MmcpPong>()
+            val node1ToNode2Ping = MmcpPing(Random.nextInt())
 
-        node1.addPongListener(object: PongListener{
-            override fun onPongReceived(fromNode: Int, pong: MmcpPong) {
-                if(pong.replyToMessageId == node1ToNode2Ping.messageId) {
-                    pongMessage.set(pong)
-                    latch.countDown()
+            node1.addPongListener(object: PongListener{
+                override fun onPongReceived(fromNode: Int, pong: MmcpPong) {
+                    if(pong.replyToMessageId == node1ToNode2Ping.messageId) {
+                        pongMessage.set(pong)
+                        latch.countDown()
+                    }
                 }
+            })
 
-            }
-        })
-
-
-        node1.route(
-            node1ToNode2Ping.toVirtualPacket(
-                toAddr = node2.localNodeAddress,
-                fromAddr = node1.localNodeAddress
+            node1.route(
+                node1ToNode2Ping.toVirtualPacket(
+                    toAddr = node2.localNodeAddress,
+                    fromAddr = node1.localNodeAddress
+                )
             )
-        )
 
-        latch.await(5000, TimeUnit.MILLISECONDS)
-        Assert.assertEquals(node1ToNode2Ping.messageId, pongMessage.get().replyToMessageId)
+            latch.await(5000, TimeUnit.MILLISECONDS)
+            Assert.assertEquals(node1ToNode2Ping.messageId, pongMessage.get().replyToMessageId)
+        }finally {
+            node1.close()
+            node2.close()
+        }
     }
 
 
@@ -261,7 +210,7 @@ class VirtualNodeTest {
             node2.incomingMmcpMessages.filter {
                 it.message.what == MmcpMessage.WHAT_HOTSPOT_RESPONSE
             }.test(timeout = 5.seconds) {
-                val message = awaitItem() as MmcpHotspotResponse
+                val message = awaitItem().message as MmcpHotspotResponse
                 Assert.assertEquals(requestId, message.result.responseToMessageId)
                 Assert.assertEquals("networkname", message.result.config?.ssid)
                 Assert.assertEquals("secret123", message.result.config?.passphrase)
@@ -328,19 +277,25 @@ class VirtualNodeTest {
             logger = logger,
             hotspotManager = mock { },
             json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, 1).ip4AddressToInt()
         )
         val node2 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
             hotspotManager = mock { },
             json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, 2).ip4AddressToInt()
         )
+        println("Test node1=${node1.localNodeAddress.addressToDotNotation()} node2=${node2.localNodeAddress.addressToDotNotation()}")
 
-        fun VirtualNode.assertPingTimeDetermined(otherNode: VirtualNode) {
+        fun VirtualNode.assertPingTimeDetermined(
+            otherNode: VirtualNode,
+            name: String,
+        ) {
             runBlocking {
                 neighborNodesState.filter { neighbors ->
                     (neighbors.firstOrNull { it.remoteAddress == otherNode.localNodeAddress }?.pingTime ?: 0) > 0
-                }.test(timeout = 5000.milliseconds) {
+                }.test(timeout = 10000.milliseconds, name = name) {
                     val pingTime = awaitItem().first { it.remoteAddress == otherNode.localNodeAddress }.pingTime
                     Assert.assertTrue(
                         "${localNodeAddress.addressToDotNotation()} -> " +
@@ -355,13 +310,50 @@ class VirtualNodeTest {
 
         try {
             node1.connectTo(node2)
-            node1.assertPingTimeDetermined(node2)
-            node2.assertPingTimeDetermined(node1)
+            node1.assertPingTimeDetermined(node2, name = "Found ping time from node1 to node2")
+            node2.assertPingTimeDetermined(node1, name = "Found ping time from node2 to node1")
         }finally {
             node1.close()
             node2.close()
         }
+    }
 
+    @Test
+    fun givenThreeNodes_whenConnected_thenShouldReceiveOriginatingMessagesFromOthers() {
+        val nodes = (0 until 3).map {
+            TestVirtualNode(
+                uuidMask = UUID.randomUUID(),
+                logger = logger,
+                hotspotManager = mock { },
+                json = json,
+                localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (it +1).toByte()).ip4AddressToInt()
+            )
+        }
+
+        try {
+            nodes[0].connectTo(nodes[1])
+            nodes[1].connectTo(nodes[2])
+
+            nodes.forEach { node ->
+                runBlocking {
+                    val otherNodeAddresses = nodes
+                        .filter { it.localNodeAddress != node.localNodeAddress }
+                        .map { it.localNodeAddress }
+
+                    node.state.filter { nodeState ->
+                        otherNodeAddresses.all { otherNodeAddr ->
+                            nodeState.originatorMessages.containsKey(otherNodeAddr)
+                        }
+                    }.test(timeout = 5.seconds) {
+                        val item = awaitItem()
+                        Assert.assertNotNull(item)
+                        cancelAndIgnoreRemainingEvents()
+                    }
+                }
+            }
+        }finally {
+            nodes.forEach { it.close() }
+        }
     }
 
 

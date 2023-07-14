@@ -63,7 +63,12 @@ class AndroidVirtualNode(
      * established call addNewDatagramNeighborConnection to setup the neighbor connection.
      */
     private val newWifiConnectionListener = MeshrabiyaWifiManagerAndroid.OnNewWifiConnectionListener {
-        addNewDatagramNeighborConnection(it.neighborInetAddress, it.neighborPort, it.socket)
+        addNewNeighborConnection(
+            address = it.neighborInetAddress,
+            port = it.neighborPort,
+            neighborNodeVirtualAddr =  it.neighborVirtualAddress,
+            socket = it.socket,
+        )
     }
 
     override val hotspotManager: MeshrabiyaWifiManagerAndroid = MeshrabiyaWifiManagerAndroid(

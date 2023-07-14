@@ -156,7 +156,9 @@ class VirtualNodeDatagramSocket(
                 }
             }else {
                 router.route(
-                    packet = rxVirtualPacket
+                    packet = rxVirtualPacket,
+                    datagramPacket = rxPacket,
+                    virtualNodeDatagramSocket = this,
                 )
             }
         }

@@ -52,6 +52,9 @@ class NeighborNodeManager(
 
     private val nodeState = MutableStateFlow(NeighborNodeState(remoteAddress = remoteAddress, 0, 0))
 
+    val pingTime: Short
+        get() = nodeState.value.pingTime.toShort()
+
     fun addConnection(
         iSocket: ISocket
     ) {

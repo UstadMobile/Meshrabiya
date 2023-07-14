@@ -17,19 +17,31 @@ class MmcpOriginatorMessage(
     messageId: Int,
     val pingTimeSum: Short,
     val connectConfig: WifiConnectConfig?,
+    val sentTime: Long = System.currentTimeMillis(),
 ): MmcpMessage(WHAT_ORIGINATOR, messageId) {
     override fun toBytes(): ByteArray {
         val connectConfigSize = connectConfig?.sizeInBytes ?: 0
-        //size will be : ping time sum (2 bytes) + connect config size (2 bytes) + connect config
-        val payloadSize = 2 + 2 + connectConfigSize
+        //size will be : ping time sum (2 bytes) + sentTime (8 bytes) + connect config size (2 bytes) + connect config
+        val payloadSize = 2 + 8 + 2 + connectConfigSize
         val payload = ByteArray(payloadSize)
         ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN)
             .putShort(pingTimeSum)
+            .putLong(sentTime)
             .putShort(connectConfigSize.toShort())
         connectConfig?.toBytes(payload, 4)
 
         return headerAndPayloadToBytes(header, payload)
     }
+
+    fun copyWithPingTimeIncrement(pingTimeIncrement: Short) : MmcpOriginatorMessage{
+        return MmcpOriginatorMessage(
+            messageId = this.messageId,
+            pingTimeSum = (this.pingTimeSum + pingTimeIncrement).toShort(),
+            connectConfig = connectConfig,
+            sentTime = sentTime,
+        )
+    }
+
 
     companion object {
 
@@ -64,9 +76,10 @@ class MmcpOriginatorMessage(
             val header = MmcpHeader.fromBytes(byteArray, offset)
 
             val byteBuf = ByteBuffer
-                .wrap(byteArray, offset + MMCP_HEADER_LEN, len - offset - MMCP_HEADER_LEN)
+                .wrap(byteArray, offset + MMCP_HEADER_LEN, byteArray.size - (offset + MMCP_HEADER_LEN))
                 .order(ByteOrder.BIG_ENDIAN)
             val pingTimeSum = byteBuf.short
+            val sentTime = byteBuf.long
             val connectConfigSize = byteBuf.short
             val connectConfig = if(connectConfigSize > 0) {
                 WifiConnectConfig.fromBytes(byteArray, offset + MMCP_HEADER_LEN + 4)
@@ -74,7 +87,7 @@ class MmcpOriginatorMessage(
                 null
             }
 
-            return MmcpOriginatorMessage(header.messageId, pingTimeSum, connectConfig)
+            return MmcpOriginatorMessage(header.messageId, pingTimeSum, connectConfig, sentTime)
         }
 
     }

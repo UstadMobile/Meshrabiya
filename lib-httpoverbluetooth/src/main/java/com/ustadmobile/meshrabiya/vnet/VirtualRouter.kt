@@ -1,5 +1,7 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import java.net.DatagramPacket
+
 /**
  * Represents the netwrok
  */
@@ -12,6 +14,8 @@ interface VirtualRouter {
      */
     fun route(
         packet: VirtualPacket,
+        datagramPacket: DatagramPacket? = null,
+        virtualNodeDatagramSocket: VirtualNodeDatagramSocket? = null,
     )
 
     fun nextMmcpMessageId(): Int
@@ -34,10 +38,7 @@ interface VirtualRouter {
 
     companion object {
 
-        /**
-         * Broadcast address - 255.255.255.255 (-1)
-         */
-        const val ADDR_BROADCAST = (255 shl 24).or(255 shl 16).or(255 shl 8).or(255)
+
 
     }
 

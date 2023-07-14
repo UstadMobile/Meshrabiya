@@ -8,10 +8,11 @@ import kotlinx.coroutines.withTimeout
 import java.net.InetAddress
 
 fun VirtualNode.connectTo(other: VirtualNode, timeout: Long = 5000) {
-    addNewDatagramNeighborConnection(
-        InetAddress.getLoopbackAddress(),
-        other.localDatagramPort,
-        datagramSocket,
+    addNewNeighborConnection(
+        address = InetAddress.getLoopbackAddress(),
+        port = other.localDatagramPort,
+        neighborNodeVirtualAddr = other.localNodeAddress,
+        socket = this.datagramSocket
     )
 
     //wait for connections to be ready

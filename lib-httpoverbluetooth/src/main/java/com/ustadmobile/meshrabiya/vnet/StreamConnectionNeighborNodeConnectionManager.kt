@@ -61,6 +61,9 @@ class StreamConnectionNeighborNodeConnectionManager(
 
     override val state: Flow<NeighborNodeConnectionState> = _connectionState.asStateFlow()
 
+    override val pingTime: Short
+        get() = _connectionState.value.pingTime.toShort()
+
     private val executorFuture: Future<*>
 
     private val pingFuture: ScheduledFuture<*>

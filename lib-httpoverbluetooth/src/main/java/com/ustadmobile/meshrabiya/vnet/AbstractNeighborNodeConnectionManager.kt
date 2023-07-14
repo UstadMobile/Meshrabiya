@@ -28,6 +28,8 @@ abstract class AbstractNeighborNodeConnectionManager(
 
     abstract val state: Flow<NeighborNodeConnectionState>
 
+    abstract val pingTime: Short
+
     abstract fun send(packet: VirtualPacket)
 
 }
