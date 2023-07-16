@@ -16,3 +16,10 @@ fun InetAddress.requireAsIpv6() : Inet6Address {
 }
 
 fun unspecifiedIpv6Address() = Inet6Address.getByName("::").requireAsIpv6()
+
+fun InetAddress.prefixMatches(
+    networkPrefixLength: Int,
+    other: InetAddress
+) : Boolean {
+    return address.prefixMatches(networkPrefixLength, other.address)
+}

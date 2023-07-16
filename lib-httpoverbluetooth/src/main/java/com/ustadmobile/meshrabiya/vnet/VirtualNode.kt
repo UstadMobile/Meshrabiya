@@ -1,8 +1,10 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
+import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.appendOrReplace
+import com.ustadmobile.meshrabiya.ext.prefixMatches
 import com.ustadmobile.meshrabiya.ext.readRemoteAddress
 import com.ustadmobile.meshrabiya.ext.writeAddress
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
@@ -12,7 +14,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpMessageAndPacketHeader
 import com.ustadmobile.meshrabiya.mmcp.MmcpOriginatorMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
-import com.ustadmobile.meshrabiya.portforward.ListenAddressAndPort
+import com.ustadmobile.meshrabiya.portforward.ForwardBindPoint
 import com.ustadmobile.meshrabiya.portforward.UdpForwardRule
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
@@ -77,10 +79,17 @@ abstract class VirtualNode(
     val port: Int,
     val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
     val localNodeAddress: Int = randomApipaAddr(),
-    val autoForwardInbound: Boolean = true,
+    val networkPrefixLength: Int = 16,
     val json: Json,
     val config: NodeConfig,
 ): NeighborNodeManager.NeighborNodeStateChangedListener, VirtualRouter, Closeable {
+
+    /**
+     * The local node address as a byte array
+     */
+    val localNodeAddressByteArray = localNodeAddress.addressToByteArray()
+
+    val localNodeInetAddress: InetAddress = InetAddress.getByAddress(localNodeAddressByteArray)
 
     //This executor is used for direct I/O activities
     protected val connectionExecutor = Executors.newCachedThreadPool()
@@ -112,7 +121,7 @@ abstract class VirtualNode(
 
     private val neighborConnectionManagerLock = ReentrantLock()
 
-    private val forwardingRules: MutableMap<ListenAddressAndPort, UdpForwardRule> = ConcurrentHashMap()
+    private val forwardingRules: MutableMap<ForwardBindPoint, UdpForwardRule> = ConcurrentHashMap()
 
     /**
      * @param originatorMessage the Originator message itself
@@ -125,6 +134,10 @@ abstract class VirtualNode(
         val lastHopAddr: Int,
         val hopCount: Byte,
     )
+
+    enum class Zone {
+        VNET, REAL
+    }
 
     /**
      * The currently known latest originator messages that can be used to route traffic.
@@ -242,23 +255,70 @@ abstract class VirtualNode(
      *
      */
     fun forward(
-        listenAddress: InetAddress,
-        listenPort: Int,
+        bindAddress: InetAddress,
+        bindPort: Int,
         destAddress: InetAddress,
         destPort: Int,
     ) : Int {
-        val localSocket = iDatagramSocketFactory.createSocket(listenAddress, listenPort)
-        val forwardRule = UdpForwardRule(
-            localSocket = localSocket,
+        val listenSocket = if(
+            bindAddress.prefixMatches(networkPrefixLength, localNodeInetAddress)
+        ) {
+            openSocket(bindPort)
+        }else {
+            DatagramSocket(bindPort, bindAddress).asIDatagramSocket()
+        }
+
+        val forwardRule = createForwardRule(listenSocket, destAddress, destPort)
+        val boundPort = listenSocket.localPort
+        forwardingRules[ForwardBindPoint(bindAddress, null, boundPort)] = forwardRule
+
+        return boundPort
+    }
+
+    fun forward(
+        bindZone: Zone,
+        bindPort: Int,
+        destAddress: InetAddress,
+        destPort: Int
+    ): Int {
+        val listenSocket = if(bindZone == Zone.VNET) {
+            openSocket(bindPort)
+        }else {
+            DatagramSocket(bindPort).asIDatagramSocket()
+        }
+        val forwardRule = createForwardRule(listenSocket, destAddress, destPort)
+        val boundPort = listenSocket.localPort
+        forwardingRules[ForwardBindPoint(null, bindZone, boundPort)] = forwardRule
+        return boundPort
+    }
+
+    fun stopForward(
+        bindZone: Zone,
+        bindPort: Int
+    ) {
+
+    }
+
+    fun stopForward(
+        bindAddr: InetAddress,
+        bindPort: Int,
+    ) {
+
+    }
+
+    private fun createForwardRule(
+        listenSocket: IDatagramSocket,
+        destAddress: InetAddress,
+        destPort: Int,
+    ) : UdpForwardRule {
+        return UdpForwardRule(
+            localSocket = listenSocket,
             ioExecutor = this.connectionExecutor,
             toAddress = destAddress,
             toPort = destPort,
             logger = logger,
             returnPathSocketFactory = iDatagramSocketFactory,
         )
-        forwardingRules[ListenAddressAndPort(listenAddress, listenPort)] = forwardRule
-
-        return localSocket.localPort
     }
 
 
@@ -289,7 +349,6 @@ abstract class VirtualNode(
             logger(Log.DEBUG, "$logPrefix received MMCP message (${mmcpMessage::class.simpleName}) " +
                     "from ${from.addressToDotNotation()}", null)
 
-            val isBroadcast = packet.isBroadcast()
             val isToThisNode = packet.header.toAddr == localNodeAddress
 
             var shouldRoute = true

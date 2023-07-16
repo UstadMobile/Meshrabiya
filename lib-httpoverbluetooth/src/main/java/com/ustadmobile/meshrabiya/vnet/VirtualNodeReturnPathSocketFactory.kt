@@ -1,8 +1,8 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import com.ustadmobile.meshrabiya.ext.prefixMatches
 import com.ustadmobile.meshrabiya.portforward.ReturnPathSocketFactory
 import java.net.DatagramSocket
-import java.net.Inet4Address
 import java.net.InetAddress
 
 /**
@@ -13,17 +13,12 @@ class VirtualNodeReturnPathSocketFactory(
     private val node: VirtualNode,
 ): ReturnPathSocketFactory {
 
-    //Should use subnet/mask, but for now, this will work
-    private fun isVirtualAddr(address: InetAddress): Boolean {
-        return address is Inet4Address && address.address[0] == 169.toByte() &&
-                address.address[1] == 254.toByte()
-     }
-
-
     override fun createSocket(destAddress: InetAddress, port: Int): IDatagramSocket {
-        return if(isVirtualAddr(destAddress)) {
+        return if(
+            destAddress.address.prefixMatches(node.networkPrefixLength, node.localNodeAddressByteArray)
+        ) {
             node.openSocket(port)
-        }else {
+        }else{
             DatagramSocket().asIDatagramSocket()
         }
     }
