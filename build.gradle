@@ -24,10 +24,16 @@ ext {
     version_kodein_di = "7.20.1"
     version_zxing_embedded = "4.3.0"
     version_datastore = "1.0.0"
+    version_bouncycastle = "1.75"
+    version_kwik = "0.1a"
+    version_agent15 = "0.1a"
+    version_android_desugaring = "2.0.3"
 
     version_android_junit_runner = "1.5.2"
     version_androidx_test_rules = "1.5.0"
     version_androidx_orchestrator = "1.4.2"
 
     version_kotlinx_serialization = "1.5.0"
+    version_android_junit_runner = "1.5.2"
+    version_androidx_test_rules = "1.5.0"
 }

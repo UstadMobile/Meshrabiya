@@ -28,28 +28,28 @@ import java.util.concurrent.Future
  *     senders origin address and port.
  *
  *
- * @param localSocket a Socket that is listening on a particular interface (e.g. local interface)
+ * @param boundSocket a Socket that is listening on a particular interface (e.g. local interface)
  *                    where any packets received should be forwarded to the given toAddress/toPort
  * @param ioExecutor ExecutorService that will be used to send/receive packets
- * @param toAddress the address that packets will be forwarded to
- * @param toPort the port that packets will be forwarded to
+ * @param destAddress the address that packets will be forwarded to
+ * @param destPort the port that packets will be forwarded to
  * @param returnPathSocketFactory a factory that is used to generate the return path required for
  *                                step a) above.
  */
 class UdpForwardRule(
-    private val localSocket: IDatagramSocket,
+    private val boundSocket: IDatagramSocket,
     private val ioExecutor: ExecutorService,
-    private val toAddress: InetAddress,
-    private val toPort: Int,
+    private val destAddress: InetAddress,
+    private val destPort: Int,
     private val returnPathSocketFactory: ReturnPathSocketFactory = ReturnPathSocketFactory { addr, port ->
         DatagramSocket(port).asIDatagramSocket()
     },
     private val logger: MNetLogger,
 ): Runnable, Closeable {
 
-    val localPort: Int = localSocket.localPort
+    val localPort: Int = boundSocket.localPort
 
-    private val logPrefix: String = "[UdpForwardRule : ${localSocket.localPort} -> ${toAddress.hostAddress}:$toPort]"
+    private val logPrefix: String = "[UdpForwardRule : ${boundSocket.localPort} -> ${destAddress.hostAddress}:$destPort]"
 
     private inner class ReturnPathDatagramSocket(
         val returnPathSocket: IDatagramSocket,
@@ -67,7 +67,7 @@ class UdpForwardRule(
                 returnPathSocket.receive(packet)
                 packet.address = returnToAddress
                 packet.port = returnToPort
-                localSocket.send(packet)
+                boundSocket.send(packet)
             }
         }
 
@@ -87,18 +87,18 @@ class UdpForwardRule(
             logger(Log.DEBUG, "$logPrefix listening", null)
             while(!Thread.interrupted()) {
                 val packet = DatagramPacket(buffer, 0, buffer.size)
-                localSocket.receive(packet)
+                boundSocket.receive(packet)
 
                 val returnSocket = returnSockets.getOrPut(packet.socketAddress){
                     ReturnPathDatagramSocket(
-                        returnPathSocket = returnPathSocketFactory.createSocket(toAddress, 0),
+                        returnPathSocket = returnPathSocketFactory.createSocket(destAddress, 0),
                         returnToAddress = packet.address,
                         returnToPort = packet.port
                     )
                 }
 
-                packet.address = toAddress
-                packet.port = toPort
+                packet.address = destAddress
+                packet.port = destPort
 
                 returnSocket.returnPathSocket.send(packet)
             }
@@ -119,7 +119,7 @@ class UdpForwardRule(
 
         future.cancel(true)
         if(closeLocalSocket)
-            localSocket.close()
+            boundSocket.close()
     }
 
     override fun close() {

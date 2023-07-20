@@ -312,10 +312,10 @@ abstract class VirtualNode(
         destPort: Int,
     ) : UdpForwardRule {
         return UdpForwardRule(
-            localSocket = listenSocket,
+            boundSocket = listenSocket,
             ioExecutor = this.connectionExecutor,
-            toAddress = destAddress,
-            toPort = destPort,
+            destAddress = destAddress,
+            destPort = destPort,
             logger = logger,
             returnPathSocketFactory = iDatagramSocketFactory,
         )

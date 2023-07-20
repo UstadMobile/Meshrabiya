@@ -10,7 +10,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        mavenLocal()
         maven { url 'https://jitpack.io' }
+        maven { url "https://devserver3.ustadmobile.com/maven2/" }
     }
 }
 rootProject.name = "HttpOverBluetooth"

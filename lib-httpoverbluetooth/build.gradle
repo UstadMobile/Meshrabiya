@@ -23,6 +23,12 @@ android {
         }
     }
     compileOptions {
+        //Experiencing this bug:
+        // https://issuetracker.google.com/issues/243636261
+        // java.net.ConnectException: Handshake error: java.lang.ClassCastException: j$.util.stream.SliceOps$1 cannot be cast to java.util.stream.Stream
+        //As per https://developer.android.com/studio/write/java8-support#library-desugaring
+        coreLibraryDesugaringEnabled true
+
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -32,7 +38,6 @@ android {
 }
 
 dependencies {
-
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation "com.athaydes.rawhttp:rawhttp-core:2.5.2"
@@ -40,9 +45,25 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "androidx.datastore:datastore-preferences:$version_datastore"
 
+
+    implementation "org.bouncycastle:bcprov-jdk18on:$version_bouncycastle"
+    implementation "org.bouncycastle:bcpkix-jdk18on:$version_bouncycastle"
+
+    //BEGIN: Quic related things
+    implementation "com.github.UstadMobile:kwik:$version_kwik"
+    implementation "com.github.UstadMobile:agent15:$version_agent15"
+    //END: Quic related things
+
+
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:$version_android_desugaring"
+
     testImplementation 'junit:junit:4.13.2'
     testImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
     testImplementation "app.cash.turbine:turbine:$version_turbine"
+
+    //As per: https://developer.android.com/topic/libraries/testing-support-library/packages.html#gradle-dependencies
+    androidTestImplementation "androidx.test:runner:$version_android_junit_runner"
+    androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
+
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
