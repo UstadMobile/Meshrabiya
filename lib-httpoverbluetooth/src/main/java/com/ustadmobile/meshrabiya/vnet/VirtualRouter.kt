@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
 import java.net.DatagramPacket
 
 /**
@@ -30,8 +31,8 @@ interface VirtualRouter {
     /**
      * Allocate a port on the virtual router
      */
-    fun allocatePortOrThrow(
-        protocol: Protocol,
+    fun allocateUdpPortOrThrow(
+        virtualDatagramSocketImpl: VirtualDatagramSocketImpl?,
         portNum: Int
     ): Int
 

@@ -1,10 +1,15 @@
-package com.ustadmobile.meshrabiya.vnet
+package com.ustadmobile.meshrabiya.datagram
 
-import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
 import com.ustadmobile.meshrabiya.test.contentRangeEqual
+import com.ustadmobile.meshrabiya.vnet.VirtualDatagramSocket
+import com.ustadmobile.meshrabiya.vnet.VirtualPacket
+import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
+import com.ustadmobile.meshrabiya.vnet.VirtualRouter
+import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
 import org.junit.Assert
 import org.junit.Test
 import org.mockito.kotlin.any
@@ -17,7 +22,7 @@ import java.net.DatagramPacket
 import java.net.InetAddress
 import kotlin.random.Random
 
-class VirtualDatagramSocketTest {
+class VirtualDatagramSocketImplTest {
 
     @Test(timeout = 5000)
     fun givenOnIncomingPacketCalled_whenReceiveCalled_thenContentAndAddressShouldMatch(){
@@ -31,8 +36,7 @@ class VirtualDatagramSocketTest {
         val fromVirtualAddress = 43
         val fromVirtualPort = Random.nextInt(0, UShort.MAX_VALUE.toInt())
 
-        val virtualSocket = VirtualDatagramSocket(
-            port = 0,
+        val virtualSocket = VirtualDatagramSocketImpl(
             localVirtualAddress = localVirtualAddress,
             router = mockRouter,
             logger = MNetLoggerStdout(),
@@ -43,7 +47,7 @@ class VirtualDatagramSocketTest {
         val incomingPacket = VirtualPacket.fromHeaderAndPayloadData(
             header = VirtualPacketHeader(
                 toAddr = localVirtualAddress,
-                toPort = virtualSocket.localPort,
+                toPort = virtualSocket.boundPort,
                 fromAddr = fromVirtualAddress,
                 fromPort = fromVirtualPort,
                 lastHopAddr = fromVirtualAddress,
@@ -69,6 +73,7 @@ class VirtualDatagramSocketTest {
             datagramPacket.data, datagramPacket.offset, datagramPacket.length)
     }
 
+
     @Test(timeout = 5000)
     fun givenVirtualSocket_whenOutgoingDatagramSent_thenShouldCallRouteWithValidVirtualPacket() {
         val mockRouter = mock<VirtualRouter> {
@@ -81,8 +86,7 @@ class VirtualDatagramSocketTest {
         val toVirtualAddress = 43
         val toPort = Random.nextInt(0, Short.MAX_VALUE.toInt())
 
-        val virtualSocket = VirtualDatagramSocket(
-            port = 0,
+        val virtualSocket = VirtualDatagramSocketImpl(
             localVirtualAddress = localVirtualAddress,
             router = mockRouter,
             logger = MNetLoggerStdout()
@@ -99,7 +103,7 @@ class VirtualDatagramSocketTest {
             it.header.toAddr == toVirtualAddress &&
                     it.header.toPort == toPort &&
                     it.header.fromAddr == localVirtualAddress &&
-                    it.header.fromPort == virtualSocket.localPort &&
+                    it.header.fromPort == virtualSocket.boundPort &&
                     datagramPacket.data.contentRangeEqual(datagramPacket.offset, it.data,
                         it.payloadOffset, datagramPacket.length)
         }, anyOrNull(), anyOrNull())
@@ -117,26 +121,27 @@ class VirtualDatagramSocketTest {
         val addr2 = 43
         val logger = MNetLoggerStdout()
 
-        val socket1 = VirtualDatagramSocket(
-            port = 0,
+        val socket1 = VirtualDatagramSocketImpl(
             localVirtualAddress = addr1,
             router = mockRouter,
             logger = logger,
         )
 
-        val socket2 = VirtualDatagramSocket(
-            port = 0,
+        socket1.bind(0, InetAddress.getByAddress(addr1.addressToByteArray()))
+
+        val socket2 = VirtualDatagramSocketImpl(
             localVirtualAddress = addr2,
             router = mockRouter,
             logger = logger,
         )
+        socket2.bind(0, InetAddress.getByAddress(addr2.addressToByteArray()))
 
         mockRouter.stub {
             on { route(any(), anyOrNull(), anyOrNull()) }.thenAnswer {
                 val packet = it.arguments.first() as VirtualPacket
-                if(packet.header.toPort == socket1.localPort && packet.header.toAddr == addr1)
+                if(packet.header.toPort == socket1.boundPort && packet.header.toAddr == addr1)
                     socket1.onIncomingPacket(packet)
-                else if(packet.header.toPort == socket2.localPort && packet.header.toAddr == addr2)
+                else if(packet.header.toPort == socket2.boundPort && packet.header.toAddr == addr2)
                     socket2.onIncomingPacket(packet)
 
                 Unit
@@ -146,7 +151,7 @@ class VirtualDatagramSocketTest {
         val bufferOut = Random.nextBytes(1000)
         val datagramOut = DatagramPacket(bufferOut, 0, bufferOut.size)
         datagramOut.address = InetAddress.getByAddress(addr2.addressToByteArray())
-        datagramOut.port = socket2.localPort
+        datagramOut.port = socket2.boundPort
 
         socket1.send(datagramOut)
 
@@ -155,7 +160,7 @@ class VirtualDatagramSocketTest {
         socket2.receive(datagramIn)
 
         Assert.assertEquals(addr1, datagramIn.address.requireAddressAsInt())
-        Assert.assertEquals(socket1.localPort, datagramIn.port)
+        Assert.assertEquals(socket1.boundPort, datagramIn.port)
         Assert.assertEquals(datagramOut.length, datagramIn.length)
         assertByteArrayEquals(
             expected = datagramOut.data,
@@ -165,7 +170,5 @@ class VirtualDatagramSocketTest {
             length = datagramOut.length
         )
     }
-
-
 
 }

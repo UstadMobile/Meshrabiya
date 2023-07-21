@@ -24,7 +24,7 @@ class VirtualDatagramSocket(
     private val logger: MNetLogger,
 ) : IDatagramSocket {
 
-    private val _localPort = router.allocatePortOrThrow(Protocol.UDP, port)
+    private val _localPort = router.allocateUdpPortOrThrow(null, port)
 
     private val closed = AtomicBoolean(false)
 

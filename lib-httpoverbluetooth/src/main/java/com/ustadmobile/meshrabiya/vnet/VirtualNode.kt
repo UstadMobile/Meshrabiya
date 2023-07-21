@@ -22,6 +22,7 @@ import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
+import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -235,9 +236,18 @@ abstract class VirtualNode(
 
     override fun nextMmcpMessageId() = mmcpMessageIdAtomic.incrementAndGet()
 
-    override fun allocatePortOrThrow(protocol: Protocol, portNum: Int): Int {
-        if(portNum > 0 && !activeSockets.containsKey(portNum))
+
+    override fun allocateUdpPortOrThrow(
+        virtualDatagramSocketImpl: VirtualDatagramSocketImpl?,
+        portNum: Int
+    ): Int {
+        if(portNum > 0) {
+            if(activeSockets.containsKey(portNum))
+                throw IllegalStateException("VirtualNode: port $portNum already allocated!")
+
+            //requested port is not allocated, everything OK
             return portNum
+        }
 
         var attemptCount = 0
         do {
