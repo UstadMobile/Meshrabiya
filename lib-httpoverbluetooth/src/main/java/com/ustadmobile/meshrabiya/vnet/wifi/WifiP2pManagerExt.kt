@@ -7,7 +7,7 @@ import android.net.wifi.p2p.WifiP2pManager.Channel
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest
 import androidx.annotation.RequiresApi
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import kotlinx.coroutines.CompletableDeferred
 
 

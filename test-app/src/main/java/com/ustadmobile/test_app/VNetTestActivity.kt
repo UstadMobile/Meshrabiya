@@ -67,6 +67,7 @@ import androidx.navigation.compose.rememberNavController
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.trimIfExceeds
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.test_app.appstate.AppUiState
@@ -120,7 +121,7 @@ class VNetTestActivity : ComponentActivity(), DIAware {
     }
 
 
-    private val vNetLogger = com.ustadmobile.meshrabiya.MNetLogger { priority, message, exception ->
+    private val vNetLogger = MNetLogger { priority, message, exception ->
         when (priority) {
             Log.DEBUG -> Log.d(LOG_TAG, message, exception)
             Log.INFO -> Log.i(LOG_TAG, message, exception)

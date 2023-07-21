@@ -7,6 +7,7 @@ import android.content.Context
 import android.util.Log
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.UUID_BUSY
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rawhttp.core.RawHttp
@@ -27,11 +28,11 @@ import kotlin.Exception
 class HttpOverBluetoothClient(
     private val appContext: Context,
     private val rawHttp: RawHttp,
-    private val onLog: (priority: Int, message: String, exception: Exception?) -> Unit = { _, _, _ -> },
+    private val logger: MNetLogger,
     private val clientNodeAddr: Int,
     private val uuidAllocationClient: UuidAllocationClient = UuidAllocationClient(
         appContext = appContext,
-        onLog = onLog,
+        onLog = logger,
         clientNodeAddr = clientNodeAddr
     ),
 ) {

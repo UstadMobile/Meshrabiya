@@ -15,6 +15,8 @@ import android.content.IntentFilter
 import android.util.Log
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.UUID_BUSY
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.toBytes
 import java.io.Closeable
@@ -37,7 +39,7 @@ class VirtualNodeGattServer(
     private val appContext: Context,
     allocationServiceUuid: UUID,
     private val allocationCharacteristicUuid: UUID,
-    private val vNetLogger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _ -> },
+    private val vNetLogger: MNetLogger = MNetLoggerStdout(),
     private val maxSimultaneousClients: Int = 4,
     private val onUuidAllocated: OnUuidAllocatedListener,
 ) : Closeable {

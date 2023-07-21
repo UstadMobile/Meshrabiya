@@ -1,8 +1,8 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
-import com.ustadmobile.meshrabiya.test.TestLogger
 import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
 import com.ustadmobile.meshrabiya.test.contentRangeEqual
 import org.junit.Assert
@@ -35,7 +35,7 @@ class VirtualDatagramSocketTest {
             port = 0,
             localVirtualAddress = localVirtualAddress,
             router = mockRouter,
-            logger = TestLogger(),
+            logger = MNetLoggerStdout(),
         )
 
         val payloadSize = 1000
@@ -85,7 +85,7 @@ class VirtualDatagramSocketTest {
             port = 0,
             localVirtualAddress = localVirtualAddress,
             router = mockRouter,
-            logger = TestLogger()
+            logger = MNetLoggerStdout()
         )
 
         val payloadSize = 1000
@@ -115,7 +115,7 @@ class VirtualDatagramSocketTest {
 
         val addr1 = 42
         val addr2 = 43
-        val logger = TestLogger()
+        val logger = MNetLoggerStdout()
 
         val socket1 = VirtualDatagramSocket(
             port = 0,

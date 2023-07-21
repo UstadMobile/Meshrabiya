@@ -6,7 +6,7 @@ import android.annotation.SuppressLint
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.util.Log
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 
 
 

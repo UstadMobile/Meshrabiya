@@ -7,7 +7,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.util.Log
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.util.matchesMask
 import kotlinx.coroutines.CompletableDeferred

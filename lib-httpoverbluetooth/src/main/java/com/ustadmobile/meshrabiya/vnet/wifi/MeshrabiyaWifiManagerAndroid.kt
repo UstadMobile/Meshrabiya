@@ -18,6 +18,7 @@ import com.ustadmobile.meshrabiya.ext.addOrLookupNetwork
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.bssidDataStore
 import com.ustadmobile.meshrabiya.ext.requireHostAddress
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.WifiRole
@@ -55,7 +56,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class MeshrabiyaWifiManagerAndroid(
     private val appContext: Context,
-    private val logger: com.ustadmobile.meshrabiya.MNetLogger,
+    private val logger: MNetLogger,
     private val localNodeAddr: Int,
     private val router: VirtualRouter,
     private val ioExecutor: ExecutorService,

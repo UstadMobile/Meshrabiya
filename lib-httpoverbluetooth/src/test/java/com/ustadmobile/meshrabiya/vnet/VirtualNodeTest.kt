@@ -1,7 +1,8 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import app.cash.turbine.test
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
@@ -73,15 +74,7 @@ class VirtualNodeTest {
         localNodeAddress = localNodeAddress,
     )
 
-    private val logger = MNetLogger { priority, message, exception ->
-        println(buildString {
-            append(message)
-            if(exception != null) {
-                append(" ")
-                append(exception.stackTraceToString())
-            }
-        })
-    }
+    private val logger = MNetLoggerStdout()
 
     private val json = Json {
         encodeDefaults = true

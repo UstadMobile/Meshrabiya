@@ -1,10 +1,12 @@
-package com.ustadmobile.meshrabiya
+package com.ustadmobile.meshrabiya.log
 
 import android.util.Log
 
-fun interface MNetLogger {
+abstract class MNetLogger {
 
-    operator fun invoke(priority: Int, message: String, exception: Exception?)
+    abstract operator fun invoke(priority: Int, message: String, exception: Exception? = null)
+
+    abstract operator fun invoke(priority: Int, message: () -> String, exception: Exception? = null)
 
     companion object {
 

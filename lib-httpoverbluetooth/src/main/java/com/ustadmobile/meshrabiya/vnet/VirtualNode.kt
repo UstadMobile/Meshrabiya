@@ -1,12 +1,14 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.appendOrReplace
 import com.ustadmobile.meshrabiya.ext.prefixMatches
 import com.ustadmobile.meshrabiya.ext.readRemoteAddress
 import com.ustadmobile.meshrabiya.ext.writeAddress
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
@@ -79,7 +81,7 @@ abstract class VirtualNode(
     //Note: allocationServiceUuid should be based on datagram port using a UUID "Mask" and the port
     val uuidMask: UUID,
     val port: Int,
-    val logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _, -> },
+    val logger: MNetLogger = MNetLoggerStdout(),
     val localNodeAddress: Int = randomApipaAddr(),
     val networkPrefixLength: Int = 16,
     val json: Json,
@@ -152,7 +154,7 @@ abstract class VirtualNode(
         router = this,
         localNodeVirtualAddress = localNodeAddress,
         onMmcpHelloReceivedListener = {
-            logger(Log.DEBUG, "$logPrefix onMmcpHelloReceived from ${it.address}", null)
+            logger(Log.DEBUG, { "$logPrefix onMmcpHelloReceived from ${it.address}" })
             addNewNeighborConnection(
                 address = it.address,
                 port = it.port,
@@ -166,7 +168,7 @@ abstract class VirtualNode(
     val allocationServiceUuid: UUID by lazy {
         uuidForMaskAndPort(uuidMask, datagramSocket.localPort).also {
             val matches = it.matchesMask(uuidMask)
-            logger(Log.DEBUG, "Allocation Service UUID: matches mask ($uuidMask) = $matches", null)
+            logger(Log.DEBUG,  {"Allocation Service UUID: matches mask ($uuidMask) = $matches" })
         }
     }
 
@@ -183,15 +185,19 @@ abstract class VirtualNode(
             sentTime = sentTime
         )
 
-        logger(Log.DEBUG, "$logPrefix sending originating message " +
-                "messageId=${originatingMessage.messageId} sentTime=$sentTime", null)
+        logger(
+            priority = Log.DEBUG,
+            message = { "$logPrefix sending originating message " +
+                "messageId=${originatingMessage.messageId} sentTime=$sentTime"
+            }
+        )
 
         val packet = originatingMessage.toVirtualPacket(
             toAddr = ADDR_BROADCAST,
             fromAddr = localNodeAddress,
         )
         val messageFromPacket = MmcpMessage.fromVirtualPacket(packet) as? MmcpOriginatorMessage
-        logger(Log.DEBUG, "$logPrefix from packet sent time = ${messageFromPacket?.sentTime}", null)
+        logger(Log.DEBUG, { "$logPrefix from packet sent time = ${messageFromPacket?.sentTime}"})
         if(messageFromPacket?.sentTime != sentTime) {
             logger(Log.ERROR, "WRONG WRONG WRONG", null)
         }
@@ -356,8 +362,12 @@ abstract class VirtualNode(
         try {
             val mmcpMessage = MmcpMessage.fromVirtualPacket(packet)
             val from = packet.header.fromAddr
-            logger(Log.DEBUG, "$logPrefix received MMCP message (${mmcpMessage::class.simpleName}) " +
-                    "from ${from.addressToDotNotation()}", null)
+            logger(Log.DEBUG,
+                message = {
+                    "$logPrefix received MMCP message (${mmcpMessage::class.simpleName}) " +
+                    "from ${from.addressToDotNotation()}"
+                }
+            )
 
             val isToThisNode = packet.header.toAddr == localNodeAddress
 
@@ -365,7 +375,11 @@ abstract class VirtualNode(
 
             when {
                 mmcpMessage is MmcpPing && isToThisNode -> {
-                    logger(Log.DEBUG, "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}", null)
+                    logger(Log.DEBUG,
+                        message = {
+                            "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}"
+                        }
+                    )
                     //send pong
                     val pongMessage = MmcpPong(
                         messageId = nextMmcpMessageId(),
@@ -377,12 +391,12 @@ abstract class VirtualNode(
                         fromAddr = localNodeAddress
                     )
 
-                    logger(Log.DEBUG, "$logPrefix Sending pong to ${from.addressToDotNotation()}", null)
+                    logger(Log.DEBUG, { "$logPrefix Sending pong to ${from.addressToDotNotation()}" })
                     route(replyPacket)
                 }
 
                 mmcpMessage is MmcpPong && isToThisNode -> {
-                    logger(Log.DEBUG, "$logPrefix Received pong(id=${mmcpMessage.messageId})}", null)
+                    logger(Log.DEBUG, { "$logPrefix Received pong(id=${mmcpMessage.messageId})}" })
                     pongListeners.forEach {
                         it.onPongReceived(from, mmcpMessage)
                     }
@@ -411,9 +425,13 @@ abstract class VirtualNode(
 
                 mmcpMessage is MmcpOriginatorMessage -> {
                     //Dont keep originator messages in our own table for this node
-                    logger(Log.DEBUG, "$logPrefix received originating message from " +
-                            "${packet.header.fromAddr.addressToDotNotation()} via ${packet.header.lastHopAddr.addressToDotNotation()}",
-                        null)
+                    logger(Log.DEBUG,
+                        message= {
+                            "$logPrefix received originating message from " +
+                                    "${packet.header.fromAddr.addressToDotNotation()} via " +
+                                    packet.header.lastHopAddr.addressToDotNotation()
+                        }
+                    )
                     if(packet.header.fromAddr == localNodeAddress)
                         return true
 
@@ -429,13 +447,16 @@ abstract class VirtualNode(
                     val isMoreRecentOrBetter = mmcpMessage.sentTime > currentlyKnownSentTime
                             || packet.header.hopCount < currentlyKnownHopCount
 
-                    logger(Log.DEBUG, "$logPrefix received originating message from " +
-                            "${packet.header.fromAddr.addressToDotNotation()} via ${packet.header.lastHopAddr.addressToDotNotation()}" +
-                            " messageId=${mmcpMessage.messageId} " +
-                            " hopCount=${packet.header.hopCount} sentTime=${mmcpMessage.sentTime} " +
-                            " Currently known: senttime=$currentlyKnownSentTime  hop count = $currentlyKnownHopCount " +
-                            "isMoreRecentOrBetter=$isMoreRecentOrBetter ",
-                        null)
+                    logger(Log.VERBOSE,
+                        message = {
+                            "$logPrefix received originating message from " +
+                                    "${packet.header.fromAddr.addressToDotNotation()} via ${packet.header.lastHopAddr.addressToDotNotation()}" +
+                                    " messageId=${mmcpMessage.messageId} " +
+                                    " hopCount=${packet.header.hopCount} sentTime=${mmcpMessage.sentTime} " +
+                                    " Currently known: senttime=$currentlyKnownSentTime  hop count = $currentlyKnownHopCount " +
+                                    "isMoreRecentOrBetter=$isMoreRecentOrBetter "
+                        }
+                    )
 
                     if(currentOriginatorMessage == null || isMoreRecentOrBetter) {
                         originatorMessages[packet.header.fromAddr] = LastOriginatorMessage(
@@ -444,8 +465,12 @@ abstract class VirtualNode(
                             lastHopAddr = packet.header.lastHopAddr,
                             hopCount = packet.header.hopCount
                         )
-                        logger(Log.DEBUG, "$logPrefix update originator messages: " +
-                                "currently known nodes = ${originatorMessages.keys.joinToString { it.addressToDotNotation() }}", null)
+                        logger(Log.DEBUG,
+                            message = {
+                                "$logPrefix update originator messages: " +
+                                        "currently known nodes = ${originatorMessages.keys.joinToString { it.addressToDotNotation() }}"
+                            }
+                        )
 
                         _state.update { prev ->
                             prev.copy(
@@ -525,10 +550,14 @@ abstract class VirtualNode(
                         .filter {
                             it.remoteAddress != fromLastHop && it.remoteAddress != packet.header.fromAddr
                         }.forEach {
-                            logger(Log.DEBUG, "$logPrefix broadcast packet " +
-                                    "from=${packet.header.fromAddr.addressToDotNotation()} " +
-                                    "lasthop=${fromLastHop.addressToDotNotation()} " +
-                                    "send to ${it.remoteAddress.addressToDotNotation()}", null)
+                            logger(Log.DEBUG,
+                                message = {
+                                    "$logPrefix broadcast packet " +
+                                            "from=${packet.header.fromAddr.addressToDotNotation()} " +
+                                            "lasthop=${fromLastHop.addressToDotNotation()} " +
+                                            "send to ${it.remoteAddress.addressToDotNotation()}"
+                                }
+                            )
                             it.send(packet)
                         }
                 }else {

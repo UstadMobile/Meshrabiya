@@ -4,7 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import com.ustadmobile.test_app.VNetTestActivity.Companion.UUID_MASK
@@ -47,7 +47,7 @@ class App: Application(), DIAware {
         }
 
         bind<MNetLogger>() with singleton {
-            MNetLoggerImpl()
+            MNetLoggerAndroid()
         }
         bind<Json>() with singleton {
             Json {

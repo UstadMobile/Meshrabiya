@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
         HttpOverBluetoothClient(
             appContext = applicationContext,
             rawHttp = rawHttp,
-            onLog = { priority, message, exception ->
+            logger = { priority, message, exception ->
                 onLogLine(priority,"Client: $message", exception)
             }
          )

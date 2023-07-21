@@ -1,7 +1,7 @@
 package com.ustadmobile.meshrabiya.portforward
 
 import android.util.Log
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.IDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
 import com.ustadmobile.meshrabiya.vnet.asIDatagramSocket

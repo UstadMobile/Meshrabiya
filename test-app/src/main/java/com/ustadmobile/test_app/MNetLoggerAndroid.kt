@@ -2,20 +2,22 @@ package com.ustadmobile.test_app
 
 import android.util.Log
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.ext.trimIfExceeds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class MNetLoggerImpl: MNetLogger {
+class MNetLoggerAndroid(
+    private val minLogLevel: Int = Log.VERBOSE
+): MNetLogger() {
 
     val _recentLogs = MutableStateFlow(emptyList<LogLine>())
 
     val recentLogs: Flow<List<LogLine>> = _recentLogs.asStateFlow()
 
-    override fun invoke(priority: Int, message: String, exception: Exception?) {
+    private fun doLog(priority: Int, message: String, exception: Exception?) {
         when (priority) {
             Log.DEBUG -> Log.d(HttpOverBluetoothConstants.LOG_TAG, message, exception)
             Log.INFO -> Log.i(HttpOverBluetoothConstants.LOG_TAG, message, exception)
@@ -39,5 +41,15 @@ class MNetLoggerImpl: MNetLogger {
                 addAll(prev.trimIfExceeds(100))
             }
         }
+    }
+
+    override fun invoke(priority: Int, message: () -> String, exception: Exception?) {
+        if(priority >= minLogLevel)
+            doLog(priority, message(), exception)
+    }
+
+    override fun invoke(priority: Int, message: String, exception: Exception?) {
+        if(priority >= minLogLevel)
+            doLog(priority, message, exception)
     }
 }

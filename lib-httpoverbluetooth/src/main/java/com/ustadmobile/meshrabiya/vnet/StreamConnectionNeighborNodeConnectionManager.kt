@@ -3,6 +3,7 @@ package com.ustadmobile.meshrabiya.vnet
 import android.util.Log
 import com.ustadmobile.meshrabiya.ext.readVirtualPacket
 import com.ustadmobile.meshrabiya.ext.writeVirtualPacket
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,7 @@ class StreamConnectionNeighborNodeConnectionManager(
     localNodeAddr: Int,
     remoteNodeAddr: Int,
     private val socket: ISocket,
-    private val logger: com.ustadmobile.meshrabiya.MNetLogger,
+    private val logger: MNetLogger,
     executor: ExecutorService,
     scheduledExecutor: ScheduledExecutorService,
     stateChangeListener: OnNeighborNodeConnectionStateChangedListener = OnNeighborNodeConnectionStateChangedListener { },

@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import java.io.Closeable
@@ -32,7 +33,7 @@ class NeighborNodeManager(
     private val router: VirtualRouter,
     private val connectionExecutor: ExecutorService,
     private val scheduledExecutor: ScheduledExecutorService,
-    private val logger: com.ustadmobile.meshrabiya.MNetLogger,
+    private val logger: MNetLogger,
     private val listener: NeighborNodeStateChangedListener,
 ): AbstractNeighborNodeConnectionManager.OnNeighborNodeConnectionStateChangedListener, Closeable {
 

@@ -11,6 +11,8 @@ import android.content.IntentFilter
 import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
@@ -34,7 +36,7 @@ class AndroidVirtualNode(
     val appContext: Context,
     uuidMask: UUID,
     port: Int = 0,
-    logger: com.ustadmobile.meshrabiya.MNetLogger = com.ustadmobile.meshrabiya.MNetLogger { _, _, _ -> },
+    logger: MNetLogger = MNetLoggerStdout(),
     localMNodeAddress: Int = randomApipaAddr(),
     json: Json,
     private val dataStore: DataStore<Preferences>,

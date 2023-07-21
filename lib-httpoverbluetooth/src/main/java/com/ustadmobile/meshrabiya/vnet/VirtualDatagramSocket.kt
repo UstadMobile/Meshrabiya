@@ -1,11 +1,10 @@
 package com.ustadmobile.meshrabiya.vnet
 
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import org.apache.commons.pool2.ObjectPool
 import org.apache.commons.pool2.impl.GenericObjectPool
-import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.InetAddress
 import java.util.concurrent.LinkedBlockingDeque

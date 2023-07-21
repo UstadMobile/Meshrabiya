@@ -1,7 +1,7 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
-import com.ustadmobile.meshrabiya.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.mmcp.MmcpAck
 import com.ustadmobile.meshrabiya.mmcp.MmcpHello

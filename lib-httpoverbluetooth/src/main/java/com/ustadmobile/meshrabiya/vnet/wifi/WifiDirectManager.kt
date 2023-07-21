@@ -18,13 +18,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.encodeAsHex
-import com.ustadmobile.meshrabiya.ext.requireAsIpv6
-import com.ustadmobile.meshrabiya.ext.requireHostAddress
 import com.ustadmobile.meshrabiya.ext.toPrettyString
 import com.ustadmobile.meshrabiya.ext.unspecifiedIpv6Address
 import com.ustadmobile.meshrabiya.ext.withoutScope
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.util.randomString
-import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiDirectState
 import kotlinx.coroutines.CompletableDeferred
@@ -52,7 +50,6 @@ import java.net.Inet6Address
 import java.net.NetworkInterface
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  *
@@ -63,7 +60,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class WifiDirectManager(
     private val appContext: Context,
-    private val logger: com.ustadmobile.meshrabiya.MNetLogger,
+    private val logger: MNetLogger,
     private val localNodeAddr: Int,
     private val router: VirtualRouter,
     private val dataStore: DataStore<Preferences>,
