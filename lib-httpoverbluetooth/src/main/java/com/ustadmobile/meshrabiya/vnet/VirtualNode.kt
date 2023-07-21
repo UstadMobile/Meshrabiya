@@ -439,7 +439,7 @@ abstract class VirtualNode(
 
                     if(currentOriginatorMessage == null || isMoreRecentOrBetter) {
                         originatorMessages[packet.header.fromAddr] = LastOriginatorMessage(
-                            originatorMessage = mmcpMessage,
+                            originatorMessage = mmcpMessage.copyWithPingTimeIncrement(connectionPingTime),
                             timeReceived = System.currentTimeMillis(),
                             lastHopAddr = packet.header.lastHopAddr,
                             hopCount = packet.header.hopCount
