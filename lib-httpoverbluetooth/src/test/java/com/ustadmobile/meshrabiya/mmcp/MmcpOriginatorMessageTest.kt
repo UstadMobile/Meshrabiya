@@ -13,9 +13,11 @@ class MmcpOriginatorMessageTest {
 
     @Test
     fun givenOriginatorMessage_whenSerializedThenDeserialized_shouldBeEqual() {
+        val sentTime = System.currentTimeMillis()
         val originatorMessage = MmcpOriginatorMessage(
             messageId = 1042,
             pingTimeSum = 200.toShort(),
+            sentTime = sentTime,
             connectConfig = WifiConnectConfig(
                 nodeVirtualAddr = 1000,
                 ssid = "test",

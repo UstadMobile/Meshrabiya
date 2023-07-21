@@ -29,6 +29,9 @@ class SimpleEchoClient(
             .noServerCertificateCheck()
             .build()
         connection.connect(5000, "echo")
+        //if expecting peer initiated sessions
+        //connection.setPeerInitiatedStreamCallback()
+
         echo("hello mate!")
         echo("look, a second request on a separate stream!")
         connection.closeAndWait()
@@ -36,6 +39,7 @@ class SimpleEchoClient(
 
     @Throws(IOException::class)
     private fun echo(payload: String) {
+
         val quicStream: QuicStream = connection.createStream(true)
         val requestData = payload.toByteArray(StandardCharsets.US_ASCII)
         quicStream.outputStream.write(requestData)

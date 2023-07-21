@@ -18,6 +18,22 @@ class MmcpHotspotRequest(
         )
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is MmcpHotspotRequest) return false
+        if (!super.equals(other)) return false
+
+        if (hotspotRequest != other.hotspotRequest) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = super.hashCode()
+        result = 31 * result + hotspotRequest.hashCode()
+        return result
+    }
+
     companion object {
 
         fun fromBytes(

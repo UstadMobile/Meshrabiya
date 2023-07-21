@@ -11,6 +11,23 @@ class MmcpHotspotResponse(
         return headerAndPayloadToBytes(header, result.toBytes())
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is MmcpHotspotResponse) return false
+        if (!super.equals(other)) return false
+
+        if (result != other.result) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result1 = super.hashCode()
+        result1 = 31 * result1 + result.hashCode()
+        return result1
+    }
+
+
     companion object {
 
         fun fromBytes(

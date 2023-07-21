@@ -21,6 +21,22 @@ class MmcpAck(
             .putInt(ackOfMessageId)
             .array())
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is MmcpAck) return false
+        if (!super.equals(other)) return false
+
+        if (ackOfMessageId != other.ackOfMessageId) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = super.hashCode()
+        result = 31 * result + ackOfMessageId
+        return result
+    }
+
     companion object {
 
         //Size = size of ackOfMessageId = 4 bytes

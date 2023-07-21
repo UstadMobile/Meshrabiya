@@ -8,6 +8,9 @@ class MmcpPing(
 
     override fun toBytes() = headerAndPayloadToBytes(header, emptyByteArray())
 
+    //There is no need for equals/hashcode here because there is no real payload
+
+
     companion object {
 
         fun fromBytes(

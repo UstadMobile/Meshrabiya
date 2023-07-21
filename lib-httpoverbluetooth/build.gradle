@@ -66,4 +66,7 @@ dependencies {
     androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
 
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation "app.cash.turbine:turbine:$version_turbine"
+    androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"
+    androidTestImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
 }

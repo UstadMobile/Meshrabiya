@@ -42,7 +42,9 @@ import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
@@ -92,10 +94,10 @@ abstract class VirtualNode(
     val localNodeInetAddress: InetAddress = InetAddress.getByAddress(localNodeAddressByteArray)
 
     //This executor is used for direct I/O activities
-    protected val connectionExecutor = Executors.newCachedThreadPool()
+    protected val connectionExecutor: ExecutorService = Executors.newCachedThreadPool()
 
     //This executor is used to schedule maintenance e.g. pings etc.
-    protected val scheduledExecutor = Executors.newScheduledThreadPool(2)
+    protected val scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(2)
 
     protected val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
 
@@ -173,19 +175,27 @@ abstract class VirtualNode(
     }
 
     private val sendOriginatingMessageRunnable = Runnable {
+        val sentTime = System.currentTimeMillis()
         val originatingMessage = MmcpOriginatorMessage(
             messageId = nextMmcpMessageId(),
             pingTimeSum = 0,
             connectConfig = _state.value.wifiState.config,
-            sentTime = System.currentTimeMillis()
+            sentTime = sentTime
         )
 
-        logger(Log.DEBUG, "$logPrefix sending originating message", null)
+        logger(Log.DEBUG, "$logPrefix sending originating message " +
+                "messageId=${originatingMessage.messageId} sentTime=$sentTime", null)
 
-        route(originatingMessage.toVirtualPacket(
+        val packet = originatingMessage.toVirtualPacket(
             toAddr = ADDR_BROADCAST,
             fromAddr = localNodeAddress,
-        ))
+        )
+        val messageFromPacket = MmcpMessage.fromVirtualPacket(packet) as? MmcpOriginatorMessage
+        logger(Log.DEBUG, "$logPrefix from packet sent time = ${messageFromPacket?.sentTime}", null)
+        if(messageFromPacket?.sentTime != sentTime) {
+            logger(Log.ERROR, "WRONG WRONG WRONG", null)
+        }
+        route(packet)
     }
 
     private val _incomingMmcpMessages = MutableSharedFlow<MmcpMessageAndPacketHeader>(
@@ -421,6 +431,7 @@ abstract class VirtualNode(
 
                     logger(Log.DEBUG, "$logPrefix received originating message from " +
                             "${packet.header.fromAddr.addressToDotNotation()} via ${packet.header.lastHopAddr.addressToDotNotation()}" +
+                            " messageId=${mmcpMessage.messageId} " +
                             " hopCount=${packet.header.hopCount} sentTime=${mmcpMessage.sentTime} " +
                             " Currently known: senttime=$currentlyKnownSentTime  hop count = $currentlyKnownHopCount " +
                             "isMoreRecentOrBetter=$isMoreRecentOrBetter ",

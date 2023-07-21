@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
+import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.test_app.appstate.AppUiState
 import com.ustadmobile.test_app.appstate.FabState
@@ -20,7 +21,27 @@ import org.kodein.di.instance
 data class NeighborNodeListUiState(
     val appUiState: AppUiState = AppUiState(),
     val neighborNodes: List<NeighborNodeState> = emptyList(),
-)
+    val filter: Filter = Filter.ALL_NODES,
+    internal val allNodes: Map<Int, VirtualNode.LastOriginatorMessage> = emptyMap(),
+) {
+
+    val nodes: Map<Int, VirtualNode.LastOriginatorMessage>
+        get() {
+            return if(filter == Filter.ALL_NODES) {
+                allNodes
+            }else {
+                allNodes.filter { it.value.hopCount == 1.toByte() }
+            }
+        }
+
+    companion object {
+
+        enum class Filter(val id: Int, val label: String) {
+            ALL_NODES(1, "All"), NEIGHBORS(2, "Neighbors")
+        }
+
+    }
+}
 
 class NeighborNodeListViewModel(
     di: DI
@@ -47,13 +68,21 @@ class NeighborNodeListViewModel(
         }
 
         viewModelScope.launch {
-            virtualNode.neighborNodesState.collect {
+            virtualNode.state.collect {
                 _uiState.update { prev ->
                     prev.copy(
-                        neighborNodes = it
+                        allNodes = it.originatorMessages
                     )
                 }
             }
+        }
+    }
+
+    fun onClickFilterChip(filter: NeighborNodeListUiState.Companion.Filter) {
+        _uiState.update { prev ->
+            prev.copy(
+                filter = filter
+            )
         }
     }
 
