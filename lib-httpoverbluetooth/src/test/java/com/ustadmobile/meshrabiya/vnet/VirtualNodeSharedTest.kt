@@ -1,5 +1,5 @@
 package com.ustadmobile.meshrabiya.vnet
 
-class VirtualNodeSharedTest: AbstractVirtualNodeTest() {
+class VirtualNodeSharedTest: VirtualNodeIntegrationTest() {
 
 }

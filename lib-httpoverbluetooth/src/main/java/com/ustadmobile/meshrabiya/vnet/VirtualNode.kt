@@ -311,9 +311,7 @@ abstract class VirtualNode(
         destPort: Int
     ): Int {
         val listenSocket = if(bindZone == Zone.VNET) {
-            createDatagramSocket().also {
-                it.bind(InetSocketAddress(localNodeInetAddress, 0))
-            }
+            createBoundDatagramSocket(bindPort)
         }else {
             DatagramSocket(bindPort)
         }

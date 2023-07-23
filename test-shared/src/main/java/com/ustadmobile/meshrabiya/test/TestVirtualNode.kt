@@ -1,6 +1,7 @@
 package com.ustadmobile.meshrabiya.test
 
 import com.ustadmobile.meshrabiya.log.MNetLogger
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.vnet.NodeConfig
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
@@ -14,7 +15,7 @@ class TestVirtualNode(
     uuidMask: UUID = UUID.randomUUID(),
     localNodeAddress: Int = randomApipaAddr(),
     port: Int = 0,
-    logger: MNetLogger,
+    logger: MNetLogger = MNetLoggerStdout(),
     override val hotspotManager: MeshrabiyaWifiManager = mock { },
     json: Json,
     config: NodeConfig = NodeConfig(maxHops = 5),

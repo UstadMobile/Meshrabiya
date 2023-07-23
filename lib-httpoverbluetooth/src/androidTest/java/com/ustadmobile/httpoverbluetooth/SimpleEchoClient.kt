@@ -1,5 +1,7 @@
 package com.ustadmobile.httpoverbluetooth
 
+import net.luminis.quic.DatagramSocketFactory
+import net.luminis.quic.DefaultDatagramSocketFactory
 import net.luminis.quic.QuicClientConnection
 import net.luminis.quic.QuicStream
 import net.luminis.quic.log.SysOutLogger
@@ -11,7 +13,9 @@ import java.nio.charset.StandardCharsets
 //As per https://bitbucket.org/pjtr/kwik/src/master/src/main/java/net/luminis/quic/sample/echo/SimpleEchoClient.java
 
 class SimpleEchoClient(
-    val serverPort: Int
+    val serverPort: Int,
+    val serverHost: String = "localhost",
+    val socketFactory: DatagramSocketFactory = DefaultDatagramSocketFactory(),
 ) {
     private lateinit var connection: QuicClientConnection
 
@@ -24,9 +28,10 @@ class SimpleEchoClient(
         val log = SysOutLogger()
         // log.logPackets(true);     // Set various log categories with log.logABC()
         connection = QuicClientConnection.newBuilder()
-            .uri(URI.create("echo://localhost:$serverPort"))
+            .uri(URI.create("echo://$serverHost:$serverPort"))
             .logger(log)
             .noServerCertificateCheck()
+            .datagramSocketFactory(socketFactory)
             .build()
         connection.connect(5000, "echo")
         //if expecting peer initiated sessions

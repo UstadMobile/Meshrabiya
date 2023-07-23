@@ -25,7 +25,7 @@ ext {
     version_zxing_embedded = "4.3.0"
     version_datastore = "1.0.0"
     version_bouncycastle = "1.75"
-    version_kwik = "0.1a"
+    version_kwik = "0.1b"
     version_agent15 = "0.1a"
     version_android_desugaring = "2.0.3"
     version_coroutines = "1.7.2"
