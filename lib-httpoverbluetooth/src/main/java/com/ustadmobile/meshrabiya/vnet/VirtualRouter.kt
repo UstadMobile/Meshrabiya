@@ -32,7 +32,7 @@ interface VirtualRouter {
      * Allocate a port on the virtual router
      */
     fun allocateUdpPortOrThrow(
-        virtualDatagramSocketImpl: VirtualDatagramSocketImpl?,
+        virtualDatagramSocketImpl: VirtualDatagramSocketImpl,
         portNum: Int
     ): Int
 

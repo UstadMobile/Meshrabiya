@@ -19,3 +19,4 @@ rootProject.name = "HttpOverBluetooth"
 include ':app'
 include ':lib-httpoverbluetooth'
 include ':test-app'
+include ':test-shared'

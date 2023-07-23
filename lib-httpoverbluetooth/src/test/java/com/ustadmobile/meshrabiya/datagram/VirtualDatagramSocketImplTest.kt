@@ -5,7 +5,6 @@ import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
 import com.ustadmobile.meshrabiya.test.contentRangeEqual
-import com.ustadmobile.meshrabiya.vnet.VirtualDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
@@ -69,8 +68,10 @@ class VirtualDatagramSocketImplTest {
         Assert.assertEquals(fromVirtualAddress, datagramPacket.address.requireAddressAsInt())
         Assert.assertEquals(fromVirtualPort, datagramPacket.port)
         Assert.assertEquals(incomingPacket.header.payloadSize, datagramPacket.length)
-        assertByteArrayEquals(incomingPacket.data, incomingPacket.payloadOffset,
-            datagramPacket.data, datagramPacket.offset, datagramPacket.length)
+        assertByteArrayEquals(
+            incomingPacket.data, incomingPacket.payloadOffset,
+            datagramPacket.data, datagramPacket.offset, datagramPacket.length
+        )
     }
 
 

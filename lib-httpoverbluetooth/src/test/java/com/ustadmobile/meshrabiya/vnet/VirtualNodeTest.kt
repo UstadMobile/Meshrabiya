@@ -1,7 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import app.cash.turbine.test
-import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
@@ -13,6 +12,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.test.EchoDatagramServer
+import com.ustadmobile.meshrabiya.test.TestVirtualNode
 import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
 import com.ustadmobile.meshrabiya.test.connectTo
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
@@ -46,6 +46,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet6Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -57,22 +58,6 @@ import kotlin.time.Duration.Companion.seconds
 
 class VirtualNodeTest {
 
-    class TestVirtualNode(
-        uuidMask: UUID = UUID.randomUUID(),
-        localNodeAddress: Int = randomApipaAddr(),
-        port: Int = 0,
-        logger: MNetLogger,
-        override val hotspotManager: MeshrabiyaWifiManager = mock { },
-        json: Json,
-        config: NodeConfig = NodeConfig(maxHops = 5),
-    ) : VirtualNode(
-        uuidMask = uuidMask,
-        port = port,
-        logger = logger,
-        json = json,
-        config = config,
-        localNodeAddress = localNodeAddress,
-    )
 
     private val logger = MNetLoggerStdout()
 
@@ -319,7 +304,12 @@ class VirtualNodeTest {
                 logger = logger,
                 hotspotManager = mock { },
                 json = json,
-                localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (it +1).toByte()).ip4AddressToInt()
+                localNodeAddress = byteArrayOf(
+                    169.toByte(),
+                    254.toByte(),
+                    1,
+                    (it + 1).toByte()
+                ).ip4AddressToInt()
             )
         }
 
@@ -412,7 +402,12 @@ class VirtualNodeTest {
             logger = logger,
             hotspotManager = mock { },
             json = json,
-            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()).ip4AddressToInt()
+            localNodeAddress = byteArrayOf(
+                169.toByte(),
+                254.toByte(),
+                1,
+                (1).toByte()
+            ).ip4AddressToInt()
         )
 
         val node2  = TestVirtualNode(
@@ -420,12 +415,20 @@ class VirtualNodeTest {
             logger = logger,
             hotspotManager = mock { },
             json = json,
-            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()).ip4AddressToInt()
+            localNodeAddress = byteArrayOf(
+                169.toByte(),
+                254.toByte(),
+                1,
+                (2).toByte()
+            ).ip4AddressToInt()
         )
         try {
             node1.connectTo(node2)
-            val node1socket  = node1.openSocket(81)
-            val node2socket = node2.openSocket(82)
+            val node1socket  = node1.createDatagramSocket()
+            node1socket.bind(InetSocketAddress(node1.localNodeInetAddress, 81))
+
+            val node2socket = node2.createDatagramSocket()
+            node2socket.bind(InetSocketAddress(node2.localNodeInetAddress, 82))
 
             val packetData = "Hello World".encodeToByteArray()
             val txPacket = DatagramPacket(packetData, 0, packetData.size)
@@ -460,7 +463,12 @@ class VirtualNodeTest {
             logger = logger,
             hotspotManager = mock { },
             json = json,
-            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()).ip4AddressToInt()
+            localNodeAddress = byteArrayOf(
+                169.toByte(),
+                254.toByte(),
+                1,
+                (1).toByte()
+            ).ip4AddressToInt()
         )
 
         val node2  = TestVirtualNode(
@@ -468,7 +476,12 @@ class VirtualNodeTest {
             logger = logger,
             hotspotManager = mock { },
             json = json,
-            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()).ip4AddressToInt()
+            localNodeAddress = byteArrayOf(
+                169.toByte(),
+                254.toByte(),
+                1,
+                (2).toByte()
+            ).ip4AddressToInt()
         )
 
         val node1InetAddr = InetAddress.getByAddress(byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()))

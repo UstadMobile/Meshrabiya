@@ -2,7 +2,6 @@ package com.ustadmobile.meshrabiya.portforward
 
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.test.EchoDatagramServer
-import com.ustadmobile.meshrabiya.vnet.asIDatagramSocket
 import org.junit.Assert
 import org.junit.Test
 import java.net.DatagramPacket
@@ -41,7 +40,7 @@ class ForwardingTest {
 
         val forwardRuleDatagramSocket = DatagramSocket()
         val forwardingRule = UdpForwardRule(
-            DatagramSocket().asIDatagramSocket(), executor,
+            DatagramSocket(), executor,
             InetAddress.getLoopbackAddress(), echoServer.listeningPort,
             logger = MNetLoggerStdout()
         )

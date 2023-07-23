@@ -13,6 +13,7 @@
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/lib-httpoverbluetooth" />
             <option value="$PROJECT_DIR$/test-app" />
+            <option value="$PROJECT_DIR$/test-shared" />
           </set>
         </option>
       </GradleProjectSettings>

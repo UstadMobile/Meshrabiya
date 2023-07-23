@@ -19,15 +19,15 @@ class VirtualNodeReturnPathSocketFactory(
 ): ReturnPathSocketFactory {
 
 
-    override fun createSocket(destAddress: InetAddress, port: Int): IDatagramSocket {
+    override fun createSocket(destAddress: InetAddress, port: Int): DatagramSocket {
         return if(
             destAddress.address.prefixMatches(node.networkPrefixLength, node.localNodeAddressByteArray)
         ) {
-            node.openSocket(port)
+            node.createBoundDatagramSocket(0)
         }else{
             val bindAddress = findLocalInetAddressForDestinationAddress(destAddress)
 
-            return bindAddress?.let { DatagramSocket(0, it).asIDatagramSocket() }
+            return bindAddress?.let { DatagramSocket(0, it) }
                 ?: throw IllegalArgumentException("Could not find network interface with subnet " +
                         "mask for dest address $destAddress")
         }

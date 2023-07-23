@@ -22,6 +22,7 @@ import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
+import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocket2
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
@@ -42,6 +43,7 @@ import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -149,7 +151,7 @@ abstract class VirtualNode(
      */
     protected val originatorMessages: MutableMap<Int, LastOriginatorMessage> = ConcurrentHashMap()
 
-    internal val datagramSocket = VirtualNodeDatagramSocket(
+    val datagramSocket = VirtualNodeDatagramSocket(
         socket = DatagramSocket(0),
         ioExecutorService = connectionExecutor,
         router = this,
@@ -212,7 +214,7 @@ abstract class VirtualNode(
 
     val incomingMmcpMessages: Flow<MmcpMessageAndPacketHeader> = _incomingMmcpMessages.asSharedFlow()
 
-    private val activeSockets: MutableMap<Int, VirtualDatagramSocket> = ConcurrentHashMap()
+    private val activeSockets: MutableMap<Int, VirtualDatagramSocketImpl> = ConcurrentHashMap()
 
     init {
         _state.update { prev ->
@@ -238,7 +240,7 @@ abstract class VirtualNode(
 
 
     override fun allocateUdpPortOrThrow(
-        virtualDatagramSocketImpl: VirtualDatagramSocketImpl?,
+        virtualDatagramSocketImpl: VirtualDatagramSocketImpl,
         portNum: Int
     ): Int {
         if(portNum > 0) {
@@ -246,14 +248,17 @@ abstract class VirtualNode(
                 throw IllegalStateException("VirtualNode: port $portNum already allocated!")
 
             //requested port is not allocated, everything OK
+            activeSockets[portNum] = virtualDatagramSocketImpl
             return portNum
         }
 
         var attemptCount = 0
         do {
             val randomPort = Random.nextInt(0, Short.MAX_VALUE.toInt())
-            if(!activeSockets.containsKey(randomPort))
+            if(!activeSockets.containsKey(randomPort)) {
+                activeSockets[randomPort] = virtualDatagramSocketImpl
                 return randomPort
+            }
 
             attemptCount++
         }while(attemptCount < 100)
@@ -265,16 +270,14 @@ abstract class VirtualNode(
         activeSockets.remove(portNum)
     }
 
-    fun openSocket(port: Int): VirtualDatagramSocket {
-        val virtualSocket = VirtualDatagramSocket(
-            port = port,
-            localVirtualAddress =  localNodeAddress,
-            router = this,
-            logger = logger,
-        )
+    fun createDatagramSocket(): DatagramSocket {
+        return VirtualDatagramSocket2(this, localNodeAddress, logger)
+    }
 
-        activeSockets[virtualSocket.localPort] = virtualSocket
-        return virtualSocket
+    fun createBoundDatagramSocket(port: Int): DatagramSocket {
+        return createDatagramSocket().also {
+            it.bind(InetSocketAddress(localNodeInetAddress, port))
+        }
     }
 
     /**
@@ -289,9 +292,9 @@ abstract class VirtualNode(
         val listenSocket = if(
             bindAddress.prefixMatches(networkPrefixLength, localNodeInetAddress)
         ) {
-            openSocket(bindPort)
+            createBoundDatagramSocket(bindPort)
         }else {
-            DatagramSocket(bindPort, bindAddress).asIDatagramSocket()
+            DatagramSocket(bindPort, bindAddress)
         }
 
         val forwardRule = createForwardRule(listenSocket, destAddress, destPort)
@@ -308,9 +311,11 @@ abstract class VirtualNode(
         destPort: Int
     ): Int {
         val listenSocket = if(bindZone == Zone.VNET) {
-            openSocket(bindPort)
+            createDatagramSocket().also {
+                it.bind(InetSocketAddress(localNodeInetAddress, 0))
+            }
         }else {
-            DatagramSocket(bindPort).asIDatagramSocket()
+            DatagramSocket(bindPort)
         }
         val forwardRule = createForwardRule(listenSocket, destAddress, destPort)
         val boundPort = listenSocket.localPort
@@ -333,7 +338,7 @@ abstract class VirtualNode(
     }
 
     private fun createForwardRule(
-        listenSocket: IDatagramSocket,
+        listenSocket: DatagramSocket,
         destAddress: InetAddress,
         destPort: Int,
     ) : UdpForwardRule {

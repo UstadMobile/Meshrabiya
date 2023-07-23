@@ -2,9 +2,7 @@ package com.ustadmobile.meshrabiya.portforward
 
 import android.util.Log
 import com.ustadmobile.meshrabiya.log.MNetLogger
-import com.ustadmobile.meshrabiya.vnet.IDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
-import com.ustadmobile.meshrabiya.vnet.asIDatagramSocket
 import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -37,12 +35,12 @@ import java.util.concurrent.Future
  *                                step a) above.
  */
 class UdpForwardRule(
-    private val boundSocket: IDatagramSocket,
+    private val boundSocket: DatagramSocket,
     private val ioExecutor: ExecutorService,
     private val destAddress: InetAddress,
     private val destPort: Int,
     private val returnPathSocketFactory: ReturnPathSocketFactory = ReturnPathSocketFactory { addr, port ->
-        DatagramSocket(port).asIDatagramSocket()
+        DatagramSocket(port)
     },
     private val logger: MNetLogger,
 ): Runnable, Closeable {
@@ -52,7 +50,7 @@ class UdpForwardRule(
     private val logPrefix: String = "[UdpForwardRule : ${boundSocket.localPort} -> ${destAddress.hostAddress}:$destPort]"
 
     private inner class ReturnPathDatagramSocket(
-        val returnPathSocket: IDatagramSocket,
+        val returnPathSocket: DatagramSocket,
         private val returnToAddress: InetAddress,
         private val returnToPort: Int,
     ): Runnable {

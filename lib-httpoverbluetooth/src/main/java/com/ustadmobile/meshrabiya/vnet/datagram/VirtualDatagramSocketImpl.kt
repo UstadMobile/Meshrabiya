@@ -1,16 +1,15 @@
 package com.ustadmobile.meshrabiya.vnet.datagram
 
 import android.util.Log
+import androidx.core.util.Pools.SynchronizedPool
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import com.ustadmobile.meshrabiya.log.MNetLogger
-import com.ustadmobile.meshrabiya.vnet.BufferPooledObjectFactory
 import com.ustadmobile.meshrabiya.vnet.Protocol
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
-import org.apache.commons.pool2.ObjectPool
-import org.apache.commons.pool2.impl.GenericObjectPool
 import java.net.DatagramPacket
 import java.net.DatagramSocketImpl
 import java.net.InetAddress
@@ -20,9 +19,9 @@ import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * VirtualDatagramSocketImpl can be passed to a DatagramSocket as a constructor parameter. This
- * allows the creation of an actual DatagramSocket that will send/receive traffic over the virtual
- * network.
+ * VirtualDatagramSocketImpl can be passed to a DatagramSocket as a constructor parameter
+ * (the DatagramSocketImpl). This allows any DatagramSocket class to be used to pass data over
+ * the virtual network.
  */
 open class VirtualDatagramSocketImpl(
     private val router: VirtualRouter,
@@ -36,13 +35,9 @@ open class VirtualDatagramSocketImpl(
 
     private val receiveQueue = LinkedBlockingDeque<DatagramPacket>()
 
-    private val receiveBufferPool: ObjectPool<ByteArray> = GenericObjectPool(
-        BufferPooledObjectFactory(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE)
-    )
+    private val receiveBufferPool = SynchronizedPool<ByteArray>(RECEIVE_BUFFER_SIZE)
 
-    private val sendBufferPool: ObjectPool<ByteArray> = GenericObjectPool(
-        BufferPooledObjectFactory(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE)
-    )
+    private val sendBufferPool = SynchronizedPool<ByteArray>(SEND_BUFFER_SIZE)
 
     val boundPort: Int
         get() = localPort
@@ -60,7 +55,13 @@ open class VirtualDatagramSocketImpl(
         if(closed.get())
             return // do nothing
 
-        val buffer = receiveBufferPool.borrowObject()
+        logger(Log.VERBOSE,
+            message = {"$logPrefix incoming virtual packet=${virtualPacket.datagramPacketSize} bytes " +
+                    "from ${virtualPacket.header.fromAddr.addressToDotNotation()}:" +
+                    "${virtualPacket.header.fromPort} "}
+        )
+
+        val buffer = receiveBufferPool.acquire() ?: ByteArray(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE)
 
         //Copy from the virtual packet into the pool buffer
         System.arraycopy(virtualPacket.data, virtualPacket.payloadOffset,
@@ -94,10 +95,13 @@ open class VirtualDatagramSocketImpl(
 
     public override fun send(p: DatagramPacket) {
         assertNotClosed()
+        logger(Log.VERBOSE,
+            message = {"$logPrefix send packet size=${p.length} bytes to ${p.address}:${p.port}"}
+        )
 
         //need to borrow a buffer
         //convert to virtual packet, then send using router.
-        val buffer = sendBufferPool.borrowObject()
+        val buffer = sendBufferPool.acquire() ?: ByteArray(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE)
         try {
             System.arraycopy(p.data, p.offset,
                 buffer, VirtualPacketHeader.HEADER_SIZE, p.length)
@@ -118,7 +122,7 @@ open class VirtualDatagramSocketImpl(
             )
             router.route(virtualPacket)
         }finally {
-            sendBufferPool.returnObject(buffer)
+            sendBufferPool.release(buffer)
         }
     }
 
@@ -142,7 +146,7 @@ open class VirtualDatagramSocketImpl(
             p.address = bufferPacket.address
             p.port = bufferPacket.port
         }finally {
-            receiveBufferPool.returnObject(bufferPacket.data)
+            receiveBufferPool.release(bufferPacket.data)
         }
     }
 
@@ -182,9 +186,15 @@ open class VirtualDatagramSocketImpl(
 
     override fun close() {
         if(!closed.getAndSet(true)) {
-            sendBufferPool.close()
-            receiveBufferPool.close()
             router.deallocatePort(Protocol.UDP, localPort)
         }
+    }
+
+    companion object {
+
+        const val RECEIVE_BUFFER_SIZE = 512
+
+        const val SEND_BUFFER_SIZE = 512
+
     }
 }

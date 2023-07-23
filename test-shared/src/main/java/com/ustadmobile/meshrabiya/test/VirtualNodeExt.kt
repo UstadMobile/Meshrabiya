@@ -22,9 +22,17 @@ fun VirtualNode.connectTo(other: VirtualNode, timeout: Long = 5000) {
                 neighbors.any { it.remoteAddress == other.localNodeAddress }
             }.first()
 
+            state.filter { it.originatorMessages.containsKey(other.localNodeAddress) }
+                .first()
+
             other.neighborNodesState.filter { neighbors ->
                 neighbors.any { it.remoteAddress == this@connectTo.localNodeAddress }
             }.first()
+
+            other.state.filter {
+                it.originatorMessages.containsKey(localNodeAddress)
+            }.first()
+
         }
     }
 }

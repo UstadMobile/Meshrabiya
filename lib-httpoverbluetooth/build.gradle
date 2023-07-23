@@ -22,11 +22,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     compileOptions {
-        //Experiencing this bug:
-        // https://issuetracker.google.com/issues/243636261
-        // java.net.ConnectException: Handshake error: java.lang.ClassCastException: j$.util.stream.SliceOps$1 cannot be cast to java.util.stream.Stream
-        //As per https://developer.android.com/studio/write/java8-support#library-desugaring
         coreLibraryDesugaringEnabled true
 
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -41,7 +38,6 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation "com.athaydes.rawhttp:rawhttp-core:2.5.2"
-    implementation "org.apache.commons:commons-pool2:$version_apache_commons_pool"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "androidx.datastore:datastore-preferences:$version_datastore"
 
@@ -57,6 +53,7 @@ dependencies {
 
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:$version_android_desugaring"
 
+    testImplementation project(":test-shared")
     testImplementation 'junit:junit:4.13.2'
     testImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
     testImplementation "app.cash.turbine:turbine:$version_turbine"
@@ -65,6 +62,7 @@ dependencies {
     androidTestImplementation "androidx.test:runner:$version_android_junit_runner"
     androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
 
+    androidTestImplementation project(":test-shared")
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation "app.cash.turbine:turbine:$version_turbine"
     androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"

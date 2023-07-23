@@ -2,8 +2,8 @@
 plugins {
     id 'com.android.application' version '8.0.1' apply false
     id 'com.android.library' version '8.0.1' apply false
-    id 'org.jetbrains.kotlin.android' version '1.8.10' apply false
-    id 'org.jetbrains.kotlin.plugin.serialization' version "1.8.10" apply false
+    id 'org.jetbrains.kotlin.android' version '1.8.20' apply false
+    id 'org.jetbrains.kotlin.plugin.serialization' version "1.8.20" apply false
 }
 
 ext.buildConfigProperties = new Properties()
@@ -16,7 +16,6 @@ ext {
 
     version_kotlin_mockito = "4.1.0"
     version_android_mockito = "5.1.1"
-    version_apache_commons_pool = "2.11.1"
     version_turbine = "0.12.1"
     version_wifi_utils = "1.6.6"
     version_compose_bom = "2022.10.00"
@@ -29,6 +28,8 @@ ext {
     version_kwik = "0.1a"
     version_agent15 = "0.1a"
     version_android_desugaring = "2.0.3"
+    version_coroutines = "1.7.2"
+
 
     version_android_junit_runner = "1.5.2"
     version_androidx_test_rules = "1.5.0"
