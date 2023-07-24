@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.composable
+package com.ustadmobile.meshrabiya.testapp.composable
 
 import android.app.Activity
 import android.companion.AssociationRequest
@@ -21,7 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
-import com.ustadmobile.test_app.NEARBY_WIFI_PERMISSION_NAME
+import com.ustadmobile.meshrabiya.testapp.NEARBY_WIFI_PERMISSION_NAME
 import org.kodein.di.DI
 import org.kodein.di.compose.localDI
 import org.kodein.di.direct
@@ -80,20 +80,26 @@ fun rememberConnectWifiLauncher(
             val bssid = scanResult?.BSSID
 
             if(bssid != null) {
-                onResult(ConnectWifiLauncherResult(
+                onResult(
+                    ConnectWifiLauncherResult(
                     hotspotConfig = pendingAssociateHotspotConfig?.copy(
                         bssid = bssid
                     )
-                ))
+                )
+                )
             }else {
-                onResult(ConnectWifiLauncherResult(
+                onResult(
+                    ConnectWifiLauncherResult(
                     hotspotConfig = null
-                ))
+                )
+                )
             }
         }else {
-            onResult(ConnectWifiLauncherResult(
+            onResult(
+                ConnectWifiLauncherResult(
                 hotspotConfig = null
-            ))
+            )
+            )
         }
     }
 
@@ -104,9 +110,11 @@ fun rememberConnectWifiLauncher(
         if(granted) {
             pendingAssociateHotspotConfig = hotspotConfigVal
         }else {
-            onResult(ConnectWifiLauncherResult(
+            onResult(
+                ConnectWifiLauncherResult(
                 hotspotConfig = null
-            ))
+            )
+            )
         }
     }
 

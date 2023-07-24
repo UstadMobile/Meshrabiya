@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.ui.theme
+package com.ustadmobile.meshrabiya.testapp.theme
 
 import android.app.Activity
 import android.os.Build

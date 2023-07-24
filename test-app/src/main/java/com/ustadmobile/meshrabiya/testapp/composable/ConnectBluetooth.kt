@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.composable
+package com.ustadmobile.meshrabiya.testapp.composable
 
 import android.Manifest
 import android.app.Activity
@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import java.util.regex.Pattern
@@ -120,9 +119,11 @@ fun rememberBluetoothConnectLauncher(
         if(granted) {
             associate(btConfig)
         }else {
-            onResult(ConnectBluetoothLauncherResult(
+            onResult(
+                ConnectBluetoothLauncherResult(
                 device = null
-            ))
+            )
+            )
         }
     }
 

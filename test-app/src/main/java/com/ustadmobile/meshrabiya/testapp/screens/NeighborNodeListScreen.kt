@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.screens
+package com.ustadmobile.meshrabiya.testapp.screens
 
 import android.Manifest
 import android.util.Log
@@ -24,11 +24,11 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.vnet.MeshrabiyaConnectLink
-import com.ustadmobile.test_app.ViewModelFactory
-import com.ustadmobile.test_app.appstate.AppUiState
-import com.ustadmobile.test_app.composable.rememberConnectLauncher
-import com.ustadmobile.test_app.viewmodel.NeighborNodeListUiState
-import com.ustadmobile.test_app.viewmodel.NeighborNodeListViewModel
+import com.ustadmobile.meshrabiya.testapp.ViewModelFactory
+import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.composable.rememberConnectLauncher
+import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListUiState
+import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListViewModel
 import org.kodein.di.compose.localDI
 import org.kodein.di.direct
 import org.kodein.di.instance

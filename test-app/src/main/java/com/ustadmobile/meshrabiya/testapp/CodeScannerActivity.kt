@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app
+package com.ustadmobile.meshrabiya.testapp
 
 import android.app.Activity
 import android.content.Intent
@@ -23,7 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import com.budiyev.android.codescanner.CodeScanner
 import com.budiyev.android.codescanner.CodeScannerView
-import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
+import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 
 class CodeScannerActivity: ComponentActivity() {
 

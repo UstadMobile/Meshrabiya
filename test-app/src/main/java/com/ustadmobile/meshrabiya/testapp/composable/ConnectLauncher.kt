@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.composable
+package com.ustadmobile.meshrabiya.testapp.composable
 
 import android.bluetooth.BluetoothDevice
 import android.util.Log

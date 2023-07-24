@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app
+package com.ustadmobile.meshrabiya.testapp
 
 import android.app.Activity
 import android.content.Context

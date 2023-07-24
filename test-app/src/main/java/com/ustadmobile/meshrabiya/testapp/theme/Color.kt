@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.ui.theme
+package com.ustadmobile.meshrabiya.testapp.theme
 
 import androidx.compose.ui.graphics.Color
 

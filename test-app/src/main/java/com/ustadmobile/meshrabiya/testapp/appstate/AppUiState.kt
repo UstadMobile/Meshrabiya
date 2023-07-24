@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.appstate
+package com.ustadmobile.meshrabiya.testapp.appstate
 
 data class AppUiState(
     val title: String = "",

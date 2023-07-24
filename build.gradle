@@ -26,6 +26,7 @@ ext {
     version_bouncycastle = "1.75"
     version_kwik = "0.1b"
     version_agent15 = "0.1a"
+    version_flupke = "0.1a-snapshot"
     version_android_desugaring = "2.0.3"
     version_coroutines = "1.7.2"
     version_core_ktx = "1.10.1"

@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app
+package com.ustadmobile.meshrabiya.testapp
 
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
@@ -30,8 +30,6 @@ import androidx.compose.material.icons.filled.ConnectWithoutContact
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Radar
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
@@ -67,19 +65,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
-import com.ustadmobile.meshrabiya.ext.trimIfExceeds
-import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
-import com.ustadmobile.test_app.appstate.AppUiState
-import com.ustadmobile.test_app.screens.LocalVirtualNodeScreen
-import com.ustadmobile.test_app.screens.NeighborNodeListScreen
-import com.ustadmobile.test_app.ui.theme.HttpOverBluetoothTheme
+import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.screens.LocalVirtualNodeScreen
+import com.ustadmobile.meshrabiya.testapp.screens.NeighborNodeListScreen
+import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.kodein.di.DI
 import org.kodein.di.DIAware

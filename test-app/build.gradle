@@ -9,11 +9,11 @@ android {
         buildConfig = true
     }
 
-    namespace 'com.ustadmobile.test_app'
+    namespace 'com.ustadmobile.meshrabiya.testapp'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.ustadmobile.test_app"
+        applicationId "com.ustadmobile.meshrabiya.testapp"
         minSdk 26
         targetSdk 33
         versionCode 1
@@ -81,6 +81,12 @@ dependencies {
     implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.material3:material3'
     implementation "androidx.compose.material:material-icons-extended"
+
+    implementation "org.bouncycastle:bcprov-jdk18on:$version_bouncycastle"
+    implementation "org.bouncycastle:bcpkix-jdk18on:$version_bouncycastle"
+    implementation "com.github.UstadMobile:kwik:$version_kwik"
+    implementation "com.github.UstadMobile:agent15:$version_agent15"
+    //implementation "com.ustadmobile:flupke:0.1a-snapshot"
 
     testImplementation "junit:junit:$version_junit"
     androidTestImplementation "androidx.test.ext:junit:$version_android_test_ext_junit"

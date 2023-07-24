@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.viewmodel
+package com.ustadmobile.meshrabiya.testapp.viewmodel
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -8,8 +8,8 @@ import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
-import com.ustadmobile.test_app.appstate.AppUiState
-import com.ustadmobile.test_app.appstate.FabState
+import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.appstate.FabState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow

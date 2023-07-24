@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app
+package com.ustadmobile.meshrabiya.testapp
 
 import android.app.Application
 import android.content.Context
@@ -7,7 +7,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
-import com.ustadmobile.test_app.VNetTestActivity.Companion.UUID_MASK
+import com.ustadmobile.meshrabiya.testapp.VNetTestActivity.Companion.UUID_MASK
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking

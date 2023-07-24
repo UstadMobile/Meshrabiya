@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app
+package com.ustadmobile.meshrabiya.testapp
 
 import android.util.Log
 import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants

@@ -1,4 +1,4 @@
-package com.ustadmobile.test_app.screens
+package com.ustadmobile.meshrabiya.testapp.screens
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
@@ -32,17 +32,17 @@ import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import kotlin.math.min as mathmin
-import com.ustadmobile.test_app.viewmodel.LocalVirtualNodeViewModel
+import com.ustadmobile.meshrabiya.testapp.viewmodel.LocalVirtualNodeViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
-import com.ustadmobile.test_app.NEARBY_WIFI_PERMISSION_NAME
-import com.ustadmobile.test_app.ViewModelFactory
-import com.ustadmobile.test_app.appstate.AppUiState
-import com.ustadmobile.test_app.hasBluetoothConnectPermission
-import com.ustadmobile.test_app.hasNearbyWifiDevicesOrLocationPermission
-import com.ustadmobile.test_app.viewmodel.LocalVirtualNodeUiState
+import com.ustadmobile.meshrabiya.testapp.NEARBY_WIFI_PERMISSION_NAME
+import com.ustadmobile.meshrabiya.testapp.ViewModelFactory
+import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.hasBluetoothConnectPermission
+import com.ustadmobile.meshrabiya.testapp.hasNearbyWifiDevicesOrLocationPermission
+import com.ustadmobile.meshrabiya.testapp.viewmodel.LocalVirtualNodeUiState
 import org.kodein.di.compose.localDI
 
 @Composable
