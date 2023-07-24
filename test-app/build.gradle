@@ -46,7 +46,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.4.2'
+        kotlinCompilerExtensionVersion '1.5.0'
     }
     packagingOptions {
         resources {
@@ -59,8 +59,8 @@ dependencies {
 
     implementation project(":lib-httpoverbluetooth")
 
-    implementation "ch.acra:acra-http:5.9.7"
-    implementation "ch.acra:acra-dialog:5.9.7"
+    implementation "ch.acra:acra-http:$version_acra"
+    implementation "ch.acra:acra-dialog:$version_acra"
 
     implementation "com.github.yuriy-budiyev:code-scanner:$version_code_scanner"
     implementation "androidx.navigation:navigation-compose:$version_navigation"
@@ -72,9 +72,9 @@ dependencies {
     implementation "com.journeyapps:zxing-android-embedded:$version_zxing_embedded"
 
 
-    implementation 'androidx.core:core-ktx:1.8.0'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.3.1'
-    implementation 'androidx.activity:activity-compose:1.5.1'
+    implementation "androidx.core:core-ktx:$version_core_ktx"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:$version_android_lifecycle"
+    implementation "androidx.activity:activity-compose:$version_android_activity"
     implementation platform("androidx.compose:compose-bom:$version_compose_bom")
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
@@ -82,9 +82,8 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation "androidx.compose.material:material-icons-extended"
 
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    testImplementation "junit:junit:$version_junit"
+    androidTestImplementation "androidx.test.ext:junit:$version_android_test_ext_junit"
     androidTestImplementation platform("androidx.compose:compose-bom:$version_compose_bom")
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
 

@@ -35,9 +35,9 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.8.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation "com.athaydes.rawhttp:rawhttp-core:2.5.2"
+    implementation "androidx.core:core-ktx:$version_core_ktx"
+    implementation "androidx.appcompat:appcompat:$version_appcompat"
+    implementation "com.athaydes.rawhttp:rawhttp-core:$version_rawhttp"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "androidx.datastore:datastore-preferences:$version_datastore"
 
@@ -54,7 +54,7 @@ dependencies {
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:$version_android_desugaring"
 
     testImplementation project(":test-shared")
-    testImplementation 'junit:junit:4.13.2'
+    testImplementation "junit:junit:$version_junit"
     testImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
     testImplementation "app.cash.turbine:turbine:$version_turbine"
 
@@ -63,7 +63,7 @@ dependencies {
     androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
 
     androidTestImplementation project(":test-shared")
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation "androidx.test.ext:junit:$version_android_test_ext_junit"
     androidTestImplementation "app.cash.turbine:turbine:$version_turbine"
     androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"
     androidTestImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"

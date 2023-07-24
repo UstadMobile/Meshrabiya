@@ -137,10 +137,10 @@ fun NeighborNodeListScreen(
             key = { it.key }
         ) { nodeEntry ->
             ListItem(
-                headlineText = {
+                headlineContent = {
                     Text(nodeEntry.key.addressToDotNotation())
                 },
-                supportingText = {
+                supportingContent = {
                     Text("Ping ${nodeEntry.value.originatorMessage.pingTimeSum}ms " +
                             " Hops: ${nodeEntry.value.hopCount} ")
                 }

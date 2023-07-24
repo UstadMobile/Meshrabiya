@@ -27,9 +27,12 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.ConnectWithoutContact
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -121,35 +124,7 @@ class VNetTestActivity : ComponentActivity(), DIAware {
     }
 
 
-    private val vNetLogger = MNetLogger { priority, message, exception ->
-        when (priority) {
-            Log.DEBUG -> Log.d(LOG_TAG, message, exception)
-            Log.INFO -> Log.i(LOG_TAG, message, exception)
-            Log.WARN -> Log.w(LOG_TAG, message, exception)
-            Log.ERROR -> Log.e(LOG_TAG, message, exception)
-            Log.ASSERT -> Log.wtf(LOG_TAG, message, exception)
-            Log.VERBOSE -> Log.v(LOG_TAG, message, exception)
-        }
-
-        val logDisplay = buildString {
-            append(message)
-            if (exception != null) {
-                append(" Exception: ")
-                append(exception.toString())
-            }
-        }
-
-        activityUiState.update { prev ->
-            prev.copy(
-                logLines = buildList {
-                    add(LogLine(logDisplay))
-                    addAll(prev.logLines.trimIfExceeds(100))
-                }
-            )
-        }
-    }
-
-
+    private val vNetLogger = MNetLoggerAndroid()
 
     fun onClickLogs() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -328,8 +303,8 @@ fun MeshrabiyaTestApp(
                 )
 
                 NavigationBarItem(
-                    selected = navController.currentDestination?.route == "neighbornodes" ,
-                    label = { Text("Neighbor Nodes") },
+                    selected = navController.currentDestination?.route == "network" ,
+                    label = { Text("Network") },
                     onClick = {
                         navController.navigate("neighbornodes")
                     },
@@ -342,12 +317,24 @@ fun MeshrabiyaTestApp(
                 )
 
                 NavigationBarItem(
-                    selected = selectedItem == "mesh" ,
-                    label = { Text("Mesh") },
+                    selected = selectedItem == "send" ,
+                    label = { Text("Send") },
                     onClick = { /*TODO*/ },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Radar,
+                            imageVector = Icons.Default.UploadFile,
+                            contentDescription = null,
+                        )
+                    }
+                )
+
+                NavigationBarItem(
+                    selected = selectedItem == "Receive" ,
+                    label = { Text("Receive") },
+                    onClick = { /*TODO*/ },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Download,
                             contentDescription = null,
                         )
                     }
@@ -507,10 +494,10 @@ fun TestScreen(
             key = { it.remoteAddress }
         ) { node ->
             ListItem(
-                headlineText = {
+                headlineContent = {
                     Text(node.remoteAddress.addressToDotNotation())
                 },
-                supportingText = {
+                supportingContent = {
                     Column {
                         Row {
                             if(node.hasBluetoothConnection) {
