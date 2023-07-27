@@ -29,6 +29,19 @@
             </AndroidTestResultsTableState>
           </value>
         </entry>
+        <entry key="-1444678430">
+          <value>
+            <AndroidTestResultsTableState>
+              <option name="preferredColumnWidths">
+                <map>
+                  <entry key="Duration" value="90" />
+                  <entry key="Nexus_4_API_30" value="120" />
+                  <entry key="Tests" value="360" />
+                </map>
+              </option>
+            </AndroidTestResultsTableState>
+          </value>
+        </entry>
         <entry key="-1128057268">
           <value>
             <AndroidTestResultsTableState>
@@ -91,6 +104,21 @@
                   <entry key="FRTBE80322863291" value="120" />
                   <entry key="HMD Global&#10; Nokia 1" value="120" />
                   <entry key="HMD Global&#10; Nokia 5.1 Plus" value="120" />
+                  <entry key="PDAGAA4892200554" value="120" />
+                  <entry key="Tests" value="360" />
+                </map>
+              </option>
+            </AndroidTestResultsTableState>
+          </value>
+        </entry>
+        <entry key="1541899220">
+          <value>
+            <AndroidTestResultsTableState>
+              <option name="preferredColumnWidths">
+                <map>
+                  <entry key="Duration" value="90" />
+                  <entry key="HMD Global&#10; Nokia 5.1 Plus" value="120" />
+                  <entry key="Nexus_4_API_30" value="120" />
                   <entry key="PDAGAA4892200554" value="120" />
                   <entry key="Tests" value="360" />
                 </map>
