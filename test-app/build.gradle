@@ -99,6 +99,11 @@ dependencies {
 
     androidTestImplementation "androidx.test:runner:$version_android_junit_runner"
     androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
+    androidTestImplementation project(":test-shared")
+
+    androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"
+    androidTestImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+
     androidTestUtil "androidx.test:orchestrator:$version_androidx_orchestrator"
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
