@@ -8,10 +8,13 @@ import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import com.ustadmobile.meshrabiya.testapp.VNetTestActivity.Companion.UUID_MASK
+import com.ustadmobile.meshrabiya.testapp.server.TestAppServer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import net.luminis.http3.libnethttp.H3HttpClient
+import net.luminis.httpclient.AndroidH3Factory
 import org.acra.ACRA
 import org.acra.config.CoreConfigurationBuilder
 import org.acra.config.HttpSenderConfigurationBuilder
@@ -21,6 +24,7 @@ import org.kodein.di.DIAware
 import org.kodein.di.bind
 import org.kodein.di.instance
 import org.kodein.di.singleton
+import java.io.File
 
 class App: Application(), DIAware {
 
@@ -55,6 +59,13 @@ class App: Application(), DIAware {
             }
         }
 
+        bind<File>(tag = TAG_WWW_DIR) with singleton {
+            File(filesDir, "www").also {
+                if(!it.exists())
+                    it.mkdirs()
+            }
+        }
+
         bind<AndroidVirtualNode>() with singleton {
             AndroidVirtualNode(
                 appContext = applicationContext,
@@ -65,6 +76,29 @@ class App: Application(), DIAware {
                 dataStore = applicationContext.dataStore
             )
         }
+
+        bind<H3HttpClient>() with singleton {
+            val node: AndroidVirtualNode = instance()
+            AndroidH3Factory().newClientBuilder()
+                .disableCertificateCheck()
+                .datagramSocketFactory {
+                    node.createBoundDatagramSocket(0)
+                }
+                .build()
+        }
+
+
+        bind<TestAppServer>() with singleton {
+            val node: AndroidVirtualNode = instance()
+            val h3Client: H3HttpClient = instance()
+            TestAppServer.newTestServerWithRandomKey(
+                appContext = applicationContext,
+                socket = node.createBoundDatagramSocket(TestAppServer.DEFAULT_PORT),
+                h3Factory = AndroidH3Factory(),
+                http3Client = h3Client,
+            )
+        }
+
     }
 
     override val di: DI by DI.lazy {
@@ -92,6 +126,8 @@ class App: Application(), DIAware {
     companion object {
 
         const val TAG_VIRTUAL_ADDRESS = "virtual_add"
+
+        const val TAG_WWW_DIR = "www_dir"
 
     }
 }

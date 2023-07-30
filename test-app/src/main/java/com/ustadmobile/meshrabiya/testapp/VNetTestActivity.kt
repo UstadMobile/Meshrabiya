@@ -71,6 +71,7 @@ import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.screens.LocalVirtualNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.NeighborNodeListScreen
+import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -313,7 +314,9 @@ fun MeshrabiyaTestApp(
                 NavigationBarItem(
                     selected = selectedItem == "send" ,
                     label = { Text("Send") },
-                    onClick = { /*TODO*/ },
+                    onClick = {
+                        navController.navigate("send")
+                    },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.UploadFile,
@@ -371,6 +374,10 @@ fun AppNavHost(
 
         composable("neighbornodes") {
             NeighborNodeListScreen(onSetAppUiState = onSetAppUiState)
+        }
+
+        composable("send") {
+            SendFileScreen(onSetAppUiState = onSetAppUiState)
         }
 
     }

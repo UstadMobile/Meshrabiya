@@ -103,6 +103,7 @@ dependencies {
 
     androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"
     androidTestImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+    androidTestImplementation "app.cash.turbine:turbine:$version_turbine"
 
     androidTestUtil "androidx.test:orchestrator:$version_androidx_orchestrator"
 
