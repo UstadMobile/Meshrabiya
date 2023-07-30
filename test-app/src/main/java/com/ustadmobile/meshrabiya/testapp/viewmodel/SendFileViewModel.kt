@@ -60,12 +60,6 @@ class SendFileViewModel(
             return
 
         onNavigateToSelectReceiveNode(uri)
-//        viewModelScope.launch {
-//            testAppServer.addOutgoingTransfer(
-//                uri = uri,
-//                toNode =  InetAddress.getLoopbackAddress(),
-//            )
-//        }
     }
 
 }

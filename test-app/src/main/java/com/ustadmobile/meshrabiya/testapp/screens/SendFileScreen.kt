@@ -54,8 +54,7 @@ fun SendFileScreen(
             defaultArgs = null,
         )
     ),
-
-    ) {
+) {
     val uiState: SendFileUiState by viewModel.uiState.collectAsState(SendFileUiState())
 
     val launcherPicker = rememberLauncherForActivityResult(

@@ -170,9 +170,11 @@ class TestAppServer(
         )
 
         //tell the other side about the transfer
+        val requestUri = URI("https://${toNode.hostAddress}:$DEFAULT_PORT/" +
+                "send?id=$transferId&filename=${URLEncoder.encode(effectiveFileName, "UTF-8")}")
+        println(requestUri)
         val request = h3Factory.newRequestBuilder()
-            .uri(URI("https://${toNode.hostName}:$DEFAULT_PORT/" +
-                    "send?id=$transferId&filename=${URLEncoder.encode(effectiveFileName, "UTF-8")}"))
+            .uri(requestUri)
             .build()
         val response = http3Client.send(request, h3Factory.bodyHandlers().ofString())
         println(response.body())
@@ -191,6 +193,8 @@ class TestAppServer(
         transfer: IncomingTransfer,
         destFile: File,
     ) {
+        val startTime = System.currentTimeMillis()
+        println("TestAppServer: acceptIncomingTransfer")
         val request = h3Factory.newRequestBuilder()
             .uri(URI("https://${transfer.fromHost.hostAddress}:$DEFAULT_PORT/download/${transfer.id}"))
             .build()
@@ -198,6 +202,9 @@ class TestAppServer(
         val response = http3Client.send(request,
             h3Factory.bodyHandlers().ofFile(destFile.toPath()))
         response.body()
+        val finishTime = System.currentTimeMillis()
+        val sizeTransferred = destFile.length()
+        println("TestAppServer: acceptIncomingTransfer: Done!!!: Received ${sizeTransferred} bytes in ${finishTime - startTime}ms")
     }
 
     companion object {

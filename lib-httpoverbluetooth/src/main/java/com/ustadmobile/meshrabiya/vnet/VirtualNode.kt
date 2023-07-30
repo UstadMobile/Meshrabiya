@@ -552,7 +552,12 @@ abstract class VirtualNode(
 
             if(packet.header.toAddr == localNodeAddress) {
                 //this is an incoming packet - give to the destination virtual socket/forwarding
-                activeSockets[packet.header.toPort]?.onIncomingPacket(packet)
+                val listeningSocket = activeSockets[packet.header.toPort]
+                if(listeningSocket != null) {
+                    listeningSocket.onIncomingPacket(packet)
+                }else {
+                    logger(Log.DEBUG, "$logPrefix Incoming packet received, but no socket listening on: ${packet.header.toPort}")
+                }
             }else {
                 //packet needs to be sent to next hop / destination
                 val toAddr = packet.header.toAddr
