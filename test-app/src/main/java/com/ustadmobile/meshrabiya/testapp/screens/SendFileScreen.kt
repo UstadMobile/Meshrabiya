@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.testapp.screens
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,18 +42,20 @@ fun SendFileScreen(
 
 @Composable
 fun SendFileScreen(
+    onNavigateToSelectReceiveNode: (Uri) -> Unit,
+    onSetAppUiState: (AppUiState) -> Unit,
     viewModel: SendFileViewModel = viewModel(
         factory = ViewModelFactory(
             di = localDI(),
             owner = LocalSavedStateRegistryOwner.current,
             vmFactory = {
-                SendFileViewModel(it)
+                SendFileViewModel(it, onNavigateToSelectReceiveNode)
             },
             defaultArgs = null,
         )
     ),
-    onSetAppUiState: (AppUiState) -> Unit,
-) {
+
+    ) {
     val uiState: SendFileUiState by viewModel.uiState.collectAsState(SendFileUiState())
 
     val launcherPicker = rememberLauncherForActivityResult(

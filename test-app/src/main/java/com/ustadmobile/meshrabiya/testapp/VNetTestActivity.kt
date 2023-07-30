@@ -71,6 +71,7 @@ import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.screens.LocalVirtualNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.NeighborNodeListScreen
+import com.ustadmobile.meshrabiya.testapp.screens.SelectDestNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import kotlinx.coroutines.flow.Flow
@@ -80,6 +81,7 @@ import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
 import org.kodein.di.compose.withDI
+import java.net.URLEncoder
 import java.util.UUID
 
 data class TestActivityUiState(
@@ -377,9 +379,25 @@ fun AppNavHost(
         }
 
         composable("send") {
-            SendFileScreen(onSetAppUiState = onSetAppUiState)
+            SendFileScreen(
+                onNavigateToSelectReceiveNode = {uri ->
+                    navController.navigate("selectdestnode/${URLEncoder.encode(uri.toString(), "UTF-8")}")
+                },
+                onSetAppUiState = onSetAppUiState,
+            )
         }
 
+        composable("selectdestnode/{sendFileUri}") { backStackEntry ->
+            val uriToSend = backStackEntry.arguments?.getString("sendFileUri")
+                ?: throw IllegalArgumentException("No uri to send")
+            SelectDestNodeScreen(
+                uriToSend = uriToSend,
+                navigateOnDone = {
+                    navController.popBackStack()
+                },
+                onSetAppUiState =  onSetAppUiState,
+            )
+        }
     }
 }
 

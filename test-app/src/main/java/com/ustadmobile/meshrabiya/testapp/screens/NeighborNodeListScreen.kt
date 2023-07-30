@@ -4,6 +4,7 @@ import android.Manifest
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +30,7 @@ import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.composable.rememberConnectLauncher
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListUiState
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListViewModel
+import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import org.kodein.di.compose.localDI
 import org.kodein.di.direct
 import org.kodein.di.instance
@@ -136,17 +138,35 @@ fun NeighborNodeListScreen(
             items = uiState.nodes.entries.toList() ,
             key = { it.key }
         ) { nodeEntry ->
-            ListItem(
-                headlineContent = {
-                    Text(nodeEntry.key.addressToDotNotation())
-                },
-                supportingContent = {
-                    Text("Ping ${nodeEntry.value.originatorMessage.pingTimeSum}ms " +
-                            " Hops: ${nodeEntry.value.hopCount} ")
-                }
-            )
+            NodeListItem(nodeEntry.key, nodeEntry.value)
         }
 
     }
 
+}
+
+@Composable
+fun NodeListItem(
+    nodeAddr: Int,
+    nodeEntry: VirtualNode.LastOriginatorMessage,
+    onClick: (() -> Unit)? = null,
+) {
+    ListItem(
+        modifier = Modifier.let {
+            if(onClick != null) {
+                it.clickable(
+                    onClick = onClick
+                )
+            }else {
+                it
+            }
+        },
+        headlineContent = {
+            Text(nodeAddr.addressToDotNotation())
+        },
+        supportingContent = {
+            Text("Ping ${nodeEntry.originatorMessage.pingTimeSum}ms " +
+                    " Hops: ${nodeEntry.hopCount} ")
+        },
+    )
 }

@@ -24,6 +24,7 @@ data class SendFileUiState(
 //the file selector, then selecting a recipient.
 class SendFileViewModel(
     di: DI,
+    private val onNavigateToSelectReceiveNode: (Uri) -> Unit,
 ) : ViewModel(){
 
     private val _uiState = MutableStateFlow(SendFileUiState())
@@ -58,12 +59,13 @@ class SendFileViewModel(
         if(uri == null)
             return
 
-        viewModelScope.launch {
-            testAppServer.addOutgoingTransfer(
-                uri = uri,
-                toNode =  InetAddress.getLoopbackAddress(),
-            )
-        }
+        onNavigateToSelectReceiveNode(uri)
+//        viewModelScope.launch {
+//            testAppServer.addOutgoingTransfer(
+//                uri = uri,
+//                toNode =  InetAddress.getLoopbackAddress(),
+//            )
+//        }
     }
 
 }
