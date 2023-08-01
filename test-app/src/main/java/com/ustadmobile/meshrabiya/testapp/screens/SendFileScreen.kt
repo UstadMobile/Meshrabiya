@@ -34,6 +34,9 @@ fun SendFileScreen(
             ListItem(
                 headlineContent = {
                     Text("${transfer.name} -> ${transfer.toHost.hostAddress}")
+                },
+                supportingContent = {
+                    Text("Status: ${transfer.status} Sent ${transfer.transferred} / ${transfer.size}")
                 }
             )
         }

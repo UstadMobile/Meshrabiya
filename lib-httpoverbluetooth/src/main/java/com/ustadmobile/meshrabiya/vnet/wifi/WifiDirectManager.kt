@@ -322,7 +322,7 @@ class WifiDirectManager(
                     val p2pConfig = WifiP2pConfig.Builder()
                         .enablePersistentMode(true)
                         .setNetworkName(config.ssid)
-                        .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
+                        .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
                         .setPassphrase(config.passphrase)
                         .build()
                     val channelVal = channel ?: throw IllegalStateException("Create group: Null channel!")

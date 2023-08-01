@@ -109,9 +109,15 @@ class MeshrabiyaWifiManagerAndroid(
 
     private val closed = AtomicBoolean(false)
 
+    private var wifiLock: WifiManager.WifiLock? = null
+
     init {
         wifiDirectManager.onBeforeGroupStart = WifiDirectManager.OnBeforeGroupStart {
             // Do nothing - in future may need to stop other WiFi stuff
+        }
+
+        wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "meshrabiya").also {
+            it.acquire()
         }
 
         nodeScope.launch {
@@ -391,7 +397,7 @@ class MeshrabiyaWifiManagerAndroid(
                 //If we are connected and now expected to act as a Wifi Direct group, setup the
                 // group and add service for discovery.
 
-                wifiDirectManager.startWifiDirectGroup()
+                //wifiDirectManager.startWifiDirectGroup()
 
             }
         }else {
@@ -404,6 +410,9 @@ class MeshrabiyaWifiManagerAndroid(
         if(!closed.getAndSet(true)) {
             nodeScope.cancel()
             wifiDirectManager.close()
+            wifiLock?.also {
+                it.release()
+            }
         }
     }
 

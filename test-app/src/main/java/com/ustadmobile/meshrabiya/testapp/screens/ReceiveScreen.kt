@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.testapp.screens
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -62,18 +63,28 @@ fun ReceiveScreen(
                     Text(transfer.name)
                 },
                 supportingContent = {
-                    Text("From ${transfer.fromHost.hostAddress}")
+                    Column {
+                        Text("From ${transfer.fromHost.hostAddress} (${transfer.status})")
+                        Text(buildString {
+                            append("${transfer.transferred} / ${transfer.size} bytes")
+                            if(transfer.status == TestAppServer.Status.COMPLETED) {
+                                append(" @ ${transfer.size / transfer.transferTime}KB/s (${transfer.transferTime})ms")
+                            }
+                        })
+                    }
                 },
                 trailingContent = {
-                    IconButton(
-                        onClick = {
-                            onClickAccept(transfer)
+                    if(transfer.status == TestAppServer.Status.PENDING) {
+                        IconButton(
+                            onClick = {
+                                onClickAccept(transfer)
+                            }
+                        ) {
+                            Icon(
+                                imageVector  = Icons.Default.Check,
+                                contentDescription = "Accept",
+                            )
                         }
-                    ) {
-                        Icon(
-                            imageVector  = Icons.Default.Check,
-                            contentDescription = "Accept",
-                        )
                     }
                 }
             )

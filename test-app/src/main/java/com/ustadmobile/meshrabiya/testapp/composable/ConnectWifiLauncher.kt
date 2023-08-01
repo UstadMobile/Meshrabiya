@@ -108,22 +108,25 @@ fun rememberConnectWifiLauncher(
     ) { granted ->
         val hotspotConfigVal = pendingPermissionHotspotConfig ?: return@rememberLauncherForActivityResult
         if(granted) {
+            Log.d(LOG_TAG, "ConnectWifiLauncher: permission granted")
             pendingAssociateHotspotConfig = hotspotConfigVal
         }else {
             onResult(
                 ConnectWifiLauncherResult(
-                hotspotConfig = null
-            )
+                   hotspotConfig = null
+                )
             )
         }
     }
 
     LaunchedEffect(pendingAssociateHotspotConfig) {
         val hotspotConfigVal = pendingPermissionHotspotConfig ?: return@LaunchedEffect
+        Log.d(LOG_TAG, "ConnectWifiLauncher: check for assocation with ${hotspotConfigVal.ssid}")
         val node: AndroidVirtualNode = di.direct.instance()
         val storedBssid = node.lookupStoredBssid(hotspotConfigVal.nodeVirtualAddr)
 
         if(storedBssid != null) {
+            Log.d(LOG_TAG, "ConnectWifiLauncher: already associated ${hotspotConfigVal.ssid}")
             onResult(
                 ConnectWifiLauncherResult(
                     hotspotConfig = hotspotConfigVal.copy(
@@ -132,6 +135,7 @@ fun rememberConnectWifiLauncher(
                 )
             )
         }else {
+            Log.d(LOG_TAG, "ConnectWifiLauncher: requesting association for ${hotspotConfigVal.ssid}")
             val deviceFilter = WifiDeviceFilter.Builder()
                 .setNamePattern(Pattern.compile(Pattern.quote(hotspotConfigVal.ssid)))
                 .build()
@@ -148,12 +152,14 @@ fun rememberConnectWifiLauncher(
                 associationRequest,
                 object: CompanionDeviceManager.Callback() {
                     override fun onDeviceFound(intentSender: IntentSender) {
+                        Log.d(LOG_TAG, "ConnectWifiLauncher: onDeviceFound for ${hotspotConfigVal.ssid}")
                         intentSenderLauncher.launch(
                             IntentSenderRequest.Builder(intentSender).build()
                         )
                     }
 
                     override fun onFailure(reason: CharSequence?) {
+                        Log.d(LOG_TAG, "ConnectWifiLauncher: onFailure for ${hotspotConfigVal.ssid}")
                         onResult(ConnectWifiLauncherResult(hotspotConfig = null))
                     }
                 },

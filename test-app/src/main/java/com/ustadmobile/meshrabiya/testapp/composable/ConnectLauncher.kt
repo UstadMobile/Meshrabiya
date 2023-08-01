@@ -82,6 +82,7 @@ fun rememberConnectLauncher(
 
     LaunchedEffect(pendingHotspotConnect) {
         val hotspotConfig = pendingHotspotConnect ?: return@LaunchedEffect
+        Log.d(LOG_TAG, "ConnectLauncher: launch WiFi connect to $hotspotConfig")
         connectWifiLauncher.launch(hotspotConfig)
     }
 

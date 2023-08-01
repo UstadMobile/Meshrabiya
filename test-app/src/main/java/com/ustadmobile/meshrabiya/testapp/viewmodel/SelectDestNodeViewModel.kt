@@ -1,8 +1,10 @@
 package com.ustadmobile.meshrabiya.testapp.viewmodel
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.appstate.FabState
@@ -22,6 +24,7 @@ import java.net.InetAddress
 
 data class SelectDestNodeUiState(
     val nodes: Map<Int, VirtualNode.LastOriginatorMessage> = emptyMap(),
+    val error: String? = null,
     val sendingUri: String = "",
     val appUiState: AppUiState = AppUiState(),
 )
@@ -68,14 +71,25 @@ class SelectDestNodeViewModel(
         val destInetAddr = InetAddress.getByAddress(destNodeAddr.addressToByteArray())
 
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                testAppServer.addOutgoingTransfer(
-                    uri = Uri.parse(uriToSend),
-                    toNode = destInetAddr,
-                )
+            val transfer = withContext(Dispatchers.IO) {
+                try {
+                    testAppServer.addOutgoingTransfer(
+                        uri = Uri.parse(uriToSend),
+                        toNode = destInetAddr,
+                    )
+                }catch(e: Exception) {
+                    Log.e(LOG_TAG, "Exception selecting destination", e)
+                    _uiState.update { prev ->
+                        prev.copy(
+                            error = e.toString()
+                        )
+                    }
+                    null
+                }
             }
 
-            navigateOnDone()
+            if(transfer != null)
+                navigateOnDone()
         }
     }
 

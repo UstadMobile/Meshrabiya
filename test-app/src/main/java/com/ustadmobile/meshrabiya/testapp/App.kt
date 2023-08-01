@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.testapp
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import com.ustadmobile.meshrabiya.log.MNetLogger
@@ -28,6 +29,10 @@ import org.kodein.di.instance
 import org.kodein.di.singleton
 import java.io.File
 import java.security.Security
+import java.time.Duration
+import java.time.temporal.TemporalUnit
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 class App: Application(), DIAware {
 
@@ -54,7 +59,7 @@ class App: Application(), DIAware {
         }
 
         bind<MNetLogger>() with singleton {
-            MNetLoggerAndroid()
+            MNetLoggerAndroid(minLogLevel = Log.INFO)
         }
         bind<Json>() with singleton {
             Json {
@@ -88,6 +93,7 @@ class App: Application(), DIAware {
             val node: AndroidVirtualNode = instance()
             AndroidH3Factory().newClientBuilder()
                 .disableCertificateCheck()
+                .connectTimeout(Duration.ofSeconds(15))
                 .datagramSocketFactory {
                     node.createBoundDatagramSocket(0)
                 }
@@ -106,6 +112,7 @@ class App: Application(), DIAware {
                 socket = node.createBoundDatagramSocket(TestAppServer.DEFAULT_PORT),
                 h3Factory = AndroidH3Factory(),
                 http3Client = h3Client,
+                mLogger = instance()
             )
         }
 

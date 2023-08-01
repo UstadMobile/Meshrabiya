@@ -47,6 +47,12 @@ fun SelectDestNodeScreen(
     onClickNode: (Int) -> Unit,
 ) {
     LazyColumn {
+        uiState.error?.also { error ->
+            item(key = "error") {
+                Text("ERROR: $error")
+            }
+        }
+
         items(
             items = uiState.nodes.entries.toList(),
             key = { it.key }

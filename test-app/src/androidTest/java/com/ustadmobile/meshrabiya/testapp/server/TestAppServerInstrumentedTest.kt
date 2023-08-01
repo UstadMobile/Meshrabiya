@@ -107,6 +107,21 @@ class TestAppServerInstrumentedTest {
 
                     cancelAndIgnoreRemainingEvents()
                 }
+
+                testNode1.testServer.outgoingTransfers.filter {
+                    it.isNotEmpty()
+                }.test(timeout = 5.seconds) {
+                    val xfer = awaitItem().first()
+                    Assert.assertEquals(TestAppServer.Status.COMPLETED, xfer.status)
+                }
+
+                testNode2.testServer.incomingTransfers.filter {
+                    it.isNotEmpty()
+                }.test(timeout = 5.seconds) {
+                    val incomingTransfer = awaitItem().first()
+                    Assert.assertEquals(TestAppServer.Status.COMPLETED, incomingTransfer.status)
+                }
+
             }
         }finally {
             testNode1.testNode.close()

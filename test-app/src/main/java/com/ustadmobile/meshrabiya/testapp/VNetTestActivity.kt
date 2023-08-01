@@ -1,19 +1,12 @@
 package com.ustadmobile.meshrabiya.testapp
 
-import android.app.Activity
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
-import android.companion.CompanionDeviceManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -38,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -53,7 +45,6 @@ import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
@@ -73,7 +64,7 @@ class VNetTestActivity : ComponentActivity(), DIAware {
     override val di by closestDI()
 
     private val activityUiState = MutableStateFlow(TestActivityUiState())
-    
+
     fun onClickLogs() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 

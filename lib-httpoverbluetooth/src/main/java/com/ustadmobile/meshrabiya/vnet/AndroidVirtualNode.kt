@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -120,7 +121,6 @@ class AndroidVirtualNode(
 
     private val receiverRegistered = AtomicBoolean(false)
 
-
     /**
      * Listener that opens a bluetooth server socket
      */
@@ -151,18 +151,6 @@ class AndroidVirtualNode(
         }
     }
 
-//    private val uuidAllocationServer = UuidAllocationServer(
-//        appContext = appContext,
-//        allocationServiceUuid = allocationServiceUuid,
-//        allocationCharacteristicUuid = allocationCharacteristicUuid,
-//        onUuidAllocated = onUuidAllocatedListener,
-//    )
-
-//    private val uuidAllocationClient = UuidAllocationClient(
-//        appContext = appContext,
-//        onLog = logger,
-//        clientNodeAddr = localNodeAddress
-//    )
 
     init {
         //uuidAllocationServer.start()
