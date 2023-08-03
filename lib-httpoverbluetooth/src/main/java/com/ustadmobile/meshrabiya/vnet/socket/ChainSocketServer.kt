@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.vnet.socket
 
 import com.ustadmobile.meshrabiya.ext.readChainInitResponse
 import com.ustadmobile.meshrabiya.ext.readyByteArrayOfSizeOrThrow
+import com.ustadmobile.meshrabiya.ext.writeChainSocketInitRequest
 import com.ustadmobile.meshrabiya.ext.writeChainSocketInitResponse
 import java.net.ServerSocket
 import java.net.Socket
@@ -44,14 +45,16 @@ class ChainSocketServer(
                 initRequest.virtualDestAddr, initRequest.virtualDestPort
             )
             val onwardSocket = chainSocketResult.socket
-            val initResponse = if(!chainSocketResult.nextHop.isFinalDest) {
-                onwardSocket.getInputStream().readChainInitResponse()
+            if(!chainSocketResult.nextHop.isFinalDest) {
+                onwardSocket.getOutputStream().writeChainSocketInitRequest(initRequest)
+                val initResponse = onwardSocket.getInputStream().readChainInitResponse()
+                incomingSocket.getOutputStream().writeChainSocketInitResponse(initResponse)
             }else {
                 //Final destination has been connected
-                ChainSocketInitResponse(200)
+                incomingSocket.getOutputStream().writeChainSocketInitResponse(ChainSocketInitResponse(200))
             }
 
-            incomingSocket.getOutputStream().writeChainSocketInitResponse(initResponse)
+
 
             executorService.submit(CopyStreamRunnable(incomingSocket, onwardSocket))
             executorService.submit(CopyStreamRunnable(onwardSocket, incomingSocket))
