@@ -30,6 +30,8 @@ class ChainSocketServer(
         }
     }
 
+    val localPort: Int = serverSocket.localPort
+
     private inner class ClientInitRunnable(private val incomingSocket: Socket): Runnable {
         override fun run() {
             //read the destination - find next connection
@@ -62,9 +64,9 @@ class ChainSocketServer(
     ): Runnable {
         override fun run() {
             try {
-                while(!Thread.interrupted()) {
-                    fromSocket.getInputStream().copyTo(toSocket.getOutputStream())
-                }
+                val outStream = toSocket.getOutputStream()
+                fromSocket.getInputStream().copyTo(outStream)
+                outStream.flush()
             }finally {
                 toSocket.close()
             }

@@ -67,7 +67,7 @@ class ChainSocketFactoryTest {
 
         val destAddr = InetAddress.getByAddress(randomApipaAddr().addressToByteArray())
 
-        val chainSocketFactory = ChainSocketFactory(router)
+        val chainSocketFactory = ChainSocketFactoryImpl(router)
         val clientSocket = chainSocketFactory.createSocket(
             destAddr, serverSocket.localPort
         )
@@ -103,7 +103,7 @@ class ChainSocketFactoryTest {
             initChainRequest.complete(initRequest)
         }.start()
 
-        val socketFactory = ChainSocketFactory(router)
+        val socketFactory = ChainSocketFactoryImpl(router)
         val destAddr = InetAddress.getByAddress(randomApipaAddr().addressToByteArray())
         val destPort = 1042
         val chainSocket = socketFactory.createSocket(
