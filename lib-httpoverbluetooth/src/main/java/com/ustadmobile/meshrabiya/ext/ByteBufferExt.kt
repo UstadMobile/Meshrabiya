@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.ext
 
+import java.net.InetAddress
 import java.nio.ByteBuffer
 
 /**
@@ -37,3 +38,20 @@ fun ByteBuffer.getString(): String? {
 fun ByteBuffer.getStringOrThrow() : String {
     return getString() ?: throw NullPointerException("ByteBuffer.getStringOrThrow: stored string was null")
 }
+
+fun ByteBuffer.putInet4Address(inetAddress: InetAddress): ByteBuffer {
+    val addressBytes = inetAddress.address
+    if(addressBytes.size != 4)
+        throw IllegalArgumentException("putInetAddr: expected address of 4 bytes got ${addressBytes.size}")
+
+    put(inetAddress.address)
+
+    return this
+}
+
+fun ByteBuffer.getInet4Address(): InetAddress {
+    val addressBytes = ByteArray(4)
+    get(addressBytes)
+    return InetAddress.getByAddress(addressBytes)
+}
+

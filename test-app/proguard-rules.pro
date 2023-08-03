@@ -37,3 +37,19 @@
 -keep class org.bouncycastle.jce.provider.** { *; }
 
 -dontwarn javax.naming.**
+
+#Try remove debug log calls
+-assumenosideeffects interface net.luminis.quic.log.Logger {
+    void logDebug(...);
+    void logRaw(...);
+    void logDecrypted(...);
+    void debug(...);
+    void debugWithHexBlock(...);
+    void received(...);
+    void sent(...);
+    void raw(...);
+    void decrypted(...);
+    void encrypted(...);
+    void receivedPacketInfo(...);
+    void sentPacketInfo(...);
+}

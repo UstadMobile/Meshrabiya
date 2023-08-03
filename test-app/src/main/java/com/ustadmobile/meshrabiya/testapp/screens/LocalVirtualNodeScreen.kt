@@ -1,8 +1,6 @@
 package com.ustadmobile.meshrabiya.testapp.screens
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.content.Intent
 import android.content.res.Resources
 import android.os.Build
 import android.util.TypedValue
@@ -113,15 +111,6 @@ fun LocalVirtualNodeScreen(
         BarcodeEncoder()
     }
 
-    val launchMakeDiscoverablePrompt = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-        onResult = {
-            if(it.resultCode > 0){
-                onSetIncomingConnectionsEnabled(true)
-            }
-        }
-    )
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -140,17 +129,7 @@ fun LocalVirtualNodeScreen(
                         role = Role.Switch,
                         value = uiState.incomingConnectionsEnabled,
                         onValueChange = {
-                            if(it){
-                                val discoverableIntent: Intent = Intent(
-                                    BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE
-                                ).apply {
-                                    putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
-                                }
-
-                                launchMakeDiscoverablePrompt.launch(discoverableIntent)
-                            }else {
-                                onSetIncomingConnectionsEnabled(it)
-                            }
+                            onSetIncomingConnectionsEnabled(it)
                         },
                     )
             ) {

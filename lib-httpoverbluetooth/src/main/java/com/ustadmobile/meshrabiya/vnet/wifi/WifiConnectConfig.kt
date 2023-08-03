@@ -1,13 +1,11 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
 import android.net.wifi.WifiManager
-import android.os.Build
 import com.ustadmobile.meshrabiya.ext.getStringOrThrow
 import com.ustadmobile.meshrabiya.ext.putStringFromBytes
 import com.ustadmobile.meshrabiya.ext.requireHostAddress
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -26,7 +24,8 @@ import java.nio.ByteOrder
  * @param passphrase the passphrase for the Wifi to connect to
  * @param linkLocalAddr the ipv6 link local address of the node on the interface that provides the
  *                      hotspot. See architecture docs for why this is important.
- * @param port the UDP port that is used for virtualpackets
+ * @param port the UDP port that is used for virtualpackets. The same port will be used for socket
+ *             chains on TCP.
  * @param hotspotType the type of connection being offered - currently only Wifi Direct group is
  *                    supported. Wifi Aware may be added in future.
  * @param persistenceType the expected persistence of this config. This helps the client decide

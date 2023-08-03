@@ -1,7 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
 import com.ustadmobile.meshrabiya.ext.requireAsIpv6
-import com.ustadmobile.meshrabiya.ext.requireHostAddress
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import kotlinx.serialization.json.Json
 import org.junit.Assert

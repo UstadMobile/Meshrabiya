@@ -2,8 +2,11 @@ package com.ustadmobile.meshrabiya.ext
 
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
+import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketInitRequest
+import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketInitResponse
 import java.io.IOException
 import java.io.InputStream
+import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 
 /**
@@ -39,6 +42,10 @@ fun InputStream.readByteArrayOfSize(size: Int): ByteArray? {
         byteArray
     else
         null
+}
+
+fun InputStream.readyByteArrayOfSizeOrThrow(size: Int) : ByteArray{
+    return readByteArrayOfSize(size) ?: throw IOException("Could not read requested $size bytes")
 }
 
 fun InputStream.readRemoteAddress() : Int{
@@ -77,5 +84,17 @@ fun InputStream.readVirtualPacket(
         data = buffer,
         payloadOffset = offset + VirtualPacketHeader.HEADER_SIZE,
         headerAlreadyInData = true,
+    )
+}
+
+fun InputStream.readChainInitResponse() : ChainSocketInitResponse {
+    return ChainSocketInitResponse.fromBytes(
+        readyByteArrayOfSizeOrThrow(ChainSocketInitResponse.MESSAGE_SIZE), 0
+    )
+}
+
+fun InputStream.readChainSocketInitRequest(): ChainSocketInitRequest {
+    return ChainSocketInitRequest.fromBytes(
+        readyByteArrayOfSizeOrThrow(ChainSocketInitRequest.MESSAGE_SIZE)
     )
 }

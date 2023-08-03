@@ -7,6 +7,7 @@ import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.appendOrReplace
 import com.ustadmobile.meshrabiya.ext.prefixMatches
 import com.ustadmobile.meshrabiya.ext.readRemoteAddress
+import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import com.ustadmobile.meshrabiya.ext.writeAddress
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
@@ -24,6 +25,7 @@ import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocket2
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
+import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -44,6 +46,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.NoRouteToHostException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -86,7 +89,7 @@ abstract class VirtualNode(
     val port: Int,
     val logger: MNetLogger = MNetLoggerStdout(),
     val localNodeAddress: Int = randomApipaAddr(),
-    val networkPrefixLength: Int = 16,
+    override val networkPrefixLength: Int = 16,
     val json: Json,
     val config: NodeConfig,
 ): NeighborNodeManager.NeighborNodeStateChangedListener, VirtualRouter, Closeable {
@@ -96,7 +99,7 @@ abstract class VirtualNode(
      */
     val localNodeAddressByteArray = localNodeAddress.addressToByteArray()
 
-    val localNodeInetAddress: InetAddress = InetAddress.getByAddress(localNodeAddressByteArray)
+    override val localNodeInetAddress: InetAddress = InetAddress.getByAddress(localNodeAddressByteArray)
 
     //This executor is used for direct I/O activities
     protected val connectionExecutor: ExecutorService = Executors.newCachedThreadPool()
@@ -140,6 +143,8 @@ abstract class VirtualNode(
         val timeReceived: Long,
         val lastHopAddr: Int,
         val hopCount: Byte,
+        val lastHopRealInetAddr: InetAddress,
+        val lastHopRealPort: Int,
     )
 
     enum class Zone {
@@ -370,6 +375,7 @@ abstract class VirtualNode(
 
     private fun onIncomingMmcpMessage(
         packet: VirtualPacket,
+        datagramPacket: DatagramPacket?,
     ) : Boolean {
         //This is an Mmcp message
         try {
@@ -457,6 +463,7 @@ abstract class VirtualNode(
                     //via some other (suboptimal) route with more hops
                     val currentlyKnownSentTime = (currentOriginatorMessage?.originatorMessage?.sentTime ?: 0)
                     val currentlyKnownHopCount = (currentOriginatorMessage?.hopCount ?: Byte.MAX_VALUE)
+                    val receivedFromRealInetAddr = datagramPacket?.address ?: return false
                     val isMoreRecentOrBetter = mmcpMessage.sentTime > currentlyKnownSentTime
                             || packet.header.hopCount < currentlyKnownHopCount
 
@@ -476,7 +483,9 @@ abstract class VirtualNode(
                             originatorMessage = mmcpMessage.copyWithPingTimeIncrement(connectionPingTime),
                             timeReceived = System.currentTimeMillis(),
                             lastHopAddr = packet.header.lastHopAddr,
-                            hopCount = packet.header.hopCount
+                            hopCount = packet.header.hopCount,
+                            lastHopRealInetAddr = receivedFromRealInetAddr,
+                            lastHopRealPort = datagramPacket.port
                         )
                         logger(Log.DEBUG,
                             message = {
@@ -544,7 +553,7 @@ abstract class VirtualNode(
 
             if(packet.header.toPort == 0 && packet.header.fromAddr != localNodeAddress){
                 //this is an MMCP message
-                if(!onIncomingMmcpMessage(packet)){
+                if(!onIncomingMmcpMessage(packet, datagramPacket)){
                     //It was determined that this packet should go no further by MMCP processing
                     logger(Log.DEBUG, "Drop mmcp packet from ${packet.header.fromAddr}", null)
                 }
@@ -603,6 +612,35 @@ abstract class VirtualNode(
                 e
             )
             throw e
+        }
+    }
+
+    override fun lookupNextHopForChainSocket(address: InetAddress, port: Int): ChainSocketNextHop {
+        val addressInt = address.requireAddressAsInt()
+
+        val originatorMessage = originatorMessages[addressInt]
+
+        return when {
+            //Destination address is this node
+            addressInt == localNodeAddress -> {
+                ChainSocketNextHop(InetAddress.getLoopbackAddress(), port, true)
+            }
+
+            //Destination is a direct neighbor (final destination) - connect to the actual socket itself
+            originatorMessage != null && originatorMessage.hopCount == 1.toByte() -> {
+                ChainSocketNextHop(originatorMessage.lastHopRealInetAddr, port, true)
+            }
+
+            //Destination is not a direct neighbor, but we have a route there
+            originatorMessage != null -> {
+                ChainSocketNextHop(originatorMessage.lastHopRealInetAddr,
+                    originatorMessage.lastHopRealPort, false)
+            }
+
+            //No route available to reach the given address
+            else -> {
+                throw NoRouteToHostException("No route to virtual host $address")
+            }
         }
     }
 

@@ -198,6 +198,7 @@ class TestAppServer(
     fun addOutgoingTransfer(
         uri: Uri,
         toNode: InetAddress,
+        toPort: Int = DEFAULT_PORT,
         fileName: String? = null,
     ): OutgoingTransfer? {
         val transferId = transferIdAtomic.incrementAndGet()
@@ -215,7 +216,7 @@ class TestAppServer(
 
 
         //tell the other side about the transfer
-        val requestUri = URI("https://${toNode.hostAddress}:$DEFAULT_PORT/" +
+        val requestUri = URI("https://${toNode.hostAddress}:$toPort/" +
                 "send?id=$transferId&filename=${URLEncoder.encode(effectiveName, "UTF-8")}&size=${nameAndSize.size}")
 
 
@@ -312,11 +313,12 @@ class TestAppServer(
     fun acceptIncomingTransfer(
         transfer: IncomingTransfer,
         destFile: File,
+        fromPort: Int = DEFAULT_PORT,
     ) {
         val startTime = System.currentTimeMillis()
 
         val request = h3Factory.newRequestBuilder()
-            .uri(URI("https://${transfer.fromHost.hostAddress}:$DEFAULT_PORT/download/${transfer.id}"))
+            .uri(URI("https://${transfer.fromHost.hostAddress}:$fromPort/download/${transfer.id}"))
             .build()
 
         val response = http3Client.send(
