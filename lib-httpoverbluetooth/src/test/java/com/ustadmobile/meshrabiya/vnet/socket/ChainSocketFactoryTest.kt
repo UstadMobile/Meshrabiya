@@ -81,6 +81,8 @@ class ChainSocketFactoryTest {
     fun givenNextHopIsNotFinalDest_whenSocketCreated_thenWillConnectAndWriteInitRequest() {
         val initResponseSocketServer = ServerSocket(0)
         val router: VirtualRouter = createMockVirtualRouter()
+        val destAddr = InetAddress.getByAddress(randomApipaAddr().addressToByteArray())
+
         router.stub {
             on {
                 lookupNextHopForChainSocket(any(), any())
@@ -104,7 +106,6 @@ class ChainSocketFactoryTest {
         }.start()
 
         val socketFactory = ChainSocketFactoryImpl(router)
-        val destAddr = InetAddress.getByAddress(randomApipaAddr().addressToByteArray())
         val destPort = 1042
         val chainSocket = socketFactory.createSocket(
             destAddr, destPort

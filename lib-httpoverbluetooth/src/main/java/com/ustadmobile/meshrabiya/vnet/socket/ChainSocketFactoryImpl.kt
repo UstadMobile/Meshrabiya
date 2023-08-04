@@ -1,16 +1,13 @@
 package com.ustadmobile.meshrabiya.vnet.socket
 
 import com.ustadmobile.meshrabiya.ext.prefixMatches
-import com.ustadmobile.meshrabiya.ext.readChainInitResponse
-import com.ustadmobile.meshrabiya.ext.writeChainSocketInitRequest
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
-import java.io.IOException
 import java.net.InetAddress
 import java.net.Socket
 import javax.net.SocketFactory
 
 class ChainSocketFactoryImpl(
-    private val virtualRouter: VirtualRouter,
+    internal val virtualRouter: VirtualRouter,
     private val systemSocketFactory: SocketFactory = getDefault(),
 ) : ChainSocketFactory() {
 
@@ -20,7 +17,7 @@ class ChainSocketFactoryImpl(
         port: Int,
         localAddress: InetAddress? = null,
         localPort: Int? = null
-    ) : ChainSocketFactory.ChainSocketResult {
+    ) : ChainSocketResult {
         val nextHop = virtualRouter.lookupNextHopForChainSocket(address, port)
         val socket = if(localAddress != null && localPort != null) {
             systemSocketFactory.createSocket(nextHop.address, nextHop.port, localAddress, localPort)
@@ -28,22 +25,16 @@ class ChainSocketFactoryImpl(
             systemSocketFactory.createSocket(nextHop.address, nextHop.port)
         }
 
-        if(!nextHop.isFinalDest) {
-            val chainInitRequest = ChainSocketInitRequest(
+        socket.initializeChainIfNotFinalDest(
+            ChainSocketInitRequest(
                 virtualDestAddr = address,
                 virtualDestPort = port,
                 fromAddr = virtualRouter.localNodeInetAddress
-            )
-            socket.getOutputStream().writeChainSocketInitRequest(chainInitRequest)
-            val initResponse = socket.getInputStream().readChainInitResponse()
+            ),
+            nextHop
+        )
 
-            if(initResponse.statusCode != 200){
-                socket.close()
-                throw IOException("Could not init chain socket: status code = ${initResponse.statusCode}")
-            }
-        }
-
-        return ChainSocketFactory.ChainSocketResult(socket, nextHop)
+        return ChainSocketResult(socket, nextHop)
     }
 
     private fun InetAddress.isVirtualAddress(): Boolean {
@@ -82,6 +73,10 @@ class ChainSocketFactoryImpl(
         }else {
             systemSocketFactory.createSocket(address, port, localAddress, localPort)
         }
+    }
+
+    override fun createSocket(): Socket {
+        return ChainSocket(virtualRouter)
     }
 
     override fun createChainSocket(address: InetAddress, port: Int): ChainSocketResult {
