@@ -156,11 +156,16 @@ class ChainSocketServer(
         }
     }
 
-    override fun close() {
+    fun close(closeSocket: Boolean) {
         acceptRunnableFuture.cancel(true)
         clientFutures.forEach {
             it.get()?.cancel(true)
         }
+        serverSocket.takeIf { closeSocket }?.close()
+    }
+
+    override fun close() {
+        close(closeSocket = false)
     }
 
 }

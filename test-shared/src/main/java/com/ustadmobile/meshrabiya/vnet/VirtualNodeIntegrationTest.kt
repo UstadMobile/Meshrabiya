@@ -12,9 +12,12 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.test.EchoDatagramServer
+import com.ustadmobile.meshrabiya.test.FileEchoSocketServer
 import com.ustadmobile.meshrabiya.test.TestVirtualNode
 import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
+import com.ustadmobile.meshrabiya.test.assertFileContentsAreEqual
 import com.ustadmobile.meshrabiya.test.connectTo
+import com.ustadmobile.meshrabiya.test.newFileWithRandomData
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotStatus
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -35,12 +38,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verifyBlocking
+import java.io.FileOutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet6Address
@@ -58,10 +64,27 @@ import kotlin.time.Duration.Companion.seconds
 
 abstract class VirtualNodeIntegrationTest {
 
-    private val logger = MNetLoggerStdout()
+    protected val logger = MNetLoggerStdout()
 
-    private val json = Json {
+    protected val json = Json {
         encodeDefaults = true
+    }
+
+    @JvmField
+    @field:Rule
+    val tempFolder = TemporaryFolder()
+
+    fun makeNode(lastAddrByte: Byte): VirtualNode {
+        return TestVirtualNode(
+            localNodeAddress = byteArrayOf(
+                169.toByte(),
+                254.toByte(),
+                1,
+                lastAddrByte,
+            ).ip4AddressToInt(),
+            json = json,
+            logger = logger,
+        )
     }
 
     @Test(timeout = 5000)
@@ -509,6 +532,51 @@ abstract class VirtualNodeIntegrationTest {
         }
     }
 
+    @Test
+    fun givenTwoNodesConnected_whenSocketCreatedUsingSocketFactory_thenWillConnectAndDownload() {
+        val (node1, node2) = makeNode(1.toByte()) to makeNode(2.toByte())
+        node1.connectTo(node2)
+        val randomFile = tempFolder.newFileWithRandomData(1024 * 1024, "random.dat")
+
+        val node2ServerSocket = FileEchoSocketServer(randomFile, 0)
+        val downloadedFile = tempFolder.newFile("downloaded.dat")
+        node1.socketFactory.createSocket(
+            node2.localNodeInetAddress, node2ServerSocket.localPort
+        ).use { clientSocket ->
+            FileOutputStream(downloadedFile).use { fileOutStream ->
+                clientSocket.getInputStream().copyTo(fileOutStream)
+                fileOutStream.flush()
+            }
+        }
+
+        assertFileContentsAreEqual(randomFile, downloadedFile)
+        node1.close()
+        node2.close()
+    }
+
+    @Test
+    fun givenThreeNodesConnected_whenSocketCreatedUsingSocketFactory_thenWillConnectOverMultihopAndDownload() {
+        val nodes = (1..3).map {
+            makeNode(it.toByte())
+        }
+        nodes[0].connectTo(nodes[1])
+        nodes[1].connectTo(nodes[2])
+
+        val randomFile = tempFolder.newFileWithRandomData(1024 * 1024, "random.dat")
+
+        val node3ServerSocket = FileEchoSocketServer(randomFile, 0)
+        val downloadedFile = tempFolder.newFile("download.dat")
+        nodes.first().socketFactory.createSocket(
+            nodes.last().localNodeInetAddress, node3ServerSocket.localPort
+        ).use {clientSocket ->
+            FileOutputStream(downloadedFile).use { fileOut ->
+                clientSocket.getInputStream().copyTo(fileOut)
+            }
+        }
+
+        assertFileContentsAreEqual(randomFile, downloadedFile)
+        nodes.forEach { it.close() }
+    }
 
 
 }

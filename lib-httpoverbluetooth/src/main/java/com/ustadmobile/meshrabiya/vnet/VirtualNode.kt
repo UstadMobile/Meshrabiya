@@ -19,13 +19,17 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.portforward.ForwardBindPoint
 import com.ustadmobile.meshrabiya.portforward.UdpForwardRule
+import com.ustadmobile.meshrabiya.util.findFreePort
 import com.ustadmobile.meshrabiya.util.matchesMask
 import com.ustadmobile.meshrabiya.util.uuidForMaskAndPort
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocket2
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
+import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactory
+import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactoryImpl
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
+import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketServer
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -47,6 +51,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NoRouteToHostException
+import java.net.ServerSocket
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -56,6 +61,7 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
+import javax.net.SocketFactory
 import kotlin.concurrent.withLock
 import kotlin.random.Random
 
@@ -147,6 +153,7 @@ abstract class VirtualNode(
         val lastHopRealPort: Int,
     )
 
+    @Suppress("unused") //Part of the API
     enum class Zone {
         VNET, REAL
     }
@@ -156,8 +163,10 @@ abstract class VirtualNode(
      */
     protected val originatorMessages: MutableMap<Int, LastOriginatorMessage> = ConcurrentHashMap()
 
+    private val localPort = findFreePort(0)
+
     val datagramSocket = VirtualNodeDatagramSocket(
-        socket = DatagramSocket(0),
+        socket = DatagramSocket(localPort),
         ioExecutorService = connectionExecutor,
         router = this,
         localNodeVirtualAddress = localNodeAddress,
@@ -171,6 +180,19 @@ abstract class VirtualNode(
             )
         },
         logger = logger,
+    )
+
+    private val chainSocketFactory: ChainSocketFactory = ChainSocketFactoryImpl(this)
+
+    val socketFactory: SocketFactory
+        get() = chainSocketFactory
+
+    private val chainSocketServer = ChainSocketServer(
+        serverSocket = ServerSocket(localPort),
+        executorService = connectionExecutor,
+        chainSocketFactory = chainSocketFactory,
+        name = localNodeAddress.addressToDotNotation(),
+        logger = logger
     )
 
     val allocationServiceUuid: UUID by lazy {
@@ -753,6 +775,7 @@ abstract class VirtualNode(
             it.close()
         }
         datagramSocket.close()
+        chainSocketServer.close(closeSocket = true)
 
         connectionExecutor.shutdown()
         scheduledExecutor.shutdown()

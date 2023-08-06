@@ -8,8 +8,8 @@ import java.util.concurrent.Executors
 
 class FileEchoSocketServer(
     private val file: File,
-    port: Int,
-    private val executorService: ExecutorService = Executors.newSingleThreadExecutor(),
+    port: Int = 0,
+    executorService: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : Runnable {
 
     private val serverSocket = ServerSocket(port)
