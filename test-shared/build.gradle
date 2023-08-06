@@ -43,5 +43,6 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
     implementation "app.cash.turbine:turbine:$version_turbine"
-
+    implementation "com.squareup.okhttp3:mockwebserver:$version_mockwebserver"
+    implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
 }

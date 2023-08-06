@@ -3,6 +3,7 @@ package com.ustadmobile.meshrabiya.vnet
 import app.cash.turbine.test
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.copyToExactlyOrThrow
 import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
 import com.ustadmobile.meshrabiya.ext.requireAsIpv6
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
@@ -37,6 +38,14 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import okio.Buffer
+import okio.source
 import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
@@ -47,6 +56,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.timeout
 import org.mockito.kotlin.verifyBlocking
 import java.io.FileOutputStream
+import java.lang.IllegalStateException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet6Address
@@ -576,6 +586,56 @@ abstract class VirtualNodeIntegrationTest {
 
         assertFileContentsAreEqual(randomFile, downloadedFile)
         nodes.forEach { it.close() }
+    }
+
+
+
+
+    @Test
+    fun givenThreeNodesConnected_whenSocketFactoryUsedToCreateOkHttpClient_thenCanMakeHttpRequestsOverMultipleHops() {
+        val nodes = (1..3).map {
+            makeNode(it.toByte())
+        }
+        nodes[0].connectTo(nodes[1])
+        nodes[1].connectTo(nodes[2])
+
+        val randomDataFile = tempFolder.newFileWithRandomData(1024 * 1024)
+
+        val mockWebServer = MockWebServer()
+        mockWebServer.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                return MockResponse()
+                    .setHeader("content-length", randomDataFile.length())
+                    .setBody(Buffer().also {
+                        it.writeAll(randomDataFile.source())
+                    })
+                    .setResponseCode(200)
+            }
+        }
+        mockWebServer.start()
+
+        val okHttpClient = OkHttpClient.Builder()
+            .socketFactory(nodes.first().socketFactory)
+            .build()
+
+        val request = Request.Builder()
+            .url("http://localhost:${mockWebServer.port}/random.dat")
+            .build()
+
+        val downloadedFile = tempFolder.newFile()
+        val response = okHttpClient.newCall(request).execute()
+        val responseBody =  response.body ?: throw IllegalStateException()
+        responseBody.byteStream().use {responseIn ->
+            FileOutputStream(downloadedFile).use { fileOut ->
+                responseIn.copyToExactlyOrThrow(fileOut, randomDataFile.length())
+                fileOut.flush()
+            }
+        }
+        response.close()
+
+        assertFileContentsAreEqual(randomDataFile, downloadedFile)
+        nodes.forEach { it.close() }
+        mockWebServer.close()
     }
 
 

@@ -6,7 +6,7 @@ import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketInitRequest
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketInitResponse
 import java.io.IOException
 import java.io.InputStream
-import java.lang.IllegalStateException
+import java.io.OutputStream
 import java.nio.ByteBuffer
 
 /**
@@ -29,6 +29,32 @@ fun InputStream.readExactly(b: ByteArray, offset: Int, len: Int): Int {
     return bytesRead
 }
 
+/**
+ * Copy exactly the given
+ */
+fun InputStream.copyToExactlyOrThrow(
+    out: OutputStream,
+    length: Long,
+    bufSize: Int = 8192,
+) {
+    val buf = ByteArray(bufSize)
+    var bytesRemaining = length
+    while(bytesRemaining > bufSize) {
+        val bytesRead = read(buf)
+        if(bytesRead == -1) {
+            //end of stream reached, but that should not be
+            throw IOException("copyToExactlyOrThrow: unexpected end of stream copied $bytesRemaining/$length")
+        }
+
+        out.write(buf, 0, bytesRead)
+        bytesRemaining -= bytesRead
+    }
+
+    if(bytesRemaining != 0L) {
+        readExactlyOrThrow(buf, 0, bytesRemaining.toInt())
+        out.write(buf, 0, bytesRemaining.toInt())
+    }
+}
 fun InputStream.readExactlyOrThrow(b: ByteArray, offset: Int, len: Int) {
     val bytesRead = readExactly(b, offset, len)
     if(bytesRead != len)
