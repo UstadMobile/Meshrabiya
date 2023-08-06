@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
@@ -17,6 +18,7 @@ import kotlinx.serialization.json.Json
 import net.luminis.http3.libnethttp.H3HttpClient
 import net.luminis.httpclient.AndroidH3Factory
 import net.luminis.tls.env.PlatformMapping
+import okhttp3.OkHttpClient
 import org.acra.ACRA
 import org.acra.config.CoreConfigurationBuilder
 import org.acra.config.HttpSenderConfigurationBuilder
@@ -89,30 +91,22 @@ class App: Application(), DIAware {
             )
         }
 
-        bind<H3HttpClient>() with singleton {
+        bind<OkHttpClient>() with singleton {
             val node: AndroidVirtualNode = instance()
-            AndroidH3Factory().newClientBuilder()
-                .disableCertificateCheck()
-                .connectTimeout(Duration.ofSeconds(15))
-                .datagramSocketFactory {
-                    node.createBoundDatagramSocket(0)
-                }
+            OkHttpClient.Builder()
+                .socketFactory(node.socketFactory)
                 .build()
         }
 
-
         bind<TestAppServer>() with singleton {
-            PlatformMapping.usePlatformMapping(PlatformMapping.Platform.Android)
-            Security.addProvider(BouncyCastleProvider())
-
             val node: AndroidVirtualNode = instance()
-            val h3Client: H3HttpClient = instance()
-            TestAppServer.newTestServerWithRandomKey(
+            TestAppServer(
                 appContext = applicationContext,
-                socket = node.createBoundDatagramSocket(TestAppServer.DEFAULT_PORT),
-                h3Factory = AndroidH3Factory(),
-                http3Client = h3Client,
-                mLogger = instance()
+                httpClient = instance(),
+                mLogger = instance(),
+                port = TestAppServer.DEFAULT_PORT,
+                name = node.localNodeAddress.addressToDotNotation(),
+                localVirtualAddr = node.localNodeInetAddress,
             )
         }
 
