@@ -36,6 +36,7 @@ fun InputStream.copyToExactlyOrThrow(
     out: OutputStream,
     length: Long,
     bufSize: Int = 8192,
+    onProgress: ((Long) -> Unit)? = null,
 ) {
     val buf = ByteArray(bufSize)
     var bytesRemaining = length
@@ -48,11 +49,13 @@ fun InputStream.copyToExactlyOrThrow(
 
         out.write(buf, 0, bytesRead)
         bytesRemaining -= bytesRead
+        onProgress?.invoke(length - bytesRemaining)
     }
 
     if(bytesRemaining != 0L) {
         readExactlyOrThrow(buf, 0, bytesRemaining.toInt())
         out.write(buf, 0, bytesRemaining.toInt())
+        onProgress?.invoke(length)
     }
 }
 fun InputStream.readExactlyOrThrow(b: ByteArray, offset: Int, len: Int) {

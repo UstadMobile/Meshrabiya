@@ -79,7 +79,6 @@ class TestAppServerInstrumentedTest {
         try {
             testNode1.testNode.connectTo(testNode2.testNode)
 
-
             val randomFile = tempDir.newFileWithRandomData(1024 * 1024, "random.dat")
             val destFile = tempDir.newFile()
 
@@ -88,9 +87,8 @@ class TestAppServerInstrumentedTest {
             val outgoingTransfer = testNode1.testServer.addOutgoingTransfer(
                 uri = randomFile.toUri(),
                 toNode = testNode2.testNode.localNodeInetAddress,
-                fileName = "random.dat",
                 toPort = testNode2.testServer.localPort
-            )!!
+            )
 
             runBlocking {
                 testNode2.testServer.incomingTransfers.filter {
@@ -99,29 +97,24 @@ class TestAppServerInstrumentedTest {
                     val incomingTransfer = awaitItem().first()
                     Assert.assertEquals(incomingTransfer.id, outgoingTransfer.id)
 
-
-
                     val runTime = measureTime {
                         testNode2.testServer.acceptIncomingTransfer(
                             transfer = incomingTransfer,
                             destFile = destFile,
                             fromPort = testNode1.testServer.localPort,
                         )
-                        //Assert.assertArrayEquals(randomBytes, destFile.readBytes())
                     }
                     println("Downloaded file in $runTime")
 
                     cancelAndIgnoreRemainingEvents()
                 }
 
-                //TODO: re-enable this when the server tracks the status of reading the response
-                /*
                 testNode1.testServer.outgoingTransfers.filter {
-                    it.isNotEmpty()
+                    it.isNotEmpty() && it.first().status == TestAppServer.Status.COMPLETED
                 }.test(timeout = 5.seconds, name = "Testnode 1 outgoing tranfer status is complete") {
                     val xfer = awaitItem().first()
                     Assert.assertEquals(TestAppServer.Status.COMPLETED, xfer.status)
-                }*/
+                }
 
                 testNode2.testServer.incomingTransfers.filter {
                     it.isNotEmpty()

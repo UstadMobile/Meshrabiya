@@ -3,29 +3,29 @@ package com.ustadmobile.meshrabiya.testapp.server
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.ustadmobile.meshrabiya.ext.appendOrReplace
 import com.ustadmobile.meshrabiya.ext.copyToExactlyOrThrow
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.ext.getUriNameAndSize
 import com.ustadmobile.meshrabiya.testapp.ext.updateItem
 import fi.iki.elonen.NanoHTTPD
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import net.luminis.http3.libnethttp.H3HttpResponse
-import net.luminis.http3.libnethttp.H3HttpResponse.H3BodyHandler
-import net.luminis.http3.libnethttp.H3HttpResponse.H3BodySubscriber
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.internal.headersContentLength
+import java.io.Closeable
 import java.io.File
 import java.io.FileOutputStream
 import java.net.InetAddress
 import java.net.URLEncoder
-import java.nio.ByteBuffer
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -36,12 +36,14 @@ class TestAppServer(
     private val appContext: Context,
     private val httpClient: OkHttpClient,
     private val mLogger: MNetLogger,
-    private val name: String,
-    private val port: Int = 0,
+    name: String,
+    port: Int = 0,
     private val localVirtualAddr: InetAddress,
-) : NanoHTTPD(port) {
+) : NanoHTTPD(port), Closeable {
 
     private val logPrefix: String = "[TestAppServer - $name] "
+
+    private val scope = CoroutineScope(Dispatchers.IO + Job())
 
     enum class Status {
         PENDING, IN_PROGRESS, COMPLETED, FAILED
@@ -90,54 +92,62 @@ class TestAppServer(
                 it.id == xferId
             }
 
-            val response = NanoHTTPD.newFixedLengthResponse(
+            val contentIn = appContext.contentResolver.openInputStream(outgoingXfer.uri)?.let {
+                InputStreamCounter(it)
+            }
+
+            if(contentIn == null) {
+                mLogger(Log.ERROR, "$logPrefix Failed to open input stream to serve $path - ${outgoingXfer.uri}")
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain",
+                    "Failed to open InputStream")
+            }
+
+            mLogger(Log.INFO, "$logPrefix Sending file for xfer #$xferId")
+            val response = newFixedLengthResponse(
                 Response.Status.OK, "application/octet",
-                appContext.contentResolver.openInputStream(outgoingXfer.uri),
+                contentIn,
                 outgoingXfer.size.toLong()
             )
 
-            return response
-
-            /*
-            TODO for NanoHTTPD : monitor the input stream to show progress
-            appContext.contentResolver.openInputStream(outgoingXfer.uri)?.use { inStream ->
-                val buf = ByteArray(8 * 1024)
-                var bytesRead: Int
-                val outStream = response.outputStream
-                var totalTransferred = 0
-                var lastUpdateTime = 0L
-                while(inStream.read(buf).also { bytesRead = it } != -1) {
-                    outStream.write(buf, 0, bytesRead)
-                    totalTransferred += bytesRead
-                    val timeNow = System.currentTimeMillis()
-                    if(timeNow - lastUpdateTime > 500) {
-                        _outgoingTransfers.update { prev ->
-                            prev.appendOrReplace(
-                                item = outgoingXfer.copy(
-                                    transferred = totalTransferred,
-                                    status = Status.IN_PROGRESS,
-                                ),
-                                replace = { it.id == xferId }
-                            )
-                        }
-                        lastUpdateTime = timeNow
+            //Provide status updates by checking how many bytes have been read periodically
+            scope.launch {
+                while(!contentIn.closed) {
+                    _outgoingTransfers.update { prev ->
+                        prev.updateItem(
+                            updatePredicate = { it.id == xferId },
+                            function = { item ->
+                                item.copy(
+                                    transferred = contentIn.bytesRead,
+                                )
+                            }
+                        )
                     }
+                    delay(500)
                 }
+
+                val status = if(contentIn.bytesRead == outgoingXfer.size) {
+                    Status.COMPLETED
+                }else {
+                    Status.FAILED
+                }
+                mLogger(Log.INFO, "$logPrefix Sending file for xfer #$xferId - finished - status=$status")
 
                 _outgoingTransfers.update { prev ->
                     prev.updateItem(
                         updatePredicate = { it.id == xferId },
                         function = { item ->
                             item.copy(
-                                status = Status.COMPLETED,
-                                transferred = item.size,
+                                transferred = contentIn.bytesRead,
+                                status = status
                             )
                         }
                     )
                 }
             }
-             */
+
+            return response
         }else if(path.startsWith("/send")) {
+            mLogger(Log.INFO, "$logPrefix Received incoming transfer request")
             val searchParams = session.queryParameterString.split("&")
                 .map {
                     it.substringBefore("=") to it.substringAfter("=")
@@ -166,9 +176,11 @@ class TestAppServer(
                 mLogger(Log.INFO, "$logPrefix Added request id $id for $filename from ${incomingTransfer.fromHost}")
                 return newFixedLengthResponse("OK")
             }else {
+                mLogger(Log.INFO, "$logPrefix incomin transfer request - bad request - missing params")
                 return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Bad request")
             }
         }else {
+            mLogger(Log.INFO, "$logPrefix : $path - NOT FOUND")
             return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "not found: $path")
         }
     }
@@ -186,12 +198,13 @@ class TestAppServer(
         uri: Uri,
         toNode: InetAddress,
         toPort: Int = DEFAULT_PORT,
-        fileName: String? = null,
     ): OutgoingTransfer {
         val transferId = transferIdAtomic.incrementAndGet()
 
         val nameAndSize = appContext.contentResolver.getUriNameAndSize(uri)
         val effectiveName = nameAndSize.name ?: "unknown"
+        mLogger(Log.INFO, "$logPrefix adding outgoing transfer of $uri " +
+                "(name=${nameAndSize.name} size=${nameAndSize.size} to $toNode:$toPort")
 
         val outgoingTransfer = OutgoingTransfer(
             id = transferId,
@@ -207,9 +220,11 @@ class TestAppServer(
                 "send?id=$transferId&filename=${URLEncoder.encode(effectiveName, "UTF-8")}" +
                 "&size=${nameAndSize.size}&from=${localVirtualAddr.hostAddress}")
             .build()
+        mLogger(Log.INFO, "$logPrefix notifying $toNode of incoming transfer")
 
         val response = httpClient.newCall(request).execute()
-        println(response.body?.string())
+        val serverResponse = response.body?.string()
+        mLogger(Log.INFO, "$logPrefix - received response: $serverResponse")
 
         _outgoingTransfers.update { prev ->
             buildList {
@@ -219,80 +234,6 @@ class TestAppServer(
         }
 
         return outgoingTransfer
-    }
-
-    @Suppress("Since15") //Flow classes are supported by desugarnig
-    inner class AcceptTransferBodyHandler(
-        private val file: File,
-        private val incomingTransfer: IncomingTransfer,
-    ): H3BodyHandler<File> {
-
-        inner class BodySubscriber: H3BodySubscriber<File> {
-
-            private lateinit var outputStream: FileOutputStream
-
-            private val future = CompletableFuture<File>()
-
-            private var lastUpdateTime = 0L
-
-            private var totalTransferred = 0
-            override fun onSubscribe(subscription: java.util.concurrent.Flow.Subscription) {
-                subscription.request(Long.MAX_VALUE)
-                outputStream = FileOutputStream(file)
-            }
-
-            override fun onNext(buffers: List<ByteBuffer>) {
-                buffers.forEach {
-                    val buffer = it.array()
-                    outputStream.write(buffer)
-                    totalTransferred += buffer.size
-                }
-
-                val timeNow = System.currentTimeMillis()
-                if(timeNow - lastUpdateTime > 500) {
-                    _incomingTransfers.update { prev ->
-                        prev.appendOrReplace(
-                            item = incomingTransfer.copy(
-                                transferred = totalTransferred,
-                                status = Status.IN_PROGRESS
-                            ),
-                            replace = { it.id == incomingTransfer.id }
-                        )
-                    }
-                    lastUpdateTime = timeNow
-                }
-            }
-
-            override fun onComplete() {
-                outputStream.flush()
-                outputStream.close()
-                _incomingTransfers.update { prev ->
-                    prev.updateItem(
-                        updatePredicate = { it.id == incomingTransfer.id },
-                        function = { item ->
-                            item.copy(
-                                status = Status.COMPLETED,
-                                transferred = item.size,
-                            )
-                        }
-                    )
-                }
-                future.complete(file)
-            }
-
-            override fun getBody(): CompletionStage<File> {
-                return future
-            }
-
-            override fun onError(p0: Throwable?) {
-                p0?.printStackTrace()
-            }
-        }
-
-        override fun apply(p0: H3HttpResponse.H3ResponseInfo?): H3BodySubscriber<File> {
-            return BodySubscriber()
-        }
-
     }
 
     fun acceptIncomingTransfer(
@@ -306,41 +247,79 @@ class TestAppServer(
                 updatePredicate = { it.id == transfer.id },
                 function = { item ->
                     item.copy(
-                        status = TestAppServer.Status.IN_PROGRESS,
+                        status = Status.IN_PROGRESS,
                     )
                 }
             )
         }
 
-        val request = Request.Builder()
-            .url("http://${transfer.fromHost.hostAddress}:$fromPort/download/${transfer.id}")
-            .build()
+        try {
+            val request = Request.Builder()
+                .url("http://${transfer.fromHost.hostAddress}:$fromPort/download/${transfer.id}")
+                .build()
 
-        val response = httpClient.newCall(request).execute()
-        val fileSize = response.headersContentLength()
-        response.body?.byteStream()?.use { responseIn ->
-            FileOutputStream(destFile).use { fileOut ->
-                responseIn.copyToExactlyOrThrow(fileOut, response.headersContentLength())
+            val response = httpClient.newCall(request).execute()
+            val fileSize = response.headersContentLength()
+            var lastUpdateTime = 0L
+            response.body?.byteStream()?.use { responseIn ->
+                FileOutputStream(destFile).use { fileOut ->
+                    responseIn.copyToExactlyOrThrow(
+                        out = fileOut,
+                        length = response.headersContentLength(),
+                        onProgress = { bytesTransferred ->
+                            val timeNow = System.currentTimeMillis()
+                            if(timeNow - lastUpdateTime > 500) {
+                                _incomingTransfers.update { prev ->
+                                    prev.updateItem(
+                                        updatePredicate = { it.id == transfer.id },
+                                        function = { item ->
+                                            item.copy(
+                                                transferred = bytesTransferred.toInt()
+                                            )
+                                        }
+                                    )
+                                }
+                                lastUpdateTime = System.currentTimeMillis()
+                            }
+                        }
+                    )
+                }
+            }
+            response.close()
+
+            val transferDurationMs = (System.currentTimeMillis() - startTime).toInt()
+            _incomingTransfers.update { prev ->
+                prev.updateItem(
+                    updatePredicate = { it.id == transfer.id },
+                    function = { item ->
+                        item.copy(
+                            transferTime = transferDurationMs,
+                            status = Status.COMPLETED,
+                            transferred = fileSize.toInt()
+                        )
+                    }
+                )
+            }
+
+            mLogger(Log.INFO, "$logPrefix acceptIncomingTransfer successful!")
+        }catch(e: Exception) {
+            mLogger(Log.ERROR, "$logPrefix acceptIncomingTransfer ($transfer) FAILED", e)
+            _incomingTransfers.update { prev ->
+                prev.updateItem(
+                    updatePredicate = { it.id == transfer.id },
+                    function = { item ->
+                        item.copy(
+                            status = Status.FAILED,
+                        )
+                    }
+                )
             }
         }
-        response.close()
+    }
 
-        val transferDurationMs = (System.currentTimeMillis() - startTime).toInt()
-        _incomingTransfers.update { prev ->
-            prev.updateItem(
-                updatePredicate = { it.id == transfer.id },
-                function = { item ->
-                    item.copy(
-                        transferTime = transferDurationMs,
-                        status = TestAppServer.Status.COMPLETED,
-                        transferred = fileSize.toInt()
-                    )
-                }
-            )
-        }
-
-        val sizeTransferred = destFile.length()
-        println("TestAppServer: acceptIncomingTransfer: Done!!!: Received ${sizeTransferred} bytes in ${transferDurationMs}ms")
+    override fun close() {
+        stop()
+        scope.cancel()
     }
 
     companion object {

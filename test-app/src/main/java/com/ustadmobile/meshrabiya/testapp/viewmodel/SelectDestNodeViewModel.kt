@@ -4,8 +4,8 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.appstate.FabState
 import com.ustadmobile.meshrabiya.testapp.server.TestAppServer
@@ -43,6 +43,8 @@ class SelectDestNodeViewModel(
 
     private val virtualNode: AndroidVirtualNode by di.instance()
 
+    private val logger: MNetLogger by di.instance()
+
     init {
         _uiState.update { prev ->
             prev.copy(
@@ -78,7 +80,7 @@ class SelectDestNodeViewModel(
                         toNode = destInetAddr,
                     )
                 }catch(e: Exception) {
-                    Log.e(LOG_TAG, "Exception selecting destination", e)
+                    logger(Log.ERROR, "Exception attempting to send to destination", e)
                     _uiState.update { prev ->
                         prev.copy(
                             error = e.toString()
