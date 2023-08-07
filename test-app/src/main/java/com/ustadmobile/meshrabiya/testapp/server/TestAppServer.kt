@@ -3,7 +3,7 @@ package com.ustadmobile.meshrabiya.testapp.server
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.ustadmobile.meshrabiya.ext.copyToExactlyOrThrow
+import com.ustadmobile.meshrabiya.ext.copyToWithProgressCallback
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.ext.getUriNameAndSize
 import com.ustadmobile.meshrabiya.testapp.ext.updateItem
@@ -93,7 +93,7 @@ class TestAppServer(
             }
 
             val contentIn = appContext.contentResolver.openInputStream(outgoingXfer.uri)?.let {
-                InputStreamCounter(it)
+                InputStreamCounter(it.buffered())
             }
 
             if(contentIn == null) {
@@ -104,7 +104,7 @@ class TestAppServer(
 
             mLogger(Log.INFO, "$logPrefix Sending file for xfer #$xferId")
             val response = newFixedLengthResponse(
-                Response.Status.OK, "application/octet",
+                Response.Status.OK, "application/octet-stream",
                 contentIn,
                 outgoingXfer.size.toLong()
             )
@@ -219,6 +219,7 @@ class TestAppServer(
         val request = Request.Builder().url("http://${toNode.hostAddress}:$toPort/" +
                 "send?id=$transferId&filename=${URLEncoder.encode(effectiveName, "UTF-8")}" +
                 "&size=${nameAndSize.size}&from=${localVirtualAddr.hostAddress}")
+            //.addHeader("connection", "close")
             .build()
         mLogger(Log.INFO, "$logPrefix notifying $toNode of incoming transfer")
 
@@ -261,11 +262,10 @@ class TestAppServer(
             val response = httpClient.newCall(request).execute()
             val fileSize = response.headersContentLength()
             var lastUpdateTime = 0L
-            response.body?.byteStream()?.use { responseIn ->
+            val totalTransfered = response.body?.byteStream()?.use { responseIn ->
                 FileOutputStream(destFile).use { fileOut ->
-                    responseIn.copyToExactlyOrThrow(
+                    responseIn.copyToWithProgressCallback(
                         out = fileOut,
-                        length = response.headersContentLength(),
                         onProgress = { bytesTransferred ->
                             val timeNow = System.currentTimeMillis()
                             if(timeNow - lastUpdateTime > 500) {
@@ -294,8 +294,12 @@ class TestAppServer(
                     function = { item ->
                         item.copy(
                             transferTime = transferDurationMs,
-                            status = Status.COMPLETED,
-                            transferred = fileSize.toInt()
+                            status = if(totalTransfered == fileSize) {
+                                 Status.COMPLETED
+                            }else {
+                                  Status.FAILED
+                            },
+                            transferred = totalTransfered?.toInt() ?: item.transferred
                         )
                     }
                 )
@@ -309,6 +313,7 @@ class TestAppServer(
                     updatePredicate = { it.id == transfer.id },
                     function = { item ->
                         item.copy(
+                            transferred = destFile.length().toInt(),
                             status = Status.FAILED,
                         )
                     }

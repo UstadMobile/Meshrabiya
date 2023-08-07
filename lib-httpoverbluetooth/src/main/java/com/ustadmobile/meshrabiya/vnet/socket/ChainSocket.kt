@@ -1,6 +1,8 @@
 package com.ustadmobile.meshrabiya.vnet.socket
 
+import android.util.Log
 import com.ustadmobile.meshrabiya.ext.prefixMatches
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -17,7 +19,12 @@ import java.net.SocketAddress
  * It would be possible to use extension functions to adjust the call to super initialization, but
  * it would not be possible to determine if this was the final hop (or not).
  */
-class ChainSocket(private val virtualRouter: VirtualRouter): Socket() {
+class ChainSocket(
+    private val virtualRouter: VirtualRouter,
+    private val logger: MNetLogger,
+): Socket() {
+
+    private val logPrefix = "[ChainSocket for ${virtualRouter.localNodeInetAddress}]"
 
     override fun connect(endpoint: SocketAddress, timeout: Int) {
         val endpointInetAddr = endpoint as? InetSocketAddress
@@ -27,20 +34,27 @@ class ChainSocket(private val virtualRouter: VirtualRouter): Socket() {
                 virtualRouter.networkPrefixLength, virtualRouter.localNodeInetAddress
             ) == true
         ) {
-            val nextHop = virtualRouter.lookupNextHopForChainSocket(
-                endpointInetAddr.address, endpoint.port
-            )
-            super.connect(InetSocketAddress(nextHop.address, nextHop.port))
+            try {
+                val nextHop = virtualRouter.lookupNextHopForChainSocket(
+                    endpointInetAddr.address, endpoint.port
+                )
 
-            initializeChainIfNotFinalDest(
-                ChainSocketInitRequest(
-                    virtualDestAddr = address,
-                    virtualDestPort = endpointInetAddr.port,
-                    fromAddr = virtualRouter.localNodeInetAddress
-                ),
-                nextHop
-            )
-            println("init done")
+                super.connect(InetSocketAddress(nextHop.address, nextHop.port))
+
+                initializeChainIfNotFinalDest(
+                    ChainSocketInitRequest(
+                        virtualDestAddr = address,
+                        virtualDestPort = endpointInetAddr.port,
+                        fromAddr = virtualRouter.localNodeInetAddress
+                    ),
+                    nextHop
+                )
+                logger(
+                    Log.INFO, "$logPrefix created socket to $address:$port " +
+                        "nexthop = ${nextHop.address}:${nextHop.port}")
+            }catch(e: Exception) {
+                logger(Log.ERROR, "$logPrefix Exception connecting to $endpoint")
+            }
         }else {
             super.connect(endpoint, timeout)
         }

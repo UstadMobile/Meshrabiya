@@ -15,26 +15,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import net.luminis.http3.libnethttp.H3HttpClient
-import net.luminis.httpclient.AndroidH3Factory
-import net.luminis.tls.env.PlatformMapping
 import okhttp3.OkHttpClient
 import org.acra.ACRA
 import org.acra.config.CoreConfigurationBuilder
 import org.acra.config.HttpSenderConfigurationBuilder
 import org.acra.data.StringFormat
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.bind
 import org.kodein.di.instance
 import org.kodein.di.singleton
 import java.io.File
-import java.security.Security
-import java.time.Duration
-import java.time.temporal.TemporalUnit
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.seconds
 
 class App: Application(), DIAware {
 
@@ -61,7 +52,7 @@ class App: Application(), DIAware {
         }
 
         bind<MNetLogger>() with singleton {
-            MNetLoggerAndroid(minLogLevel = Log.INFO)
+            MNetLoggerAndroid(minLogLevel = Log.VERBOSE)
         }
         bind<Json>() with singleton {
             Json {

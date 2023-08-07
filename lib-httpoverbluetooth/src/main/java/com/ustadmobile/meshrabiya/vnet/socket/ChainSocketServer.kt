@@ -52,9 +52,14 @@ class ChainSocketServer(
 
     private val acceptRunnable = Runnable {
         while(!Thread.interrupted()) {
-            val incomingSocket = serverSocket.accept()
-            logger(Log.DEBUG, "$logPrefix accepted new client")
-            executorService.submit(ClientInitRunnable(incomingSocket))
+            try {
+                val incomingSocket = serverSocket.accept()
+                logger(Log.DEBUG, "$logPrefix accepted new client")
+                executorService.submit(ClientInitRunnable(incomingSocket))
+            }catch(e: Exception) {
+                logger(Log.WARN, "$logPrefix exception accepting client", e)
+                Thread.sleep(1000)
+            }
         }
     }
 
@@ -137,7 +142,7 @@ class ChainSocketServer(
                 inStream.copyTo(outStream)
                 logger(Log.VERBOSE, {"$logPrefix $clientAddr : CopyStream: $name - finished copying - reached end of stream"})
             }catch(e: Exception) {
-                println("exception: $name : $e")
+                logger(Log.WARN, {"$logPrefix $clientAddr: CopyStream: aborting"}, e)
             }finally {
                 //Need to explicitly close the streams we are handling immediately
                 inStream.close()
@@ -162,6 +167,7 @@ class ChainSocketServer(
             it.get()?.cancel(true)
         }
         serverSocket.takeIf { closeSocket }?.close()
+        logger(Log.INFO, "$logPrefix closed")
     }
 
     override fun close() {

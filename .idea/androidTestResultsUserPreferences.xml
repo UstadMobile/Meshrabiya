@@ -49,7 +49,9 @@
                 <map>
                   <entry key="Duration" value="90" />
                   <entry key="Nexus_4_API_30" value="120" />
+                  <entry key="OnePlus&#10; BE2029" value="120" />
                   <entry key="Tests" value="360" />
+                  <entry key="fbc3566e" value="120" />
                 </map>
               </option>
             </AndroidTestResultsTableState>
@@ -88,7 +90,9 @@
                 <map>
                   <entry key="Duration" value="90" />
                   <entry key="Nexus_4_API_30" value="120" />
+                  <entry key="R9YTA08E9MK" value="120" />
                   <entry key="Tests" value="360" />
+                  <entry key="samsung&#10; SM-X200" value="120" />
                 </map>
               </option>
             </AndroidTestResultsTableState>

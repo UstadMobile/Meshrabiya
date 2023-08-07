@@ -182,7 +182,10 @@ abstract class VirtualNode(
         logger = logger,
     )
 
-    private val chainSocketFactory: ChainSocketFactory = ChainSocketFactoryImpl(this)
+    protected val chainSocketFactory: ChainSocketFactory = ChainSocketFactoryImpl(
+        virtualRouter = this,
+        logger = logger,
+    )
 
     val socketFactory: SocketFactory
         get() = chainSocketFactory
@@ -661,6 +664,7 @@ abstract class VirtualNode(
 
             //No route available to reach the given address
             else -> {
+                logger(Log.ERROR, "$logPrefix : No route to virtual host: $address")
                 throw NoRouteToHostException("No route to virtual host $address")
             }
         }

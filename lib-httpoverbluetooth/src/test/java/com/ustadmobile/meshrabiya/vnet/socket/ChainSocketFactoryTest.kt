@@ -3,6 +3,7 @@ package com.ustadmobile.meshrabiya.vnet.socket
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.readChainSocketInitRequest
 import com.ustadmobile.meshrabiya.ext.writeChainSocketInitResponse
+import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.test.FileEchoSocketServer
 import com.ustadmobile.meshrabiya.test.assertFileContentsAreEqual
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
@@ -27,6 +28,8 @@ class ChainSocketFactoryTest {
     @JvmField
     @field:Rule
     val tmpFolder = TemporaryFolder()
+
+    private val logger = MNetLoggerStdout()
 
     fun Socket.readToFile(file: File) {
         getInputStream().use {socketIn ->
@@ -67,7 +70,7 @@ class ChainSocketFactoryTest {
 
         val destAddr = InetAddress.getByAddress(randomApipaAddr().addressToByteArray())
 
-        val chainSocketFactory = ChainSocketFactoryImpl(router)
+        val chainSocketFactory = ChainSocketFactoryImpl(router, logger = logger)
         val clientSocket = chainSocketFactory.createSocket(
             destAddr, serverSocket.localPort
         )
@@ -105,7 +108,7 @@ class ChainSocketFactoryTest {
             initChainRequest.complete(initRequest)
         }.start()
 
-        val socketFactory = ChainSocketFactoryImpl(router)
+        val socketFactory = ChainSocketFactoryImpl(router, logger = logger)
         val destPort = 1042
         val chainSocket = socketFactory.createSocket(
             destAddr, destPort

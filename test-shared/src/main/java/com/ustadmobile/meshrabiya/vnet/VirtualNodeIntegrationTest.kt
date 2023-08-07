@@ -3,7 +3,7 @@ package com.ustadmobile.meshrabiya.vnet
 import app.cash.turbine.test
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
-import com.ustadmobile.meshrabiya.ext.copyToExactlyOrThrow
+import com.ustadmobile.meshrabiya.ext.copyToWithProgressCallback
 import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
 import com.ustadmobile.meshrabiya.ext.requireAsIpv6
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
@@ -554,7 +554,7 @@ abstract class VirtualNodeIntegrationTest {
             node2.localNodeInetAddress, node2ServerSocket.localPort
         ).use { clientSocket ->
             FileOutputStream(downloadedFile).use { fileOutStream ->
-                clientSocket.getInputStream().copyTo(fileOutStream)
+                clientSocket.getInputStream().copyToWithProgressCallback(fileOutStream)
                 fileOutStream.flush()
             }
         }
@@ -580,7 +580,7 @@ abstract class VirtualNodeIntegrationTest {
             nodes.last().localNodeInetAddress, node3ServerSocket.localPort
         ).use {clientSocket ->
             FileOutputStream(downloadedFile).use { fileOut ->
-                clientSocket.getInputStream().copyTo(fileOut)
+                clientSocket.getInputStream().copyToWithProgressCallback(fileOut)
             }
         }
 
@@ -627,7 +627,7 @@ abstract class VirtualNodeIntegrationTest {
         val responseBody =  response.body ?: throw IllegalStateException()
         responseBody.byteStream().use {responseIn ->
             FileOutputStream(downloadedFile).use { fileOut ->
-                responseIn.copyToExactlyOrThrow(fileOut, randomDataFile.length())
+                responseIn.copyToWithProgressCallback(fileOut)
                 fileOut.flush()
             }
         }

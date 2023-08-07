@@ -8,7 +8,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -40,7 +39,7 @@ class AndroidVirtualNode(
     logger: MNetLogger = MNetLoggerStdout(),
     localMNodeAddress: Int = randomApipaAddr(),
     json: Json,
-    private val dataStore: DataStore<Preferences>,
+    dataStore: DataStore<Preferences>,
     config: NodeConfig = NodeConfig.DEFAULT_CONFIG,
 ): VirtualNode(
     uuidMask = uuidMask,
@@ -79,6 +78,7 @@ class AndroidVirtualNode(
         logger = logger,
         localNodeAddr = localMNodeAddress,
         router = this,
+        chainSocketFactory = chainSocketFactory,
         ioExecutor = connectionExecutor,
         dataStore = dataStore,
         json = json,

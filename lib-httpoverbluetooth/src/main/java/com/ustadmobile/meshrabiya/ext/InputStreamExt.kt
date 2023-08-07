@@ -30,33 +30,23 @@ fun InputStream.readExactly(b: ByteArray, offset: Int, len: Int): Int {
 }
 
 /**
- * Copy exactly the given
+ * CopyTo with a progress function, returns the total number of bytes copied.
  */
-fun InputStream.copyToExactlyOrThrow(
+fun InputStream.copyToWithProgressCallback(
     out: OutputStream,
-    length: Long,
     bufSize: Int = 8192,
     onProgress: ((Long) -> Unit)? = null,
-) {
+): Long {
     val buf = ByteArray(bufSize)
-    var bytesRemaining = length
-    while(bytesRemaining > bufSize) {
-        val bytesRead = read(buf)
-        if(bytesRead == -1) {
-            //end of stream reached, but that should not be
-            throw IOException("copyToExactlyOrThrow: unexpected end of stream copied $bytesRemaining/$length")
-        }
-
+    var bytesRead: Int
+    var totalCopied = 0L
+    while(read(buf).also { bytesRead = it } != -1) {
         out.write(buf, 0, bytesRead)
-        bytesRemaining -= bytesRead
-        onProgress?.invoke(length - bytesRemaining)
+        totalCopied += bytesRead
+        onProgress?.invoke(totalCopied)
     }
 
-    if(bytesRemaining != 0L) {
-        readExactlyOrThrow(buf, 0, bytesRemaining.toInt())
-        out.write(buf, 0, bytesRemaining.toInt())
-        onProgress?.invoke(length)
-    }
+    return totalCopied
 }
 fun InputStream.readExactlyOrThrow(b: ByteArray, offset: Int, len: Int) {
     val bytesRead = readExactly(b, offset, len)

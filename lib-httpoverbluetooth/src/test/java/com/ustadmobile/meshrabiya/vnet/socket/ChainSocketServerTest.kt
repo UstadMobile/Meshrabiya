@@ -118,14 +118,14 @@ class ChainSocketServerTest {
         }
 
         //ChainSocketFactory2 represents the node that is a neighbor to the final destination
-        val chainSocketFactory2 = spy(ChainSocketFactoryImpl(virtualRouter2))
+        val chainSocketFactory2 = spy(ChainSocketFactoryImpl(virtualRouter2, logger = mNetLogger))
         val chainSocketServer2 = ChainSocketServer(
             chainServerSocket2, Executors.newCachedThreadPool(), chainSocketFactory2,
             "server2", mNetLogger, onMakeChainSocket
         )
 
         //ChainSocketFactory1 represents the node that makes the request that will run via ChainSocketFactory2
-        val chainSocketFactory1 = spy(ChainSocketFactoryImpl(virtualRouter1))
+        val chainSocketFactory1 = spy(ChainSocketFactoryImpl(virtualRouter1, logger = mNetLogger))
         val chainSocketServer1 = ChainSocketServer(
             chainServerSocket1, Executors.newCachedThreadPool(), chainSocketFactory1,
             "server1", mNetLogger, onMakeChainSocket
