@@ -52,7 +52,7 @@ class App: Application(), DIAware {
         }
 
         bind<MNetLogger>() with singleton {
-            MNetLoggerAndroid(minLogLevel = Log.VERBOSE)
+            MNetLoggerAndroid(minLogLevel = Log.DEBUG)
         }
         bind<Json>() with singleton {
             Json {

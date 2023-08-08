@@ -13,7 +13,7 @@ class MNetLoggerAndroid(
     private val minLogLevel: Int = Log.VERBOSE
 ): MNetLogger() {
 
-    val _recentLogs = MutableStateFlow(emptyList<LogLine>())
+    private val _recentLogs = MutableStateFlow(emptyList<LogLine>())
 
     val recentLogs: Flow<List<LogLine>> = _recentLogs.asStateFlow()
 

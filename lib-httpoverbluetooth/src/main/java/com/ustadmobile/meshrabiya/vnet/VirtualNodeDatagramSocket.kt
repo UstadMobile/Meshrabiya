@@ -102,7 +102,7 @@ class VirtualNodeDatagramSocket(
                     ))
                 }
 
-                logger(Log.DEBUG, "$logPrefix received MMCP packet from ${rxPacket.address}/${rxPacket.port} id=${mmcpMessage.messageId} type=${mmcpMessage::class.simpleName}", null)
+                logger(Log.VERBOSE, "$logPrefix received MMCP packet from ${rxPacket.address}/${rxPacket.port} id=${mmcpMessage.messageId} type=${mmcpMessage::class.simpleName}", null)
                 when(mmcpMessage) {
                     is MmcpHello -> {
                         logger(Log.DEBUG, "$logPrefix Received hello from ${rxPacket.address}/${rxPacket.port}", null)
@@ -152,7 +152,7 @@ class VirtualNodeDatagramSocket(
                 }
 
                 if(mmcpMessage is MmcpAck) {
-                    logger(Log.DEBUG, "Ack: messageId = ${mmcpMessage.messageId} from ${rxPacket.address}/${rxPacket.port}", null)
+                    logger(Log.VERBOSE, "Ack: messageId = ${mmcpMessage.messageId} from ${rxPacket.address}/${rxPacket.port}", null)
                 }
             }else {
                 router.route(

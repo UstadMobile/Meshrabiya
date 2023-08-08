@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConnectWithoutContact
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +37,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.screens.InfoScreen
 import com.ustadmobile.meshrabiya.testapp.screens.LocalVirtualNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.NeighborNodeListScreen
 import com.ustadmobile.meshrabiya.testapp.screens.ReceiveScreen
@@ -198,6 +200,20 @@ fun MeshrabiyaTestApp(
                         )
                     }
                 )
+
+                NavigationBarItem(
+                    selected = selectedItem == "info" ,
+                    label = { Text("Info") },
+                    onClick = {
+                        navController.navigate("Info")
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                        )
+                    }
+                )
             }
         }
 
@@ -263,6 +279,10 @@ fun AppNavHost(
             ReceiveScreen(
                 onSetAppUiState = onSetAppUiState
             )
+        }
+
+        composable("info") {
+            InfoScreen(onSetAppUiState = onSetAppUiState)
         }
     }
 }

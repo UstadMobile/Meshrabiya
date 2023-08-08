@@ -307,7 +307,9 @@ class TestAppServer(
                 )
             }
 
-            mLogger(Log.INFO, "$logPrefix acceptIncomingTransfer successful!")
+            val speedKBS = transfer.size / transferDurationMs
+            mLogger(Log.INFO, "$logPrefix acceptIncomingTransfer successful: Downloaded " +
+                    "${transfer.size}bytes in ${transfer.transferTime}ms ($speedKBS) KB/s")
         }catch(e: Exception) {
             mLogger(Log.ERROR, "$logPrefix acceptIncomingTransfer ($transfer) FAILED", e)
             _incomingTransfers.update { prev ->

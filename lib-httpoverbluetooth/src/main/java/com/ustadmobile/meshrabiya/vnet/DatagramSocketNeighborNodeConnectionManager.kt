@@ -64,7 +64,7 @@ class DatagramSocketNeighborNodeConnectionManager(
 
         //Note: sometimes this is VERY fast during tests, a ping time of 0 would fail the test.
         val responseTime = max(System.currentTimeMillis() - pendingPing.timesent, 1L)
-        logger(Log.DEBUG, "$logPrefix pong(replyTo=${pendingPing.ping.messageId}) received time=${responseTime}ms", null)
+        logger(Log.VERBOSE, "$logPrefix pong(replyTo=${pendingPing.ping.messageId}) received time=${responseTime}ms", null)
 
         val newState = _state.updateAndGet { prev ->
             prev.copy(
@@ -78,7 +78,7 @@ class DatagramSocketNeighborNodeConnectionManager(
     private val pingRunnable = Runnable {
         val pingToSend = MmcpPing(router.nextMmcpMessageId())
         pendingPings += PendingPing(pingToSend, System.currentTimeMillis())
-        logger(Log.DEBUG, "$logPrefix send ping", null)
+        logger(Log.VERBOSE, "$logPrefix send ping", null)
         send(pingToSend.toVirtualPacket(
             toAddr = 0,
             fromAddr = localNodeAddr,

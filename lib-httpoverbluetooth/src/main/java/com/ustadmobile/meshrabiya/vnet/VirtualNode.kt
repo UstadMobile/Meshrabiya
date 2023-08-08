@@ -219,7 +219,7 @@ abstract class VirtualNode(
         )
 
         logger(
-            priority = Log.DEBUG,
+            priority = Log.VERBOSE,
             message = { "$logPrefix sending originating message " +
                 "messageId=${originatingMessage.messageId} sentTime=$sentTime"
             }
@@ -230,7 +230,7 @@ abstract class VirtualNode(
             fromAddr = localNodeAddress,
         )
         val messageFromPacket = MmcpMessage.fromVirtualPacket(packet) as? MmcpOriginatorMessage
-        logger(Log.DEBUG, { "$logPrefix from packet sent time = ${messageFromPacket?.sentTime}"})
+        logger(Log.VERBOSE, { "$logPrefix from packet sent time = ${messageFromPacket?.sentTime}"})
         if(messageFromPacket?.sentTime != sentTime) {
             logger(Log.ERROR, "WRONG WRONG WRONG", null)
         }
@@ -406,7 +406,7 @@ abstract class VirtualNode(
         try {
             val mmcpMessage = MmcpMessage.fromVirtualPacket(packet)
             val from = packet.header.fromAddr
-            logger(Log.DEBUG,
+            logger(Log.VERBOSE,
                 message = {
                     "$logPrefix received MMCP message (${mmcpMessage::class.simpleName}) " +
                     "from ${from.addressToDotNotation()}"
@@ -419,7 +419,7 @@ abstract class VirtualNode(
 
             when {
                 mmcpMessage is MmcpPing && isToThisNode -> {
-                    logger(Log.DEBUG,
+                    logger(Log.VERBOSE,
                         message = {
                             "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}"
                         }
@@ -435,12 +435,12 @@ abstract class VirtualNode(
                         fromAddr = localNodeAddress
                     )
 
-                    logger(Log.DEBUG, { "$logPrefix Sending pong to ${from.addressToDotNotation()}" })
+                    logger(Log.VERBOSE, { "$logPrefix Sending pong to ${from.addressToDotNotation()}" })
                     route(replyPacket)
                 }
 
                 mmcpMessage is MmcpPong && isToThisNode -> {
-                    logger(Log.DEBUG, { "$logPrefix Received pong(id=${mmcpMessage.messageId})}" })
+                    logger(Log.VERBOSE, { "$logPrefix Received pong(id=${mmcpMessage.messageId})}" })
                     pongListeners.forEach {
                         it.onPongReceived(from, mmcpMessage)
                     }
@@ -469,7 +469,7 @@ abstract class VirtualNode(
 
                 mmcpMessage is MmcpOriginatorMessage -> {
                     //Dont keep originator messages in our own table for this node
-                    logger(Log.DEBUG,
+                    logger(Log.VERBOSE,
                         message= {
                             "$logPrefix received originating message from " +
                                     "${packet.header.fromAddr.addressToDotNotation()} via " +
@@ -512,7 +512,7 @@ abstract class VirtualNode(
                             lastHopRealInetAddr = receivedFromRealInetAddr,
                             lastHopRealPort = datagramPacket.port
                         )
-                        logger(Log.DEBUG,
+                        logger(Log.VERBOSE,
                             message = {
                                 "$logPrefix update originator messages: " +
                                         "currently known nodes = ${originatorMessages.keys.joinToString { it.addressToDotNotation() }}"
@@ -602,7 +602,7 @@ abstract class VirtualNode(
                         .filter {
                             it.remoteAddress != fromLastHop && it.remoteAddress != packet.header.fromAddr
                         }.forEach {
-                            logger(Log.DEBUG,
+                            logger(Log.VERBOSE,
                                 message = {
                                     "$logPrefix broadcast packet " +
                                             "from=${packet.header.fromAddr.addressToDotNotation()} " +
@@ -619,7 +619,7 @@ abstract class VirtualNode(
                     }
 
                     if(neighborManager != null) {
-                        logger(Log.DEBUG, "$logPrefix ${packet.header.toAddr.addressToDotNotation()}", null)
+                        logger(Log.VERBOSE, "$logPrefix ${packet.header.toAddr.addressToDotNotation()}", null)
                         neighborManager.send(packet)
                     }else {
                         //not routeable
