@@ -1,5 +1,9 @@
 package com.ustadmobile.meshrabiya.testapp.screens
 
+import android.content.Intent
+import android.webkit.MimeTypeMap
+import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,7 +17,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ustadmobile.meshrabiya.testapp.ViewModelFactory
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
@@ -53,12 +60,35 @@ fun ReceiveScreen(
     uiState: ReceiveUiState,
     onClickAccept: (TestAppServer.IncomingTransfer) -> Unit =  { },
 ) {
+    val context = LocalContext.current
+
     LazyColumn {
         items(
             items = uiState.incomingTransfers,
             key = { Pair(it.fromHost, it.id) }
         ) { transfer ->
             ListItem(
+                modifier = Modifier.clickable {
+                    val file = transfer.file
+                    if(file != null && transfer.status == TestAppServer.Status.COMPLETED) {
+                        val uri = FileProvider.getUriForFile(
+                            context, "com.ustadmobile.meshrabiya.testapp.fileprovider", file
+                        )
+
+                        val intent = Intent(Intent.ACTION_VIEW)
+                        intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+                            file.extension
+                        ) ?: "*/*"
+                        intent.setDataAndType(uri, mimeType)
+                        if(intent.resolveActivity(context.packageManager) != null) {
+                            context.startActivity(intent)
+                        }else {
+                            Toast.makeText(context, "No app found to open file", Toast.LENGTH_LONG).show()
+                        }
+
+                    }
+                },
                 headlineContent = {
                     Text(transfer.name)
                 },
@@ -86,7 +116,7 @@ fun ReceiveScreen(
                             )
                         }
                     }
-                }
+                },
             )
         }
     }

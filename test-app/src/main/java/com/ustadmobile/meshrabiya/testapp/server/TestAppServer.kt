@@ -66,6 +66,7 @@ class TestAppServer(
         val size: Int,
         val transferred: Int = 0,
         val transferTime: Int = 1,
+        val file: File? = null,
     )
 
     private val transferIdAtomic = AtomicInteger()
@@ -299,6 +300,7 @@ class TestAppServer(
                             }else {
                                   Status.FAILED
                             },
+                            file = destFile,
                             transferred = totalTransfered?.toInt() ?: item.transferred
                         )
                     }

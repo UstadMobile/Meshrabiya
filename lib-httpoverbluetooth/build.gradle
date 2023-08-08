@@ -35,7 +35,7 @@ android {
 }
 
 dependencies {
-    implementation "androidx.core:core-ktx:$version_core_ktx"
+    implementation "androidx.core:core-ktx:$version_androidx_core"
     implementation "androidx.appcompat:appcompat:$version_appcompat"
     implementation "com.athaydes.rawhttp:rawhttp-core:$version_rawhttp"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"

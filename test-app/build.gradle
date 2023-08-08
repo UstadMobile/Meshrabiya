@@ -75,7 +75,8 @@ dependencies {
     implementation "com.journeyapps:zxing-android-embedded:$version_zxing_embedded"
 
 
-    implementation "androidx.core:core-ktx:$version_core_ktx"
+    implementation "androidx.core:core:$version_androidx_core"
+    implementation "androidx.core:core-ktx:$version_androidx_core"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:$version_android_lifecycle"
     implementation "androidx.activity:activity-compose:$version_android_activity"
     implementation platform("androidx.compose:compose-bom:$version_compose_bom")

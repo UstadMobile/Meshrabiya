@@ -29,7 +29,7 @@ ext {
     version_flupke = "0.1r-snapshot"
     version_android_desugaring = "2.0.3"
     version_coroutines = "1.7.2"
-    version_core_ktx = "1.10.1"
+    version_androidx_core = "1.10.1"
     version_rawhttp = "2.5.2"
     version_junit = "4.13.2"
     version_appcompat = "1.6.1"
