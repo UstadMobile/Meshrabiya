@@ -17,6 +17,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.connectBand
 import com.ustadmobile.meshrabiya.ext.encodeAsHex
 import com.ustadmobile.meshrabiya.ext.toPrettyString
 import com.ustadmobile.meshrabiya.ext.unspecifiedIpv6Address
@@ -55,8 +56,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Note: To discover the WifiDirect group service, the service request must use a blank .newInstance() !
  *
- * @param onBeforeGroupStart function that will be called before trying to create a wifi p2p group.
- *        This needs to be used to stop any local only hotspot.
  */
 class WifiDirectManager(
     private val appContext: Context,
@@ -170,6 +169,7 @@ class WifiDirectManager(
      */
     private fun onNewWifiP2pGroupInfoReceived(group: WifiP2pGroup?) {
         val ssid = group?.networkName
+
         val passphrase = group?.passphrase
         val interfaceName = group?.`interface`
         val linkInterface = NetworkInterface.getNetworkInterfaces()
@@ -182,6 +182,10 @@ class WifiDirectManager(
             ?.firstOrNull { it.isLinkLocalAddress && it is Inet6Address } as? Inet6Address
         logger(Log.INFO, "$logPrefix : onNewWifiP2pGroupInfoReceived : Found link local addr = $linkLocalAddr", null)
 
+        //The group could be the group that we requested, or it could be that a WiFi direct group was
+        // already started by another app.
+        val isRequestedGroup = group?.networkName?.endsWith(localNodeAddr.encodeAsHex()) == true
+
         nodeScope.launch {
             groupUpdateMutex.withLock {
                 val hotspotConfig = if(ssid != null && passphrase != null &&
@@ -191,8 +195,14 @@ class WifiDirectManager(
                         nodeVirtualAddr = localNodeAddr,
                         ssid = ssid,
                         passphrase = passphrase,
+                        band = group.connectBand,
                         port = router.localDatagramPort,
                         linkLocalAddr = linkLocalAddr.withoutScope(),
+                        persistenceType = if(Build.VERSION.SDK_INT >= 29 && isRequestedGroup) {
+                            HotspotPersistenceType.FULL
+                        } else {
+                            HotspotPersistenceType.NONE
+                        },
                         hotspotType = HotspotType.WIFIDIRECT_GROUP
                     )
                 }else {

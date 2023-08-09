@@ -12,11 +12,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.unit.dp
@@ -24,13 +26,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.MeshrabiyaConnectLink
 import com.ustadmobile.meshrabiya.testapp.ViewModelFactory
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
-import com.ustadmobile.meshrabiya.testapp.composable.rememberConnectLauncher
+import com.ustadmobile.meshrabiya.testapp.composable.rememberConnectWifiLauncher
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListUiState
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListViewModel
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
+import kotlinx.coroutines.launch
 import org.kodein.di.compose.localDI
 import org.kodein.di.direct
 import org.kodein.di.instance
@@ -48,18 +52,25 @@ fun NeighborNodeListScreen(
         )
     ),
     onSetAppUiState: (AppUiState) -> Unit,
+    snackbarHostState: SnackbarHostState,
 ) {
     val uiState by viewModel.uiState.collectAsState(NeighborNodeListUiState())
+    val snackbar by viewModel.snackbars.collectAsState(initial = null)
     val di = localDI()
+    val logger : MNetLogger by di.instance()
+    val scope = rememberCoroutineScope()
 
-    val connectLauncher = rememberConnectLauncher(
-        onConnectBluetooth = {
-            viewModel.onConnectBluetooth(it.address)
-        },
-        onConnectWifi = {
-            viewModel.onConnectWifi(it)
+    val connectLauncher = rememberConnectWifiLauncher(
+        logger = logger,
+    ) { result ->
+        if(result.hotspotConfig != null) {
+            viewModel.onConnectWifi(result.hotspotConfig)
+        }else {
+            scope.launch {
+                snackbarHostState.showSnackbar(message = "ERROR: ${result.exception?.message}")
+            }
         }
-    )
+    }
 
     val qrCodeScannerLauncher = rememberLauncherForActivityResult(
         contract = ScanContract()
@@ -71,9 +82,14 @@ fun NeighborNodeListScreen(
                     uri = link,
                     json = di.direct.instance(),
                 )
-
-                connectLauncher.launch(connectLink)
-
+                val hotspotConfigVal = connectLink.hotspotConfig
+                if(hotspotConfigVal != null) {
+                    connectLauncher.launch(hotspotConfigVal)
+                }else {
+                    scope.launch {
+                        snackbarHostState.showSnackbar("ERROR: link does not have wificonfig")
+                    }
+                }
             }catch(e: Exception) {
                 Log.e("TestApp", "Exception", e)
             }
@@ -104,6 +120,15 @@ fun NeighborNodeListScreen(
         )
     }
 
+    LaunchedEffect(snackbar) {
+        val snackbarVal = snackbar
+        if(snackbarVal != null) {
+            snackbarHostState.showSnackbar(
+                message = snackbarVal.message
+            )
+        }
+    }
+
     NeighborNodeListScreen(
         uiState = uiState,
         onClickFilter = viewModel::onClickFilterChip
@@ -116,7 +141,7 @@ fun NeighborNodeListScreen(
     uiState: NeighborNodeListUiState,
     onClickFilter: (NeighborNodeListUiState.Companion.Filter) -> Unit = { },
 ) {
-    LazyColumn() {
+    LazyColumn {
         item(key = "filterchips") {
             Row(modifier = Modifier.padding(horizontal = 8.dp)){
                 NeighborNodeListUiState.Companion.Filter.values().forEach { filter ->

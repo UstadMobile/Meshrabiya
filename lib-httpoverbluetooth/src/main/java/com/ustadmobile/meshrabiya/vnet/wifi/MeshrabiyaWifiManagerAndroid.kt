@@ -327,6 +327,10 @@ class MeshrabiyaWifiManagerAndroid(
     override suspend fun connectToHotspot(
         config: WifiConnectConfig,
     ) {
+        if(config.band == ConnectBand.BAND_5GHZ && !wifiManager.is5GHzBandSupported) {
+            throw WifiConnectException("ERROR: 5Ghz not supported by device: ${config.ssid} uses 5Ghz band")
+        }
+
         val networkAndServerAddr = connectToHotspot(
             ssid = config.ssid,
             passphrase = config.passphrase,

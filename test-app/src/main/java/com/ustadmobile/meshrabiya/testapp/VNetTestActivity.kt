@@ -1,10 +1,6 @@
 package com.ustadmobile.meshrabiya.testapp
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -23,6 +19,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -46,7 +44,6 @@ import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
@@ -64,22 +61,6 @@ data class TestActivityUiState(
 class VNetTestActivity : ComponentActivity(), DIAware {
 
     override val di by closestDI()
-
-    private val activityUiState = MutableStateFlow(TestActivityUiState())
-
-    fun onClickLogs() {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-
-        val clip: ClipData = ClipData.newPlainText("Logs",
-            "===Mashrabiya ${activityUiState.value.localAddress}===\n" +
-                activityUiState.value.logLines.joinToString(separator = ",\n") {
-                    "#${it.lineId} ${it.line}"
-                }
-        )
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(this, "Copied logs!", Toast.LENGTH_LONG).show()
-    }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,8 +101,14 @@ fun MeshrabiyaTestApp(
         mutableStateOf(null)
     }
 
+    val snackbarHostState = remember {
+        SnackbarHostState()
+    }
 
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
             TopAppBar(title = {
                 Text(appUiState.title)
@@ -226,7 +213,8 @@ fun MeshrabiyaTestApp(
                 navController = navController,
                 onSetAppUiState = {
                     appUiState = it
-                }
+                },
+                snackbarHostState = snackbarHostState,
             )
         }
     }
@@ -238,6 +226,7 @@ fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     startDestination: String = "localvirtualnode",
     onSetAppUiState: (AppUiState) -> Unit = { },
+    snackbarHostState: SnackbarHostState,
 ){
     NavHost(
         modifier = modifier,
@@ -251,7 +240,10 @@ fun AppNavHost(
         }
 
         composable("neighbornodes") {
-            NeighborNodeListScreen(onSetAppUiState = onSetAppUiState)
+            NeighborNodeListScreen(
+                onSetAppUiState = onSetAppUiState,
+                snackbarHostState = snackbarHostState,
+            )
         }
 
         composable("send") {

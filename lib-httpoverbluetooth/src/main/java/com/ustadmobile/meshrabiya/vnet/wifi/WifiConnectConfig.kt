@@ -1,6 +1,5 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
-import android.net.wifi.WifiManager
 import com.ustadmobile.meshrabiya.ext.getStringOrThrow
 import com.ustadmobile.meshrabiya.ext.putStringFromBytes
 import com.ustadmobile.meshrabiya.ext.requireHostAddress
@@ -45,6 +44,7 @@ data class WifiConnectConfig(
     val port: Int,
     val hotspotType: HotspotType,
     val persistenceType: HotspotPersistenceType = HotspotPersistenceType.NONE,
+    val band: ConnectBand = ConnectBand.BAND_UNKNOWN,
     val bssid: String? = null,
 ) {
 
@@ -62,12 +62,13 @@ data class WifiConnectConfig(
      * passphrase: 4 bytes ( string length int) plus string bytes length
      * port: 4 bytes
      * hotspotType: 1 byte
+     * band: 1 byte
      * persistenceType: 1 byte
      * linkLocalAddr: 16 bytes (IPv6 address)
      *
      */
     val sizeInBytes: Int
-        get() = 4 + (4 + (ssidBytes?.size ?: 0) ) + (4 + (passphraseBytes?.size ?: 0)) + 4 + 1 + 1 + 16
+        get() = 4 + (4 + (ssidBytes?.size ?: 0) ) + (4 + (passphraseBytes?.size ?: 0)) + 4 + 1 + 1 + 1 + 16
 
     fun toBytes(
         byteArray: ByteArray,
@@ -83,6 +84,7 @@ data class WifiConnectConfig(
             .putStringFromBytes(passphraseBytes)
             .putInt(port)
             .put(hotspotType.flag)
+            .put(band.flag)
             .put(persistenceType.flag)
             .put(linkLocalAddr.address)
 
@@ -109,6 +111,7 @@ data class WifiConnectConfig(
             val passphrase = byteBuf.getStringOrThrow()
             val port = byteBuf.int
             val hotspotType = HotspotType.fromFlag(byteBuf.get())
+            val connectBand = ConnectBand.fromFlag(byteBuf.get())
             val persistenceType = HotspotPersistenceType.fromFlag(byteBuf.get())
             val linkLocalAddr = Inet6Address
                 .getByAddress(ByteArray(16).also { byteBuf.get(it) }) as Inet6Address
@@ -119,6 +122,7 @@ data class WifiConnectConfig(
                 passphrase = passphrase,
                 port = port,
                 hotspotType = hotspotType,
+                band = connectBand,
                 persistenceType = persistenceType,
                 linkLocalAddr = linkLocalAddr
             )
@@ -144,55 +148,3 @@ object Inet6AddressSerializer: KSerializer<Inet6Address> {
     }
 }
 
-
-@Deprecated("Will use only WiFi Direct group")
-fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
-    nodeVirtualAddr: Int,
-    port: Int,
-): WifiConnectConfig? {
-    TODO("We won't use this anymore because we don't need local only hotspot")
-    /*
-    return if(Build.VERSION.SDK_INT >= 30) {
-        val softApConfig = softApConfiguration
-        val ssid = if(Build.VERSION.SDK_INT >= 33) {
-            //As per https://developer.android.com/reference/android/net/wifi/WifiSsid#toString()
-            // Any WiFi ssid that is in UTF-8 will be as a string with quotes.
-            // No support for ssid with non UTF-8 SSID.
-            softApConfig.wifiSsid.toString().removeSurrounding("\"")
-        }else {
-            softApConfig.ssid
-        }
-        val passphrase = softApConfig.passphrase
-        val bssid = softApConfig.bssid
-        if(ssid != null && passphrase != null) {
-            WifiConnectConfig(
-                nodeVirtualAddr = nodeVirtualAddr,
-                ssid = ssid,
-                passphrase = passphrase,
-                port = port,
-                hotspotType = HotspotType.LOCALONLY_HOTSPOT,
-                bssid = bssid?.toString()
-            )
-        }else {
-            null
-        }
-    }else {
-        val wifiConfig = wifiConfiguration
-        val ssid = wifiConfig?.SSID
-        val passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\"")
-        val bssid = wifiConfig?.BSSID
-        if(ssid != null && passphrase != null) {
-            WifiConnectConfig(
-                nodeVirtualAddr = nodeVirtualAddr,
-                ssid = ssid,
-                passphrase = passphrase,
-                port = port,
-                hotspotType = HotspotType.LOCALONLY_HOTSPOT,
-                bssid = bssid,
-            )
-        }else {
-            null
-        }
-    }
-     */
-}
