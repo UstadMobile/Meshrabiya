@@ -5,10 +5,13 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
@@ -18,7 +21,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.unit.dp
@@ -30,9 +37,11 @@ import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.MeshrabiyaConnectLink
 import com.ustadmobile.meshrabiya.testapp.ViewModelFactory
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.composable.ConnectWifiLauncherStatus
 import com.ustadmobile.meshrabiya.testapp.composable.rememberConnectWifiLauncher
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListUiState
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NeighborNodeListViewModel
+import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import kotlinx.coroutines.launch
 import org.kodein.di.compose.localDI
@@ -59,9 +68,17 @@ fun NeighborNodeListScreen(
     val di = localDI()
     val logger : MNetLogger by di.instance()
     val scope = rememberCoroutineScope()
+    val node: VirtualNode by di.instance()
+    var connectLauncherState by remember {
+        mutableStateOf(ConnectWifiLauncherStatus.INACTIVE)
+    }
 
     val connectLauncher = rememberConnectWifiLauncher(
         logger = logger,
+        onStatusChange = {
+            connectLauncherState = it
+        },
+        node = node as AndroidVirtualNode,
     ) { result ->
         if(result.hotspotConfig != null) {
             viewModel.onConnectWifi(result.hotspotConfig)
@@ -131,6 +148,7 @@ fun NeighborNodeListScreen(
 
     NeighborNodeListScreen(
         uiState = uiState,
+        connectLauncherState = connectLauncherState,
         onClickFilter = viewModel::onClickFilterChip
     )
 }
@@ -139,6 +157,7 @@ fun NeighborNodeListScreen(
 @Composable
 fun NeighborNodeListScreen(
     uiState: NeighborNodeListUiState,
+    connectLauncherState: ConnectWifiLauncherStatus,
     onClickFilter: (NeighborNodeListUiState.Companion.Filter) -> Unit = { },
 ) {
     LazyColumn {
@@ -154,6 +173,23 @@ fun NeighborNodeListScreen(
                         label = {
                             Text(filter.label)
                         }
+                    )
+                }
+            }
+        }
+
+        if(connectLauncherState != ConnectWifiLauncherStatus.INACTIVE) {
+            item("connectlauncherstatus") {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.padding(8.dp)
+                    )
+                    Text(
+                        modifier = Modifier.padding(8.dp),
+                        text = connectLauncherState.toString(),
                     )
                 }
             }

@@ -51,13 +51,6 @@ import org.kodein.di.compose.withDI
 import java.net.URLEncoder
 import java.util.UUID
 
-data class TestActivityUiState(
-    val localAddress: Int = 0,
-    val remoteNodes: List<NeighborNodeState> = emptyList(),
-    val localHotspotState: MeshrabiyaWifiState? = null,
-    val logLines: List<LogLine> = emptyList(),
-)
-
 class VNetTestActivity : ComponentActivity(), DIAware {
 
     override val di by closestDI()

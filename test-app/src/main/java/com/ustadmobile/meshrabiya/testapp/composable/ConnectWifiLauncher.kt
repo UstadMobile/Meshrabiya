@@ -48,7 +48,11 @@ data class ConnectWifiLauncherResult(
     val exception: Exception? = null,
 )
 
+enum class ConnectWifiLauncherStatus {
 
+    INACTIVE, REQUESTING_PERMISSION, LOOKING_FOR_NETWORK, REQUESTING_LINK,
+
+}
 
 /**
  * Handle asking for permission and using companion device manager (if needed) to connect to a hotspot.
@@ -58,11 +62,12 @@ data class ConnectWifiLauncherResult(
  */
 @Composable
 fun rememberConnectWifiLauncher(
-    logger: MNetLogger,
+    node: AndroidVirtualNode,
+    logger: MNetLogger? = null,
+    onStatusChange: ((ConnectWifiLauncherStatus) -> Unit)? = null,
     onResult: (ConnectWifiLauncherResult) -> Unit,
 ): ConnectWifiLauncher {
     val context = LocalContext.current
-    val di: DI = localDI()
 
     val wifiManager: WifiManager = remember {
         context.getSystemService(WifiManager::class.java)
@@ -82,18 +87,18 @@ fun rememberConnectWifiLauncher(
         val deviceManager : CompanionDeviceManager =
             context.getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
         val associations = deviceManager.associations
-        logger(Log.INFO, "associations = ${associations.joinToString()}")
+        logger?.invoke(Log.INFO, "associations = ${associations.joinToString()}")
         val request = pendingAssociationRequest
         pendingAssociationRequest = null
 
-
+        onStatusChange?.invoke(ConnectWifiLauncherStatus.INACTIVE)
         if(result.resultCode == Activity.RESULT_OK) {
             val scanResult: ScanResult? = result.data?.getParcelableExtra(
                 CompanionDeviceManager.EXTRA_DEVICE
             )
 
 
-            logger(Log.INFO, "rememberConnectWifiLauncher: Got scan result: bssid = ${scanResult?.BSSID}")
+            logger?.invoke(Log.INFO, "rememberConnectWifiLauncher: Got scan result: bssid = ${scanResult?.BSSID}")
             val bssid = scanResult?.BSSID
 
             if(bssid != null) {
@@ -126,7 +131,7 @@ fun rememberConnectWifiLauncher(
     ) { granted ->
         val connectRequestVal = pendingPermissionRequest ?: return@rememberLauncherForActivityResult
         if(granted) {
-            logger(Log.DEBUG, "ConnectWifiLauncher: permission granted")
+            logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: permission granted")
             pendingPermissionRequest = null
             pendingAssociationRequest = connectRequestVal
         }else {
@@ -142,12 +147,12 @@ fun rememberConnectWifiLauncher(
     LaunchedEffect(pendingAssociationRequest) {
         val connectRequestVal = pendingAssociationRequest ?: return@LaunchedEffect
         val ssid = connectRequestVal.connectConfig.ssid
-        logger(Log.DEBUG, "ConnectWifiLauncher: check for assocation with $ssid")
-        val node: AndroidVirtualNode = di.direct.instance()
+        logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: check for assocation with $ssid")
         val storedBssid = node.lookupStoredBssid(connectRequestVal.connectConfig.nodeVirtualAddr)
 
         if(storedBssid != null) {
-            logger(Log.DEBUG, "ConnectWifiLauncher: already associated $ssid")
+            logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: already associated with $ssid (bssid=$storedBssid)")
+            onStatusChange?.invoke(ConnectWifiLauncherStatus.INACTIVE)
             onResult(
                 ConnectWifiLauncherResult(
                     hotspotConfig = connectRequestVal.connectConfig.copy(
@@ -156,9 +161,10 @@ fun rememberConnectWifiLauncher(
                 )
             )
         }else {
-            logger(Log.DEBUG,
+            logger?.invoke(Log.DEBUG,
                 "ConnectWifiLauncher: requesting association for $ssid"
             )
+            onStatusChange?.invoke(ConnectWifiLauncherStatus.LOOKING_FOR_NETWORK)
             val deviceFilter = WifiDeviceFilter.Builder()
                 .setNamePattern(Pattern.compile(Pattern.quote(connectRequestVal.connectConfig.ssid)))
                 .build()
@@ -175,14 +181,16 @@ fun rememberConnectWifiLauncher(
                 associationRequest,
                 object: CompanionDeviceManager.Callback() {
                     override fun onDeviceFound(intentSender: IntentSender) {
-                        logger(Log.DEBUG, "ConnectWifiLauncher: onDeviceFound for $ssid")
+                        logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: onDeviceFound for $ssid")
+                        onStatusChange?.invoke(ConnectWifiLauncherStatus.REQUESTING_LINK)
                         intentSenderLauncher.launch(
                             IntentSenderRequest.Builder(intentSender).build()
                         )
                     }
 
                     override fun onFailure(reason: CharSequence?) {
-                        logger(Log.DEBUG, "ConnectWifiLauncher: onFailure for $ssid - $reason")
+                        logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: onFailure for $ssid - $reason")
+                        onStatusChange?.invoke(ConnectWifiLauncherStatus.INACTIVE)
                         pendingAssociationRequest = null
                         onResult(
                             ConnectWifiLauncherResult(
@@ -201,6 +209,7 @@ fun rememberConnectWifiLauncher(
         if(pendingPermissionRequest == null)
             return@LaunchedEffect
 
+        onStatusChange?.invoke(ConnectWifiLauncherStatus.REQUESTING_PERMISSION)
         requestPermissionLauncher.launch(NEARBY_WIFI_PERMISSION_NAME)
     }
 
