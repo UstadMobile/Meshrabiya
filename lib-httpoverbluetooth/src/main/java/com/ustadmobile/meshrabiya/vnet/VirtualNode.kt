@@ -33,6 +33,7 @@ import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketServer
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
+import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -759,14 +760,16 @@ abstract class VirtualNode(
         )
     }
 
-    open suspend fun setWifiHotspotEnabled(enabled: Boolean) {
-        if(enabled){
-            meshrabiyaWifiManager.requestHotspot(
+    open suspend fun setWifiHotspotEnabled(enabled: Boolean): LocalHotspotResponse? {
+        return if(enabled){
+             meshrabiyaWifiManager.requestHotspot(
                 requestMessageId = nextMmcpMessageId(),
                 request = LocalHotspotRequest(
                     is5GhzSupported = meshrabiyaWifiManager.is5GhzSupported
                 )
             )
+        }else {
+            null
         }
     }
 

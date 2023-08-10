@@ -220,12 +220,12 @@ class MeshrabiyaWifiManagerAndroid(
         }
 
         val configResult = _state.filter {
-            it.wifiDirectState.hotspotStatus == HotspotStatus.STARTED || it.errorCode != 0
+            it.wifiDirectState.hotspotStatus == HotspotStatus.STARTED || it.wifiDirectState.error != 0
         }.first()
 
         return LocalHotspotResponse(
             responseToMessageId = requestMessageId,
-            errorCode = configResult.errorCode,
+            errorCode = configResult.wifiDirectState.error,
             config = configResult.config,
             redirectAddr = 0
         )

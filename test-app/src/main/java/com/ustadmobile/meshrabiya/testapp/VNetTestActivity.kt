@@ -42,8 +42,6 @@ import com.ustadmobile.meshrabiya.testapp.screens.ReceiveScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SelectDestNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
-import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
-import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
@@ -229,6 +227,7 @@ fun AppNavHost(
         composable("localvirtualnode") {
             LocalVirtualNodeScreen(
                 onSetAppUiState = onSetAppUiState,
+                snackbarHostState = snackbarHostState,
             )
         }
 

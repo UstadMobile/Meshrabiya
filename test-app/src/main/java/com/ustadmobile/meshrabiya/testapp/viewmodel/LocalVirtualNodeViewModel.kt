@@ -6,8 +6,12 @@ import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiDirectError
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -33,6 +37,12 @@ class LocalVirtualNodeViewModel(
 
     val uiState: Flow<LocalVirtualNodeUiState> = _uiState.asStateFlow()
 
+    private val _snackbars = MutableSharedFlow<SnackbarMessage>(
+        replay = 0, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
+    val snackbars: Flow<SnackbarMessage> = _snackbars.asSharedFlow()
+
     private val node: AndroidVirtualNode by di.instance()
 
     init {
@@ -56,7 +66,11 @@ class LocalVirtualNodeViewModel(
 
     fun onSetIncomingConnectionsEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            node.setWifiHotspotEnabled(enabled)
+            val response = node.setWifiHotspotEnabled(enabled)
+            if(response != null && response.errorCode != 0) {
+                val errorStr = WifiDirectError.errorString(response.errorCode)
+                _snackbars.tryEmit(SnackbarMessage("ERROR enabling incoming connections: $errorStr"))
+            }
         }
     }
 

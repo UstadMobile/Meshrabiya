@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,13 +57,21 @@ fun LocalVirtualNodeScreen(
         )
     ),
     onSetAppUiState: (AppUiState) -> Unit,
+    snackbarHostState: SnackbarHostState,
 ){
     val uiState: LocalVirtualNodeUiState by viewModel.uiState.collectAsState(
         initial = LocalVirtualNodeUiState()
     )
+    val snackbar by viewModel.snackbars.collectAsState(initial = null)
 
     LaunchedEffect(uiState.appUiState) {
         onSetAppUiState(uiState.appUiState)
+    }
+
+    LaunchedEffect(snackbar) {
+        snackbar?.also {
+            snackbarHostState.showSnackbar(message = it.message)
+        }
     }
 
     val context = LocalContext.current
