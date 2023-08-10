@@ -305,7 +305,9 @@ class WifiDirectManager(
     }
 
 
-    internal suspend fun startWifiDirectGroup(): Boolean {
+    internal suspend fun startWifiDirectGroup(
+        preferredBand: ConnectBand,
+    ): Boolean {
         logger(Log.DEBUG, "$logPrefix startWifiDirectGroup", null)
         onBeforeGroupStart?.onBeforeGroupStart()
 
@@ -332,7 +334,13 @@ class WifiDirectManager(
                     val p2pConfig = WifiP2pConfig.Builder()
                         .enablePersistentMode(true)
                         .setNetworkName(config.ssid)
-                        .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
+                        .apply {
+                            if(preferredBand == ConnectBand.BAND_5GHZ) {
+                                setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
+                            }else if(preferredBand == ConnectBand.BAND_2GHZ){
+                                setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
+                            }
+                        }
                         .setPassphrase(config.passphrase)
                         .build()
                     val channelVal = channel ?: throw IllegalStateException("Create group: Null channel!")

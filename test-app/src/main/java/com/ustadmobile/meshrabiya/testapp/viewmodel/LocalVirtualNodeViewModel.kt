@@ -1,11 +1,13 @@
 package com.ustadmobile.meshrabiya.testapp.viewmodel
 
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiDirectError
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +22,8 @@ import org.kodein.di.instance
 
 data class LocalVirtualNodeUiState(
     val localAddress: Int = 0,
+    val bandOptions: List<ConnectBand> = listOf(ConnectBand.BAND_2GHZ),
+    val band: ConnectBand = bandOptions.first(),
     val wifiState: MeshrabiyaWifiState? = null,
     val bluetoothState: MeshrabiyaBluetoothState? = null,
     val connectUri: String? = null,
@@ -27,6 +31,9 @@ data class LocalVirtualNodeUiState(
 ){
     val incomingConnectionsEnabled: Boolean
         get() = wifiState?.config != null
+
+    val connectBandVisible: Boolean
+        get() = Build.VERSION.SDK_INT >= 29 && wifiState?.config == null
 }
 
 class LocalVirtualNodeViewModel(
@@ -62,11 +69,31 @@ class LocalVirtualNodeViewModel(
             }
         }
 
+        if(node.meshrabiyaWifiManager.is5GhzSupported) {
+            _uiState.update { prev ->
+                prev.copy(
+                    bandOptions = listOf(ConnectBand.BAND_5GHZ, ConnectBand.BAND_2GHZ),
+                    band = ConnectBand.BAND_5GHZ,
+                )
+            }
+        }
+
+    }
+
+    fun onConnectBandChanged(band: ConnectBand) {
+        _uiState.update { prev ->
+            prev.copy(
+                band = band,
+            )
+        }
     }
 
     fun onSetIncomingConnectionsEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            val response = node.setWifiHotspotEnabled(enabled)
+            val response = node.setWifiHotspotEnabled(
+                enabled = enabled,
+                preferredBand = _uiState.value.band,
+            )
             if(response != null && response.errorCode != 0) {
                 val errorStr = WifiDirectError.errorString(response.errorCode)
                 _snackbars.tryEmit(SnackbarMessage("ERROR enabling incoming connections: $errorStr"))

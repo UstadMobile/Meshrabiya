@@ -17,6 +17,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
+import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid
@@ -261,9 +262,12 @@ class AndroidVirtualNode(
         meshrabiyaWifiManager.connectToHotspot(config)
     }
 
-    override suspend fun setWifiHotspotEnabled(enabled: Boolean) : LocalHotspotResponse?{
+    override suspend fun setWifiHotspotEnabled(
+        enabled: Boolean,
+        preferredBand: ConnectBand,
+    ) : LocalHotspotResponse?{
         updateBluetoothState()
-        return super.setWifiHotspotEnabled(enabled)
+        return super.setWifiHotspotEnabled(enabled, preferredBand)
     }
 
     suspend fun lookupStoredBssid(addr: Int) : String? {

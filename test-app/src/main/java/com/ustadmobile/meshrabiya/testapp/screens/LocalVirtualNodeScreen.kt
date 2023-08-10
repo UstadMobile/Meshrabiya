@@ -10,11 +10,17 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -22,7 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
@@ -42,6 +50,7 @@ import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.hasBluetoothConnectPermission
 import com.ustadmobile.meshrabiya.testapp.hasNearbyWifiDevicesOrLocationPermission
 import com.ustadmobile.meshrabiya.testapp.viewmodel.LocalVirtualNodeUiState
+import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import org.kodein.di.compose.localDI
 
 @Composable
@@ -107,13 +116,16 @@ fun LocalVirtualNodeScreen(
                 viewModel.onSetIncomingConnectionsEnabled(enabled)
             }
         },
+        onSetBand = viewModel::onConnectBandChanged,
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocalVirtualNodeScreen(
     uiState: LocalVirtualNodeUiState,
     onSetIncomingConnectionsEnabled: (Boolean) -> Unit = { },
+    onSetBand: (ConnectBand) -> Unit = { },
 ){
 
     val barcodeEncoder = remember {
@@ -129,6 +141,56 @@ fun LocalVirtualNodeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
+
+        if(uiState.connectBandVisible) {
+            item(key = "band") {
+                var expanded: Boolean by remember {
+                    mutableStateOf(false)
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    onExpandedChange = {
+                        expanded = !expanded
+                    }
+                ) {
+                    OutlinedTextField(
+                        value = uiState.band.toString(),
+                        readOnly = true,
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        label = {
+                            Text("Band")
+                        },
+                        onValueChange = { },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(
+                                expanded = expanded
+                            )
+                        },
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = {
+                            expanded = false
+                        }
+                    ) {
+                        uiState.bandOptions.forEach {
+                            DropdownMenuItem(
+                                text = { Text(it.toString()) },
+                                onClick = {
+                                    expanded = false
+                                    onSetBand(it)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
 
         item(key = "hotspotswitch") {
             Row(

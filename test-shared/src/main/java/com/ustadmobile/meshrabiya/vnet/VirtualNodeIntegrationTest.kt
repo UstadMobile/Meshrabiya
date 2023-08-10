@@ -19,6 +19,7 @@ import com.ustadmobile.meshrabiya.test.assertByteArrayEquals
 import com.ustadmobile.meshrabiya.test.assertFileContentsAreEqual
 import com.ustadmobile.meshrabiya.test.connectTo
 import com.ustadmobile.meshrabiya.test.newFileWithRandomData
+import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotStatus
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -248,7 +249,7 @@ abstract class VirtualNodeIntegrationTest {
             val requestId = Random.nextInt()
 
             node1.route(
-                packet = MmcpHotspotRequest(requestId, LocalHotspotRequest(is5GhzSupported = true))
+                packet = MmcpHotspotRequest(requestId, LocalHotspotRequest(ConnectBand.BAND_5GHZ))
                     .toVirtualPacket(
                         toAddr = node1.localNodeAddress,
                         fromAddr = node2.localNodeAddress

@@ -30,6 +30,7 @@ import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactory
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactoryImpl
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketServer
+import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -747,7 +748,10 @@ abstract class VirtualNode(
         val request = MmcpHotspotRequest(
             messageId = nextMmcpMessageId(),
             hotspotRequest = LocalHotspotRequest(
-                is5GhzSupported = meshrabiyaWifiManager.is5GhzSupported
+                preferredBand = if(meshrabiyaWifiManager.is5GhzSupported)
+                    ConnectBand.BAND_5GHZ
+                else
+                    ConnectBand.BAND_2GHZ
             )
         )
 
@@ -760,12 +764,15 @@ abstract class VirtualNode(
         )
     }
 
-    open suspend fun setWifiHotspotEnabled(enabled: Boolean): LocalHotspotResponse? {
+    open suspend fun setWifiHotspotEnabled(
+        enabled: Boolean,
+        preferredBand: ConnectBand = ConnectBand.BAND_2GHZ,
+    ): LocalHotspotResponse? {
         return if(enabled){
              meshrabiyaWifiManager.requestHotspot(
                 requestMessageId = nextMmcpMessageId(),
                 request = LocalHotspotRequest(
-                    is5GhzSupported = meshrabiyaWifiManager.is5GhzSupported
+                    preferredBand = preferredBand
                 )
             )
         }else {

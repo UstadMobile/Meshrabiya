@@ -211,7 +211,7 @@ class MeshrabiyaWifiManagerAndroid(
 
             when(prevState.hotspotTypeToCreate) {
                 HotspotType.WIFIDIRECT_GROUP -> {
-                    wifiDirectManager.startWifiDirectGroup()
+                    wifiDirectManager.startWifiDirectGroup(request.preferredBand)
                 }
                 else -> {
                     //Do nothing
