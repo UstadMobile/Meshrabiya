@@ -127,7 +127,7 @@ abstract class VirtualNode(
 
     val neighborNodesState: Flow<List<NeighborNodeState>> = _neighborNodesState.asStateFlow()
 
-    abstract val hotspotManager: MeshrabiyaWifiManager
+    abstract val meshrabiyaWifiManager: MeshrabiyaWifiManager
 
     private val pongListeners = CopyOnWriteArrayList<PongListener>()
 
@@ -449,7 +449,7 @@ abstract class VirtualNode(
                 mmcpMessage is MmcpHotspotRequest && isToThisNode -> {
                     logger(Log.INFO, "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})", null)
                     coroutineScope.launch {
-                        val hotspotResult = hotspotManager.requestHotspot(
+                        val hotspotResult = meshrabiyaWifiManager.requestHotspot(
                             mmcpMessage.messageId, mmcpMessage.hotspotRequest
                         )
 
@@ -746,7 +746,7 @@ abstract class VirtualNode(
         val request = MmcpHotspotRequest(
             messageId = nextMmcpMessageId(),
             hotspotRequest = LocalHotspotRequest(
-                is5GhzSupported = hotspotManager.is5GhzSupported
+                is5GhzSupported = meshrabiyaWifiManager.is5GhzSupported
             )
         )
 
@@ -761,10 +761,10 @@ abstract class VirtualNode(
 
     open suspend fun setWifiHotspotEnabled(enabled: Boolean) {
         if(enabled){
-            hotspotManager.requestHotspot(
+            meshrabiyaWifiManager.requestHotspot(
                 requestMessageId = nextMmcpMessageId(),
                 request = LocalHotspotRequest(
-                    is5GhzSupported = hotspotManager.is5GhzSupported
+                    is5GhzSupported = meshrabiyaWifiManager.is5GhzSupported
                 )
             )
         }

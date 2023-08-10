@@ -12,6 +12,7 @@ import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.appstate.FabState
+import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiStationState
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -27,6 +28,7 @@ data class NeighborNodeListUiState(
     val appUiState: AppUiState = AppUiState(),
     val neighborNodes: List<NeighborNodeState> = emptyList(),
     val filter: Filter = Filter.ALL_NODES,
+    val connectingInProgressSsid: String? = null,
     internal val allNodes: Map<Int, VirtualNode.LastOriginatorMessage> = emptyMap(),
 ) {
 
@@ -41,8 +43,8 @@ data class NeighborNodeListUiState(
 
     companion object {
 
-        enum class Filter(val id: Int, val label: String) {
-            ALL_NODES(1, "All"), NEIGHBORS(2, "Neighbors")
+        enum class Filter(val label: String) {
+            ALL_NODES("All"), NEIGHBORS("Neighbors")
         }
 
     }
@@ -84,7 +86,13 @@ class NeighborNodeListViewModel(
             virtualNode.state.collect {
                 _uiState.update { prev ->
                     prev.copy(
-                        allNodes = it.originatorMessages
+                        allNodes = it.originatorMessages,
+                        connectingInProgressSsid =
+                            if(it.wifiState.wifiStationState.status == WifiStationState.Status.CONNECTING) {
+                                it.wifiState.wifiStationState.config?.ssid
+                            }else {
+                                null
+                            },
                     )
                 }
             }

@@ -178,7 +178,7 @@ fun NeighborNodeListScreen(
             }
         }
 
-        if(connectLauncherState != ConnectWifiLauncherStatus.INACTIVE) {
+        if(connectLauncherState != ConnectWifiLauncherStatus.INACTIVE || uiState.connectingInProgressSsid != null) {
             item("connectlauncherstatus") {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -187,9 +187,16 @@ fun NeighborNodeListScreen(
                     CircularProgressIndicator(
                         modifier = Modifier.padding(8.dp)
                     )
+
+                    val statusText = if(connectLauncherState != ConnectWifiLauncherStatus.INACTIVE) {
+                        connectLauncherState.toString()
+                    }else {
+                        "Connecting to ${uiState.connectingInProgressSsid}"
+                    }
+
                     Text(
                         modifier = Modifier.padding(8.dp),
-                        text = connectLauncherState.toString(),
+                        text = statusText,
                     )
                 }
             }

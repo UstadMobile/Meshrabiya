@@ -9,6 +9,7 @@ import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 data class MeshrabiyaWifiState(
     val wifiRole: WifiRole = WifiRole.NONE,
     val wifiDirectState: WifiDirectState = WifiDirectState(),
+    val wifiStationState: WifiStationState = WifiStationState(),
     val errorCode: Int = 0,
 ) {
     val config: WifiConnectConfig?

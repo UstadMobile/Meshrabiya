@@ -16,7 +16,7 @@ class TestVirtualNode(
     localNodeAddress: Int = randomApipaAddr(),
     port: Int = 0,
     logger: MNetLogger = MNetLoggerStdout(),
-    override val hotspotManager: MeshrabiyaWifiManager = mock { },
+    override val meshrabiyaWifiManager: MeshrabiyaWifiManager = mock { },
     json: Json,
     config: NodeConfig = NodeConfig(maxHops = 5),
 ) : VirtualNode(

@@ -18,6 +18,7 @@ interface MeshrabiyaWifiManager {
 
     suspend fun connectToHotspot(
         config: WifiConnectConfig,
+        timeout: Long = 90_000,
     )
 
 }

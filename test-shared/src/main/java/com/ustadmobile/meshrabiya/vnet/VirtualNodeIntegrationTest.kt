@@ -102,7 +102,7 @@ abstract class VirtualNodeIntegrationTest {
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()).ip4AddressToInt()
         )
@@ -110,7 +110,7 @@ abstract class VirtualNodeIntegrationTest {
         val node2  = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()).ip4AddressToInt()
         )
@@ -149,13 +149,13 @@ abstract class VirtualNodeIntegrationTest {
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
         )
         val node2 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
         )
 
@@ -224,14 +224,14 @@ abstract class VirtualNodeIntegrationTest {
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mockHotspotManager,
+            meshrabiyaWifiManager = mockHotspotManager,
             json = json,
         )
 
         val node2 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
         )
 
@@ -332,14 +332,14 @@ abstract class VirtualNodeIntegrationTest {
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, 1).ip4AddressToInt()
         )
         val node2 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, 2).ip4AddressToInt()
         )
@@ -381,7 +381,7 @@ abstract class VirtualNodeIntegrationTest {
             TestVirtualNode(
                 uuidMask = UUID.randomUUID(),
                 logger = logger,
-                hotspotManager = mock { },
+                meshrabiyaWifiManager = mock { },
                 json = json,
                 localNodeAddress = byteArrayOf(
                     169.toByte(),
@@ -425,7 +425,7 @@ abstract class VirtualNodeIntegrationTest {
             TestVirtualNode(
                 uuidMask = UUID.randomUUID(),
                 logger = logger,
-                hotspotManager = mock { },
+                meshrabiyaWifiManager = mock { },
                 json = json,
                 localNodeAddress = byteArrayOf(
                     169.toByte(),
@@ -485,7 +485,7 @@ abstract class VirtualNodeIntegrationTest {
         val node1 = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(
                 169.toByte(),
@@ -498,7 +498,7 @@ abstract class VirtualNodeIntegrationTest {
         val node2  = TestVirtualNode(
             uuidMask = UUID.randomUUID(),
             logger = logger,
-            hotspotManager = mock { },
+            meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(
                 169.toByte(),

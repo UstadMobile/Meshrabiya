@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.vnet.wifi
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -27,7 +28,7 @@ import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactory
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketServer
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid.OnNewWifiConnectionListener
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
-import kotlinx.coroutines.CompletableDeferred
+import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiStationState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,15 +43,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import java.io.Closeable
 import java.net.DatagramSocket
 import java.net.Inet6Address
-import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -83,11 +82,50 @@ class MeshrabiyaWifiManagerAndroid(
 
     private val nodeScope = CoroutineScope(Dispatchers.Main + Job())
 
+    private inner class ConnectNetworkCallback(
+        private val config: WifiConnectConfig
+    ): NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: connection available. Network=$network")
+            _state.update { prev ->
+                prev.copy(
+                    wifiStationState = prev.wifiStationState.copy(
+                        status = WifiStationState.Status.AVAILABLE,
+                        network = network,
+                    )
+                )
+            }
 
-    data class NetworkAndDhcpServer(
-        val network: Network,
-        val dhcpServer: InetAddress
-    )
+            nodeScope.launch {
+                try {
+                    createStationNetworkBoundSockets(network, config)
+                }catch(e: Exception) {
+                    logger(Log.ERROR, "$logPrefix ConnectNetworkCallback: Exception creating station sockets", e)
+                }
+            }
+        }
+
+        override fun onUnavailable() {
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: connection unavailable", null)
+            _state.update { prev ->
+                prev.copy(
+                    wifiStationState = prev.wifiStationState.copy(
+                        status = WifiStationState.Status.UNAVAILABLE,
+                    )
+                )
+            }
+        }
+
+        override fun onLost(network: Network) {
+            _state.update { prev ->
+                prev.copy(
+                    wifiStationState = prev.wifiStationState.copy(
+                        status = WifiStationState.Status.LOST,
+                    )
+                )
+            }
+        }
+    }
 
     fun interface OnNewWifiConnectionListener {
         fun onNewWifiConnection(connectEvent: WifiConnectEvent)
@@ -115,6 +153,8 @@ class MeshrabiyaWifiManagerAndroid(
     private val closed = AtomicBoolean(false)
 
     private var wifiLock: WifiManager.WifiLock? = null
+
+    private val connectRequest = AtomicReference<Pair<WifiConnectConfig, NetworkCallback>?>(null)
 
     init {
         wifiDirectManager.onBeforeGroupStart = WifiDirectManager.OnBeforeGroupStart {
@@ -196,147 +236,139 @@ class MeshrabiyaWifiManagerAndroid(
      * Connect to the given hotspot as a station.
      */
     @Suppress("DEPRECATION") //Must use deprecated classes to support pre-SDK29
-    private suspend fun connectToHotspot(
-        ssid: String,
-        passphrase: String,
-        bssid: String? = null,
-    ): NetworkAndDhcpServer? {
-        logger(Log.INFO, "$logPrefix Connecting to hotspot: ssid=$ssid passphrase=$passphrase bssid=$bssid", null)
-        try {
-            val completable = CompletableDeferred<NetworkAndDhcpServer?>()
-            val networkCallback = object: ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    val linkProperties = connectivityManager.getLinkProperties(network)
-                    val dhcpServer = if(Build.VERSION.SDK_INT >= 30) {
-                        linkProperties?.dhcpServerAddress
-                    }else {
-                        wifiManager.dhcpInfo?.serverAddress?.let {
-                            //Strangely - seems like these are Little Endian
-                            InetAddress.getByAddress(
-                                ByteBuffer.wrap(ByteArray(4))
-                                    .order(ByteOrder.LITTLE_ENDIAN)
-                                    .putInt(it)
-                                    .array()
-                            )
-                        }
-                    }
+    private suspend fun connectToHotspotInternal(
+        config: WifiConnectConfig,
+    ): Network {
+        logger(Log.INFO,
+            "$logPrefix Connecting to hotspot: ssid=${config.ssid} passphrase=${config.passphrase} bssid=${config.bssid}"
+        )
 
-                    logger(Log.DEBUG, "$logPrefix connectToHotspot: connection available. DHCP server=$dhcpServer", null)
+        val networkCallback = ConnectNetworkCallback(config)
 
-                    if(dhcpServer != null) {
-                        completable.complete(
-                            NetworkAndDhcpServer(
-                                network,
-                                dhcpServer
-                            )
-                        )
-                    }else {
-                        logger(Log.DEBUG, "$logPrefix connectToHotspot: ERROR: could not find DHCP server", null)
-                        completable.complete(null)
-                    }
-                }
-
-
-                override fun onUnavailable() {
-                    logger(Log.DEBUG, "$logPrefix connectToHotspot: connection unavailable", null)
-                    completable.complete(null)
-                    super.onUnavailable()
-                }
-            }
-
-            if(Build.VERSION.SDK_INT >= 29) {
-                //Use the suggestion API as per https://developer.android.com/guide/topics/connectivity/wifi-bootstrap
-                /*
-                 * Dialog behavior notes
-                 *
-                 * On Android 11+ if the network is in the CompanionDeviceManager approved list (which
-                 * works on the basis of BSSID only), then no approval dialog will be shown:
-                 * See:
-                 * https://cs.android.com/android/platform/superproject/+/android-11.0.0_r1:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1321
-                 *
-                 * On Android 10:
-                 * No WifiNetworkFactory uses a list of approved access points. The BSSID, SSID, and
-                 * network type must match.
-                 * See:
-                 * https://cs.android.com/android/platform/superproject/+/android-10.0.0_r47:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1224
-                 */
-                logger(Log.DEBUG, "$logPrefix connectToHotspot: building network specifier", null)
-                val specifier = WifiNetworkSpecifier.Builder()
-                    .apply {
-                        setSsid(ssid)
-                        //TODO: set the bssid when we are confident it did not change / we know it.
+        val networkRequest = if(Build.VERSION.SDK_INT >= 29) {
+            //Use the suggestion API as per https://developer.android.com/guide/topics/connectivity/wifi-bootstrap
+            /*
+             * Dialog behavior notes
+             *
+             * On Android 11+ if the network is in the CompanionDeviceManager approved list (which
+             * works on the basis of BSSID only), then no approval dialog will be shown:
+             * See:
+             * https://cs.android.com/android/platform/superproject/+/android-11.0.0_r1:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1321
+             *
+             * On Android 10:
+             * No WifiNetworkFactory uses a list of approved access points. The BSSID, SSID, and
+             * network type must match.
+             * See:
+             * https://cs.android.com/android/platform/superproject/+/android-10.0.0_r47:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1224
+             */
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: building network specifier", null)
+            val specifier = WifiNetworkSpecifier.Builder()
+                .apply {
+                    setSsid(config.ssid)
+                    //TODO: set the bssid when we are confident it did not change / we know it.
 //                    if(bssid != null) {
 //                        setBssid(MacAddress.fromString(bssid))
 //                    }
-                    }
-                    .setWpa2Passphrase(passphrase)
-                    .build()
+                }
+                .setWpa2Passphrase(config.passphrase)
+                .build()
 
-                val request = NetworkRequest.Builder()
-                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    .setNetworkSpecifier(specifier)
-                    .build()
+            NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .setNetworkSpecifier(specifier)
+                .build()
+        }else {
+            //use pre-Android 10 WifiManager API
+            val wifiConfig = WifiConfiguration().apply {
+                SSID =  "\"${config.ssid}\""
+                preSharedKey = "\"${config.passphrase}\""
 
-                logger(Log.DEBUG, "$logPrefix connectToHotspot: Requesting network for $ssid / $passphrase", null)
-                connectivityManager.requestNetwork(request, networkCallback)
+                /* Setting hiddenSSID = true is necessary, even though the network we are connecting
+                 * to is not hidden...
+                 * Android won't connect to an SSID if it thinks the SSID is not there. The SSID
+                 * might have created only a few ms ago by the other peer, and therefor won't be
+                 * in the scan list. Setting hiddenSSID to true will ensure that Android attempts to
+                 * connect whether or not the network is in currently known scan results.
+                 */
+                hiddenSSID = true
+            }
+            val configNetworkId = wifiManager.addOrLookupNetwork(wifiConfig, logger)
+            val currentlyConnectedNetworkId = wifiManager.connectionInfo.networkId
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: Currently connected to networkId: $currentlyConnectedNetworkId", null)
+
+            if(currentlyConnectedNetworkId == configNetworkId) {
+                logger(Log.DEBUG, "$logPrefix connectToHotspot: Already connected to target networkid", null)
             }else {
-                //use pre-Android 10 WifiManager API
-                val wifiConfig = WifiConfiguration().apply {
-                    SSID =  "\"$ssid\""
-                    preSharedKey = "\"$passphrase\""
-
-                    /* Setting hiddenSSID = true is necessary, even though the network we are connecting
-                     * to is not hidden...
-                     * Android won't connect to an SSID if it thinks the SSID is not there. The SSID
-                     * might have created only a few ms ago by the other peer, and therefor won't be
-                     * in the scan list. Setting hiddenSSID to true will ensure that Android attempts to
-                     * connect whether or not the network is in currently known scan results.
-                     */
-                    hiddenSSID = true
-                }
-                val configNetworkId = wifiManager.addOrLookupNetwork(wifiConfig, logger)
-                val currentlyConnectedNetworkId = wifiManager.connectionInfo.networkId
-                logger(Log.DEBUG, "$logPrefix connectToHotspot: Currently connected to networkId: $currentlyConnectedNetworkId", null)
-
-                if(currentlyConnectedNetworkId == configNetworkId) {
-                    logger(Log.DEBUG, "$logPrefix connectToHotspot: Already connected to target networkid", null)
-                }else {
-                    //If currently connected to another network, we need to disconnect.
-                    wifiManager.takeIf { currentlyConnectedNetworkId != -1 }?.disconnect()
-                    wifiManager.enableNetwork(configNetworkId, true)
-                }
-
-                val networkRequest = NetworkRequest.Builder()
-                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    .build()
-
-
-                logger(Log.DEBUG, "$logPrefix connectToHotspot: requesting network for $ssid", null)
-                connectivityManager.requestNetwork(networkRequest, networkCallback)
+                //If currently connected to another network, we need to disconnect.
+                wifiManager.takeIf { currentlyConnectedNetworkId != -1 }?.disconnect()
+                wifiManager.enableNetwork(configNetworkId, true)
             }
 
-            return completable.await()
-        }catch(e: Exception) {
-            logger(Log.ERROR, "$logPrefix connectToHotspot: Exception!", e)
-            throw e
+            NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+        }
+
+        logger(Log.DEBUG, "$logPrefix connectToHotspot: requesting network for ${config.ssid}", null)
+        val prevRequest = connectRequest.getAndUpdate {
+            config to networkCallback
+        }
+
+        prevRequest?.second?.also {
+            logger(Log.DEBUG, "$logPrefix connectToHotspot: unregister previous callback: $it")
+            connectivityManager.unregisterNetworkCallback(it)
+        }
+
+        connectivityManager.requestNetwork(networkRequest, networkCallback)
+
+        _state.update { prev ->
+            prev.copy(
+                wifiStationState = prev.wifiStationState.copy(
+                    status = WifiStationState.Status.CONNECTING,
+                    config = config,
+                    network = null,
+                    stationBoundSocketsPort = -1,
+                )
+            )
+        }
+
+        val resultState = _state.map { it.wifiStationState }.filter {
+            it.status != WifiStationState.Status.CONNECTING
+        }.first()
+
+        if (resultState.network != null) {
+            logger(Log.INFO, "$logPrefix connectToHotspot: ${config.ssid} - success status=${resultState.status}")
+            return resultState.network
+        }else {
+            logger(Log.ERROR, "$logPrefix connectToHotspot: ${config.ssid} - fail status=${resultState.status}")
+            throw WifiConnectException("ConnectToHotspot: ${config.ssid} status=${resultState.status} network=null")
         }
     }
 
     override suspend fun connectToHotspot(
         config: WifiConnectConfig,
+        timeout: Long,
     ) {
         if(config.band == ConnectBand.BAND_5GHZ && !wifiManager.is5GHzBandSupported) {
             throw WifiConnectException("ERROR: 5Ghz not supported by device: ${config.ssid} uses 5Ghz band")
         }
 
-        val networkAndServerAddr = connectToHotspot(
-            ssid = config.ssid,
-            passphrase = config.passphrase,
-            bssid = config.bssid
-        )
+        withTimeout(timeout) {
+            connectToHotspotInternal(config)
 
+            val resultState = _state.filter {
+                it.wifiStationState.stationBoundSocketsPort != -1 || it.wifiStationState.status in WifiStationState.Status.FAIL_STATES
+            }.first()
+            val stationStatus = resultState.wifiStationState.status
+
+            if(stationStatus in WifiStationState.Status.FAIL_STATES) {
+                throw WifiConnectException("Attempted to connect to ${config.ssid}, status=$stationStatus")
+            }
+        }
+
+        /*
         if(networkAndServerAddr != null) {
             val bssid = config.bssid
             if(bssid != null) {
@@ -346,88 +378,90 @@ class MeshrabiyaWifiManagerAndroid(
             }
 
             withContext(Dispatchers.IO) {
-                val linkProperties = connectivityManager
-                    .getLinkProperties(networkAndServerAddr.network)
 
-                logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address:", null)
-                val socketPort = findFreePort(0)
-                val socket = DatagramSocket(socketPort)
-
-                networkAndServerAddr.network.bindSocket(socket)
-                val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
-                    socket = socket,
-                    localNodeVirtualAddress = localNodeAddr,
-                    ioExecutorService = ioExecutor,
-                    router = router,
-                    onMmcpHelloReceivedListener = {
-                        //Do nothing - this will never receive an incoming hello.
-                    },
-                    logger = logger,
-                    name = "network bound to ${config.ssid}"
-                )
-
-                val chainSocketServer = ChainSocketServer(
-                    serverSocket = ServerSocket(socketPort),
-                    executorService = ioExecutor,
-                    chainSocketFactory = chainSocketFactory,
-                    name = "network bound to ${config.ssid}",
-                    logger = logger,
-                )
-
-                val previousSockets = stationBoundSockets.getAndUpdate {
-                    networkBoundDatagramSocket to chainSocketServer
-                }
-
-                previousSockets?.first?.close()
-                previousSockets?.second?.close(true)
-
-                //Binding something to the network helps to avoid older versions of Android
-                //deciding to disconnect from this network.
-                logger(Log.INFO, "$logPrefix : addWifiConnection:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
-                _state.update { prev ->
-                    prev.copy(
-                        wifiRole = if(config.hotspotType == HotspotType.LOCALONLY_HOTSPOT) {
-                            WifiRole.WIFI_DIRECT_GROUP_OWNER
-                        }else {
-                            WifiRole.CLIENT
-                        }
-                    )
-                }
-
-                logger(
-                    Log.INFO, "$logPrefix : addWifiConnectionConnect:Sending " +
-                            "hello to ${networkAndServerAddr.dhcpServer}:${config.port} " +
-                            "from local:${networkBoundDatagramSocket.localPort}", null
-                )
-
-                val networkInterface = NetworkInterface.getByName(linkProperties?.interfaceName)
-
-                //Create a scoped Inet6 address using the given local link
-                val peerAddr = Inet6Address.getByAddress(
-                    config.linkLocalAddr.requireHostAddress(), config.linkLocalAddr.address, networkInterface
-                )
-
-                logger(Log.DEBUG, "$logPrefix : addWifiConnectionConnect: Peer address is: $peerAddr", null)
-
-                //Once connected,
-                onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
-                    neighborPort = config.port,
-                    neighborInetAddress = peerAddr,
-                    socket = networkBoundDatagramSocket,
-                    neighborVirtualAddress = config.nodeVirtualAddr,
-                ))
-
-                //If we are connected and now expected to act as a Wifi Direct group, setup the
-                // group and add service for discovery.
-
-                //wifiDirectManager.startWifiDirectGroup()
 
             }
         }else {
             logger(Log.ERROR, "$logPrefix : addWifiConnectionConnect: to hotspot: returned null network", null)
         }
+        */
+
     }
 
+    /**
+     * Create a datagramsocket that is bound to the the network object for the wifi station network.
+     */
+    private suspend fun createStationNetworkBoundSockets(network: Network, config: WifiConnectConfig) {
+        withContext(Dispatchers.IO) {
+            val linkProperties = connectivityManager
+                .getLinkProperties(network)
+
+            logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address:", null)
+            val socketPort = findFreePort(0)
+            val socket = DatagramSocket(socketPort)
+
+            network.bindSocket(socket)
+            val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
+                socket = socket,
+                localNodeVirtualAddress = localNodeAddr,
+                ioExecutorService = ioExecutor,
+                router = router,
+                onMmcpHelloReceivedListener = {
+                    //Do nothing - this will never receive an incoming hello.
+                },
+                logger = logger,
+                name = "network bound to ${config.ssid}"
+            )
+
+            val chainSocketServer = ChainSocketServer(
+                serverSocket = ServerSocket(socketPort),
+                executorService = ioExecutor,
+                chainSocketFactory = chainSocketFactory,
+                name = "network bound to ${config.ssid}",
+                logger = logger,
+            )
+
+            val previousSockets = stationBoundSockets.getAndUpdate {
+                networkBoundDatagramSocket to chainSocketServer
+            }
+
+            previousSockets?.first?.close()
+            previousSockets?.second?.close(true)
+
+            //Binding something to the network helps to avoid older versions of Android
+            //deciding to disconnect from this network.
+            logger(Log.INFO, "$logPrefix : addWifiConnection:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
+            _state.update { prev ->
+                prev.copy(
+                    wifiRole = if(config.hotspotType == HotspotType.LOCALONLY_HOTSPOT) {
+                        WifiRole.WIFI_DIRECT_GROUP_OWNER
+                    }else {
+                        WifiRole.CLIENT
+                    },
+                    wifiStationState = prev.wifiStationState.copy(
+                        stationBoundSocketsPort = socketPort,
+                    )
+                )
+            }
+
+            val networkInterface = NetworkInterface.getByName(linkProperties?.interfaceName)
+
+            //Create a scoped Inet6 address using the given local link
+            val peerAddr = Inet6Address.getByAddress(
+                config.linkLocalAddr.requireHostAddress(), config.linkLocalAddr.address, networkInterface
+            )
+
+            logger(Log.DEBUG, "$logPrefix : addWifiConnectionConnect: Peer address is: $peerAddr", null)
+
+            //Once connected,
+            onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
+                neighborPort = config.port,
+                neighborInetAddress = peerAddr,
+                socket = networkBoundDatagramSocket,
+                neighborVirtualAddress = config.nodeVirtualAddr,
+            ))
+        }
+    }
 
     override fun close() {
         if(!closed.getAndSet(true)) {

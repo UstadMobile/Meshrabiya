@@ -73,7 +73,7 @@ class AndroidVirtualNode(
         )
     }
 
-    override val hotspotManager: MeshrabiyaWifiManagerAndroid = MeshrabiyaWifiManagerAndroid(
+    override val meshrabiyaWifiManager: MeshrabiyaWifiManagerAndroid = MeshrabiyaWifiManagerAndroid(
         appContext = appContext,
         logger = logger,
         localNodeAddr = localMNodeAddress,
@@ -161,7 +161,7 @@ class AndroidVirtualNode(
         receiverRegistered.set(true)
 
         coroutineScope.launch {
-            hotspotManager.state.combine(_bluetoothState) { wifiState, bluetoothState ->
+            meshrabiyaWifiManager.state.combine(_bluetoothState) { wifiState, bluetoothState ->
                 wifiState to bluetoothState
             }.collect {
                 _state.update { prev ->
@@ -257,7 +257,7 @@ class AndroidVirtualNode(
     suspend fun addWifiConnection(
         config: WifiConnectConfig,
     ) {
-        hotspotManager.connectToHotspot(config)
+        meshrabiyaWifiManager.connectToHotspot(config)
     }
 
     override suspend fun setWifiHotspotEnabled(enabled: Boolean) {
@@ -266,10 +266,10 @@ class AndroidVirtualNode(
     }
 
     suspend fun lookupStoredBssid(addr: Int) : String? {
-        return hotspotManager.lookupStoredBssid(addr)
+        return meshrabiyaWifiManager.lookupStoredBssid(addr)
     }
 
     suspend fun storeBssidForAddress(addr: Int, bssid: String) {
-        hotspotManager.storeBssidForAddress(addr, bssid)
+        meshrabiyaWifiManager.storeBssidForAddress(addr, bssid)
     }
 }
