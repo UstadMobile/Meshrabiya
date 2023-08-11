@@ -3,6 +3,7 @@ package com.ustadmobile.meshrabiya.vnet.wifi
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.ConnectivityManager.NetworkCallback
+import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -262,13 +263,13 @@ class MeshrabiyaWifiManagerAndroid(
              * https://cs.android.com/android/platform/superproject/+/android-10.0.0_r47:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1224
              */
             logger(Log.DEBUG, "$logPrefix connectToHotspot: building network specifier", null)
+            val bssid = config.bssid
             val specifier = WifiNetworkSpecifier.Builder()
                 .apply {
                     setSsid(config.ssid)
-                    //TODO: set the bssid when we are confident it did not change / we know it.
-//                    if(bssid != null) {
-//                        setBssid(MacAddress.fromString(bssid))
-//                    }
+                    if(bssid != null) {
+                        setBssid(MacAddress.fromString(bssid))
+                    }
                 }
                 .setWpa2Passphrase(config.passphrase)
                 .build()
@@ -367,25 +368,6 @@ class MeshrabiyaWifiManagerAndroid(
                 throw WifiConnectException("Attempted to connect to ${config.ssid}, status=$stationStatus")
             }
         }
-
-        /*
-        if(networkAndServerAddr != null) {
-            val bssid = config.bssid
-            if(bssid != null) {
-                storeBssidForAddress(config.nodeVirtualAddr, bssid)
-                logger(Log.INFO, "$logPrefix connectToHotspot: saved bssid = $bssid for " +
-                        config.nodeVirtualAddr.addressToDotNotation(), null)
-            }
-
-            withContext(Dispatchers.IO) {
-
-
-            }
-        }else {
-            logger(Log.ERROR, "$logPrefix : addWifiConnectionConnect: to hotspot: returned null network", null)
-        }
-        */
-
     }
 
     /**
@@ -473,21 +455,29 @@ class MeshrabiyaWifiManagerAndroid(
         }
     }
 
-    suspend fun lookupStoredBssid(addr: Int) : String? {
-        val prefKey = stringPreferencesKey(addr.addressToDotNotation())
+    suspend fun lookupStoredBssid(ssid: String) : String? {
+        val prefKey = stringPreferencesKey("${PREFIX_SSID}$ssid")
+
         return appContext.bssidDataStore.data.map {
             it[prefKey]
-        }.first()
+        }.first().also {
+            logger(Log.DEBUG, "MeshrabiyaWifiManagerAndroid: lookupStoredBssid ssid=$ssid bssid=$it")
+        }
+
     }
 
-    suspend fun storeBssidForAddress(addr: Int, bssid: String) {
-        val prefKey = stringPreferencesKey(addr.addressToDotNotation())
+    suspend fun storeBssidForAddress(ssid: String, bssid: String) {
+        logger(Log.DEBUG, "MeshrabiyaWifiManagerAndroid: storeBssidForAddress ssid=$ssid bssid=$bssid")
+        val prefKey = stringPreferencesKey("${PREFIX_SSID}$ssid")
         appContext.bssidDataStore.edit {
             it[prefKey] = bssid
         }
+        logger(Log.DEBUG, "MeshrabiyaWifiManagerAndroid: storeBssidForAddress ssid=$ssid bssid=$bssid : Done")
     }
 
     companion object {
+
+        const val PREFIX_SSID = "ssid_"
 
         const val HOTSPOT_TIMEOUT = 10000L
 

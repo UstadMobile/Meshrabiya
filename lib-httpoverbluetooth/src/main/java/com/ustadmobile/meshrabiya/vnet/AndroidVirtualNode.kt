@@ -270,11 +270,24 @@ class AndroidVirtualNode(
         return super.setWifiHotspotEnabled(enabled, preferredBand)
     }
 
-    suspend fun lookupStoredBssid(addr: Int) : String? {
-        return meshrabiyaWifiManager.lookupStoredBssid(addr)
+    suspend fun lookupStoredBssid(ssid: String) : String? {
+        return meshrabiyaWifiManager.lookupStoredBssid(ssid)
     }
 
-    suspend fun storeBssidForAddress(addr: Int, bssid: String) {
-        meshrabiyaWifiManager.storeBssidForAddress(addr, bssid)
+    /**
+     * Store the BSSID for the given SSID. This ensures that when we make subsequent connection
+     * attempts we don't need to use the companiondevicemanager again. The BSSID must be provided
+     * when reconnecting on Android 10+ if we want to avoid a confirmation dialog.
+     */
+    fun storeBssid(ssid: String, bssid: String?) {
+        logger(Log.DEBUG, "$logPrefix: storeBssid: Store BSSID for $ssid : $bssid")
+        if(bssid != null) {
+            coroutineScope.launch {
+                meshrabiyaWifiManager.storeBssidForAddress(ssid, bssid)
+            }
+        }else {
+            logger(Log.WARN, "$logPrefix : storeBssid: BSSID for $ssid is NULL, can't save to avoid prompts on reconnect")
+        }
     }
+
 }

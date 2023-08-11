@@ -198,7 +198,7 @@ class WifiDirectManager(
                         band = group.connectBand,
                         port = router.localDatagramPort,
                         linkLocalAddr = linkLocalAddr.withoutScope(),
-                        persistenceType = if(Build.VERSION.SDK_INT >= 29 && isRequestedGroup) {
+                        persistenceType = if(Build.VERSION.SDK_INT >= 29) {
                             HotspotPersistenceType.FULL
                         } else {
                             HotspotPersistenceType.NONE

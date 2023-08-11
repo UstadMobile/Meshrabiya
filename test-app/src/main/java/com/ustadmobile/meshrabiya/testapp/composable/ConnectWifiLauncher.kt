@@ -20,15 +20,12 @@ import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import com.ustadmobile.meshrabiya.ext.isAssociatedWithCompat
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.testapp.NEARBY_WIFI_PERMISSION_NAME
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectException
-import org.kodein.di.DI
-import org.kodein.di.compose.localDI
-import org.kodein.di.direct
-import org.kodein.di.instance
 import java.util.regex.Pattern
 
 
@@ -88,7 +85,7 @@ fun rememberConnectWifiLauncher(
             context.getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
         val associations = deviceManager.associations
         logger?.invoke(Log.INFO, "associations = ${associations.joinToString()}")
-        val request = pendingAssociationRequest
+        val request = pendingAssociationRequest ?: return@rememberLauncherForActivityResult
         pendingAssociationRequest = null
 
         onStatusChange?.invoke(ConnectWifiLauncherStatus.INACTIVE)
@@ -97,25 +94,16 @@ fun rememberConnectWifiLauncher(
                 CompanionDeviceManager.EXTRA_DEVICE
             )
 
-
             logger?.invoke(Log.INFO, "rememberConnectWifiLauncher: Got scan result: bssid = ${scanResult?.BSSID}")
-            val bssid = scanResult?.BSSID
+            node.storeBssid(request.connectConfig.ssid, scanResult?.BSSID)
 
-            if(bssid != null) {
-                onResult(
-                    ConnectWifiLauncherResult(
-                        hotspotConfig = request?.connectConfig?.copy(
-                            bssid = bssid
-                        )
+            onResult(
+                ConnectWifiLauncherResult(
+                    hotspotConfig = request.connectConfig.copy(
+                        bssid = scanResult?.BSSID
                     )
                 )
-            }else {
-                onResult(
-                    ConnectWifiLauncherResult(
-                        hotspotConfig = null
-                    )
-                )
-            }
+            )
         }else {
             onResult(
                 ConnectWifiLauncherResult(
@@ -148,9 +136,11 @@ fun rememberConnectWifiLauncher(
         val connectRequestVal = pendingAssociationRequest ?: return@LaunchedEffect
         val ssid = connectRequestVal.connectConfig.ssid
         logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: check for assocation with $ssid")
-        val storedBssid = node.lookupStoredBssid(connectRequestVal.connectConfig.nodeVirtualAddr)
+        val storedBssid = node.lookupStoredBssid(connectRequestVal.connectConfig.ssid)
+        val deviceManager : CompanionDeviceManager =
+            context.getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
 
-        if(storedBssid != null) {
+        if(storedBssid != null && deviceManager.isAssociatedWithCompat(storedBssid)) {
             logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: already associated with $ssid (bssid=$storedBssid)")
             onStatusChange?.invoke(ConnectWifiLauncherStatus.INACTIVE)
             onResult(
@@ -174,8 +164,6 @@ fun rememberConnectWifiLauncher(
                 .setSingleDevice(true)
                 .build()
 
-            val deviceManager : CompanionDeviceManager =
-                context.getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
 
             deviceManager.associate(
                 associationRequest,
