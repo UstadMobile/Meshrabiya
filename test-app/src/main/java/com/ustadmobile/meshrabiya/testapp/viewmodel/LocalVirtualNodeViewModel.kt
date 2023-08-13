@@ -1,13 +1,16 @@
 package com.ustadmobile.meshrabiya.testapp.viewmodel
 
 import android.os.Build
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
+import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiDirectError
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -51,6 +54,8 @@ class LocalVirtualNodeViewModel(
     val snackbars: Flow<SnackbarMessage> = _snackbars.asSharedFlow()
 
     private val node: AndroidVirtualNode by di.instance()
+
+    private val logger: MNetLogger by di.instance()
 
     init {
         viewModelScope.launch {
@@ -100,5 +105,21 @@ class LocalVirtualNodeViewModel(
             }
         }
     }
+
+
+    fun onConnectWifi(
+        hotspotConfig: WifiConnectConfig
+    ) {
+        viewModelScope.launch {
+            try {
+                node.addWifiConnection(hotspotConfig)
+            }catch(e: Exception) {
+                _snackbars.tryEmit(SnackbarMessage("Failed to connect: $e"))
+                logger(Log.ERROR, "Failed to connect", e)
+            }
+
+        }
+    }
+
 
 }

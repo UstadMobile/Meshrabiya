@@ -234,7 +234,6 @@ fun AppNavHost(
         composable("neighbornodes") {
             NeighborNodeListScreen(
                 onSetAppUiState = onSetAppUiState,
-                snackbarHostState = snackbarHostState,
             )
         }
 
