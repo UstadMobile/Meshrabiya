@@ -11,75 +11,81 @@ import com.ustadmobile.meshrabiya.log.MNetLogger
 import kotlinx.coroutines.CompletableDeferred
 
 
+@Suppress("unused") //Reserved for future usage
 suspend fun WifiP2pManager.addServiceRequestAsync(
     channel: Channel?,
     request: WifiP2pServiceRequest,
     logPrefix: String? = null
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage = "${logPrefix ?: ""} failed to add service request"
+        onFailLogMessage = "${logPrefix ?: ""} failed to add service request"
     )
 
     addServiceRequest(channel, request, actionListener)
     actionListener.await()
 }
 
+@Suppress("unused") //Reserved for future usage
 suspend fun WifiP2pManager.discoverServicesAsync(
     channel: Channel?,
     logPrefix: String?,
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage = "${logPrefix ?: ""} failed to start service discovery"
+        onFailLogMessage = "${logPrefix ?: ""} failed to start service discovery"
     )
 
     discoverServices(channel, actionListener)
     actionListener.await()
 }
 
+@Suppress("unused") //Reserved for future usage
 suspend fun WifiP2pManager.connectAsync(
     channel: Channel?,
     p2pConfig: WifiP2pConfig,
     logPrefix: String? = null
 ){
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage = "${logPrefix ?: ""} : failed to request connect"
+        onFailLogMessage = "${logPrefix ?: ""} : failed to request connect"
     )
 
     connect(channel, p2pConfig, actionListener)
     actionListener.await()
 }
 
+@Suppress("unused") //Reserved for future usage
 suspend fun WifiP2pManager.removeServiceRequestAsync(
     channel: Channel?,
     request: WifiP2pServiceRequest,
     logPrefix: String?
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage ="${logPrefix ?: ""} failed to remove service request"
+        onFailLogMessage ="${logPrefix ?: ""} failed to remove service request"
     )
     removeServiceRequest(channel, request, actionListener)
     actionListener.await()
 }
 
+@Suppress("unused") //Reserved for future usage
 suspend fun WifiP2pManager.addLocalServiceAsync(
     channel: Channel?,
     serviceInfo: WifiP2pServiceInfo,
     logPrefix: String?
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage = "${logPrefix ?: ""} failed to add local service"
+        onFailLogMessage = "${logPrefix ?: ""} failed to add local service"
     )
     addLocalService(channel, serviceInfo, actionListener)
     actionListener.await()
 }
 
+@Suppress("unused") //Reserved for future usage
 suspend fun WifiP2pManager.removeLocalServiceAsync(
     channel: Channel?,
     serviceInfo: WifiP2pServiceInfo,
     logPrefix: String?
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage = "${logPrefix ?: ""} failed to remove local service"
+        onFailLogMessage = "${logPrefix ?: ""} failed to remove local service"
     )
 
     removeLocalService(channel, serviceInfo, actionListener)
@@ -95,9 +101,9 @@ suspend fun WifiP2pManager.createGroupAsync(
     logger: MNetLogger?
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage = "${logPrefix ?: ""} failed to request group creation w/config",
+        onFailLogMessage = "${logPrefix ?: ""} failed to request group creation w/config",
         logger = logger,
-        onSuccessLog = "${logPrefix ?: ""} createGroup: onSuccess w/config",
+        onSuccessLogMessage = "${logPrefix ?: ""} createGroup: onSuccess w/config",
     )
 
     createGroup(channel, config, actionListener)
@@ -110,9 +116,9 @@ suspend fun WifiP2pManager.createGroupAsync(
     logger: MNetLogger? = null,
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        failMessage = "${logPrefix ?: ""} failed to request group creation",
+        onFailLogMessage = "${logPrefix ?: ""} failed to request group creation",
         logger = logger,
-        onSuccessLog = "${logPrefix ?: ""} createGroup: onSuccess",
+        onSuccessLogMessage = "${logPrefix ?: ""} createGroup: onSuccess",
     )
     createGroup(channel, actionListener)
     actionListener.await()
@@ -127,5 +133,23 @@ suspend fun WifiP2pManager.requestGroupInfoAsync(
     }
 
     return completable.await()
+}
+
+
+/**
+ * Suspend function wrapper for removeGroup
+ */
+suspend fun WifiP2pManager.removeGroupAsync(
+    channel: Channel?,
+    logger: MNetLogger? = null,
+    logPrefix: String? = null,
+) {
+    val actionListener = WifiP2pActionListenerAdapter(
+        onSuccessLogMessage = "${logPrefix ?: ""} WifiP2pManager: removeGroup: succeeded",
+        onFailLogMessage = "${logPrefix ?: ""} WifiP2pManager: removeGroupAsync failed",
+        logger = logger,
+    )
+    removeGroup(channel, actionListener)
+    actionListener.await()
 }
 

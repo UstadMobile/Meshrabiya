@@ -184,6 +184,10 @@ class MeshrabiyaWifiManagerAndroid(
         }
     }
 
+    private fun assertNotClosed() {
+        if(closed.get())
+            throw IllegalStateException("$logPrefix is closed!")
+    }
 
     override val is5GhzSupported: Boolean
         get() = wifiManager.is5GHzBandSupported
@@ -193,8 +197,7 @@ class MeshrabiyaWifiManagerAndroid(
         requestMessageId: Int,
         request: LocalHotspotRequest
     ): LocalHotspotResponse {
-        if(closed.get())
-            throw IllegalStateException("$logPrefix is closed!")
+        assertNotClosed()
 
         logger(Log.DEBUG, "$logPrefix requestHotspot requestId=$requestMessageId", null)
         withContext(Dispatchers.Main) {
@@ -232,6 +235,11 @@ class MeshrabiyaWifiManagerAndroid(
         )
     }
 
+    override suspend fun deactivateHotspot() {
+        assertNotClosed()
+
+        wifiDirectManager.stopWifiDirectGroup()
+    }
 
     /**
      * Connect to the given hotspot as a station.

@@ -182,10 +182,6 @@ class WifiDirectManager(
             ?.firstOrNull { it.isLinkLocalAddress && it is Inet6Address } as? Inet6Address
         logger(Log.INFO, "$logPrefix : onNewWifiP2pGroupInfoReceived : Found link local addr = $linkLocalAddr", null)
 
-        //The group could be the group that we requested, or it could be that a WiFi direct group was
-        // already started by another app.
-        val isRequestedGroup = group?.networkName?.endsWith(localNodeAddr.encodeAsHex()) == true
-
         nodeScope.launch {
             groupUpdateMutex.withLock {
                 val hotspotConfig = if(ssid != null && passphrase != null &&
@@ -375,7 +371,6 @@ class WifiDirectManager(
             addWifiDirectService()
 
         return groupStartedOk
-
     }
 
 
@@ -396,33 +391,34 @@ class WifiDirectManager(
             withContext(Dispatchers.Main) {
                 val channelVal = channel
                 if(channelVal != null) {
-                    logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup - requesting group removal",null)
-                    wifiP2pManager?.removeGroup(channel, object : WifiP2pManager.ActionListener {
-                        override fun onSuccess() {
-                            logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup: successful", null)
-                            _state.update { prev ->
-                                prev.copy(
-                                    hotspotStatus = HotspotStatus.STOPPED,
-                                    config = null,
-                                    error = 0,
-                                )
-                            }
-
-                            if(Build.VERSION.SDK_INT >= 27) {
-                                logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup: closing wifi p2p channel", null)
-                                channelVal.close()
-                            }
-                            channel = null
+                    try {
+                        logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup - requesting group removal",null)
+                        wifiP2pManager?.removeGroupAsync(channelVal, logger, logPrefix)
+                        logger(Log.INFO, "$logPrefix stopWifiDirectGroup: successful", null)
+                        _state.update { prev ->
+                            prev.copy(
+                                hotspotStatus = HotspotStatus.STOPPED,
+                                config = null,
+                                error = 0,
+                            )
                         }
 
-                        override fun onFailure(reason: Int) {
-                            logger(Log.ERROR, "$logPrefix stopWifiDirectGroup: onFailure: " +
-                                    "${WifiDirectError(reason)}", null)
+                        if(Build.VERSION.SDK_INT >= 27) {
+                            logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup: closing wifi p2p channel")
+                            channelVal.close()
                         }
-                    })
+
+                        channel = null
+                    }catch(e: Exception) {
+                        logger(Log.WARN, "$logPrefix: Exception attempting to stop wifi direct group", e)
+                        _state.update { prev ->
+                            prev.copy(
+                                error = (e as? WifiDirectException)?.wifiDirectFailReason ?: -1
+                            )
+                        }
+                    }
                 }else {
-                    logger(Log.ERROR, "INVALID STATE: wifidirect group status = STARTED but channel is null", null)
-                    false
+                    logger(Log.ERROR, "INVALID STATE: wifidirect group status = STARTED but channel is null")
                 }
             }
         }

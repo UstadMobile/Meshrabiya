@@ -15,6 +15,8 @@ interface MeshrabiyaWifiManager {
         request: LocalHotspotRequest
     ): LocalHotspotResponse
 
+    suspend fun deactivateHotspot()
+
 
     suspend fun connectToHotspot(
         config: WifiConnectConfig,

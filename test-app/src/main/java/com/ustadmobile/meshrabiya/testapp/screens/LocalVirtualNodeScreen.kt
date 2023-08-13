@@ -7,6 +7,7 @@ import android.util.TypedValue
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,10 +16,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
@@ -136,9 +141,41 @@ fun LocalVirtualNodeScreen(
         modifier = Modifier.fillMaxSize(),
     ) {
         item(key = "header") {
-            Text(
-                text = uiState.localAddress.addressToDotNotation(),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            ListItem(
+                headlineContent = {
+                    Text(
+                        text = uiState.localAddress.addressToDotNotation(),
+                    )
+                },
+                supportingContent = {
+                    Column {
+                        Text("Virtual mesh address")
+
+                        Row {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info",
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                "This is your virtual mesh address. It can be used to reach " +
+                                        "this node from any other node connected the mesh, even if they" +
+                                        " are not connected directly e.g. when Device A is connected to " +
+                                        "Device B, and Device B is connected to Device C, Device A and " +
+                                        "C can reach each other via the virtual mesh address."
+                            )
+
+                        }
+                    }
+                },
+            )
+        }
+
+        item(key = "hotspotheader") {
+            ListItem(
+                headlineContent = {
+                    Text("Hotspot")
+                },
             )
         }
 
@@ -158,7 +195,9 @@ fun LocalVirtualNodeScreen(
                     OutlinedTextField(
                         value = uiState.band.toString(),
                         readOnly = true,
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
                         label = {
                             Text("Band")
                         },
@@ -191,22 +230,42 @@ fun LocalVirtualNodeScreen(
             }
         }
 
-
         item(key = "hotspotswitch") {
-            Row(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .toggleable(
-                        role = Role.Switch,
-                        value = uiState.incomingConnectionsEnabled,
-                        onValueChange = {
-                            onSetIncomingConnectionsEnabled(it)
-                        },
-                    )
-            ) {
-                Switch(checked = uiState.incomingConnectionsEnabled, onCheckedChange = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Allow incoming connections")
+            Column {
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .toggleable(
+                            role = Role.Switch,
+                            value = uiState.incomingConnectionsEnabled,
+                            onValueChange = {
+                                onSetIncomingConnectionsEnabled(it)
+                            },
+                        )
+                ) {
+                    Switch(checked = uiState.incomingConnectionsEnabled, onCheckedChange = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Hotspot enabled")
+                }
+
+                ListItem(
+                    headlineContent = {
+
+                    },
+                    supportingContent = {
+                        Row {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info",
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text("This creates a hotspot that other devices can use to connect to " +
+                                    "this device as a WiFi station (client). It will not share mobile Internet. " +
+                                    "Any device can operate as a WiFi hotspot and station (client) " +
+                                    "simultaneously.")
+                        }
+                    }
+                )
             }
         }
 

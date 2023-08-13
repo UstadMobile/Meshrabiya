@@ -776,7 +776,13 @@ abstract class VirtualNode(
                 )
             )
         }else {
-            null
+            meshrabiyaWifiManager.deactivateHotspot()
+            LocalHotspotResponse(
+                responseToMessageId = 0,
+                config = null,
+                errorCode = 0,
+                redirectAddr = 0,
+            )
         }
     }
 

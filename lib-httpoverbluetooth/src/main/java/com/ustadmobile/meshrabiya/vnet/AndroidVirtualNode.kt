@@ -92,10 +92,8 @@ class AndroidVirtualNode(
     private fun updateBluetoothState() {
         try {
             val deviceName = bluetoothAdapter?.name
-            _bluetoothState.takeIf { it.value.deviceName != deviceName }?.update { prev ->
+            _bluetoothState.takeIf { it.value.deviceName != deviceName }?.value =
                 MeshrabiyaBluetoothState(deviceName = deviceName)
-
-            }
         }catch(e: SecurityException) {
             logger(Log.WARN, "Could not get device name", e)
         }
@@ -178,45 +176,6 @@ class AndroidVirtualNode(
                 }
             }
         }
-    }
-
-
-    suspend fun addBluetoothConnection(
-        remoteBluetooothAddr: String,
-    ) {
-        logger(Log.DEBUG, "AddBluetoothConnection to $remoteBluetooothAddr", null)
-        /*
-        withContext(Dispatchers.IO) {
-            val dataUuid = uuidAllocationClient.requestUuidAllocation(
-                remoteAddress = remoteBluetooothAddr,
-                uuidMask = uuidMask,
-            )
-
-            val remoteDevice = bluetoothAdapter?.getRemoteDevice(remoteBluetooothAddr)
-
-            val socket: BluetoothSocket?
-            try {
-                logger(Log.DEBUG, "AddBluetoothConnection : got data UUID: $dataUuid, " +
-                        "creating rfcomm sockettoservice", null)
-                socket = remoteDevice?.createInsecureRfcommSocketToServiceRecord(
-                    dataUuid
-                )
-
-                socket?.also {
-                    logger(Log.DEBUG, "AddBluetoothConnection: connecting", null)
-                    it.connect()
-                    logger(Log.DEBUG, "AddBluetoothConnection: connected, submit runnable", null)
-                    val iSocket = it.asISocket()
-                    handleNewSocketConnection(iSocket)
-                }
-
-            }catch(e:SecurityException){
-                logger(Log.ERROR, "addBluetoothConnection: SecurityException", e)
-            }catch(e: Exception) {
-                logger(Log.ERROR, "addBluetoothConnection: other exception", e)
-            }
-        }
-         */
     }
 
     suspend fun addWifiConnection(remoteVirtualAddr: Int) {
