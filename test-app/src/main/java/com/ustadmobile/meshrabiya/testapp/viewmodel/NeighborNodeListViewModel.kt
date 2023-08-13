@@ -59,11 +59,9 @@ class NeighborNodeListViewModel(
         _uiState.update { prev ->
             prev.copy(
                 appUiState = prev.appUiState.copy(
-                    title = "Neighbor Nodes",
+                    title = "Network",
                     fabState = FabState(
-                        visible = true,
-                        label = "Add node",
-                        icon = Icons.Default.Add,
+                        visible = false,
                     )
                 )
             )
