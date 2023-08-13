@@ -19,6 +19,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addOrLookupNetwork
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.bssidDataStore
+import com.ustadmobile.meshrabiya.ext.firstOrNull
 import com.ustadmobile.meshrabiya.ext.requireHostAddress
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.util.findFreePort
@@ -444,10 +445,27 @@ class MeshrabiyaWifiManagerAndroid(
         withContext(Dispatchers.IO) {
             val linkProperties = connectivityManager
                 .getLinkProperties(network)
+            val networkInterface = NetworkInterface.getByName(linkProperties?.interfaceName)
 
-            logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address:", null)
+            val interfaceInet6Addrs = networkInterface.inetAddresses.toList()
+            logger(Log.INFO, "$logPrefix : connectToHotspot - addrs = ${interfaceInet6Addrs.joinToString()}")
+
+            /**
+             * Strange issue: Android 13 Samsung Tab A8 will not bind to link local ipv6 addr for
+             * station network if the wifi direct group is running.
+             *
+             * If the station network is created first, then the group is added, everything is fine.
+             * If the group is created and then the station netwokr is connected, attempting to bind
+             * to the station ipv6 local link addr will throw an exception
+             *
+             */
+            val netAddress = networkInterface.inetAddresses.firstOrNull {
+                it is Inet6Address && it.isLinkLocalAddress
+            }
+
+            logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address = $netAddress on interface ${linkProperties?.interfaceName}", null)
             val socketPort = findFreePort(0)
-            val socket = DatagramSocket(socketPort)
+            val socket = DatagramSocket(socketPort, netAddress)
 
             network.bindSocket(socket)
             val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
@@ -493,7 +511,7 @@ class MeshrabiyaWifiManagerAndroid(
                 )
             }
 
-            val networkInterface = NetworkInterface.getByName(linkProperties?.interfaceName)
+
 
             //Create a scoped Inet6 address using the given local link
             val peerAddr = Inet6Address.getByAddress(

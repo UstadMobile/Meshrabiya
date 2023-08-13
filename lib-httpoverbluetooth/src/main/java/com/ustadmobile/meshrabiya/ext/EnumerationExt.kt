@@ -17,3 +17,16 @@ inline fun <T, R> Enumeration<T>.firstNotNullOfOrNull(
 
     return null
 }
+
+fun <T> Enumeration<T>.firstOrNull(
+    predicate: (T) -> Boolean
+): T? {
+    while(hasMoreElements()) {
+        val element = nextElement()
+        if(predicate(element))
+            return element
+    }
+
+    return null
+}
+

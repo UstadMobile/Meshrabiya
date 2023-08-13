@@ -40,6 +40,8 @@ class OriginatingMessageManager(
     private val nextMmcpMessageId: () -> Int,
     private val getWifiConfig: () -> WifiConnectConfig?,
     private val pingTimeout: Int = 15_000,
+    private val originatingMessageNodeLostThreshold: Int = 10000,
+    private val lostNodeCheckInterval: Int = 1_000,
 ) {
 
     private val logPrefix ="[OriginatingMessageManager for ${localNodeInetAddr}] "
@@ -120,7 +122,7 @@ class OriginatingMessageManager(
             val pingMessage = MmcpPing(messageId = nextMmcpMessageId())
             pendingPings.add(PendingPing(pingMessage, neighborVirtualAddr, System.currentTimeMillis()))
             logger(
-                priority = Log.DEBUG,
+                priority = Log.VERBOSE,
                 message = { "$logPrefix pingNeighborsRunnable: send ping to ${neighborVirtualAddr.addressToDotNotation()}" }
             )
 
@@ -141,12 +143,31 @@ class OriginatingMessageManager(
         pendingPings.removeIf { it.timesent < pingTimeoutThreshold }
     }
 
+    private val checkLostNodesRunnable = Runnable {
+        val timeNow = System.currentTimeMillis()
+        val nodesLost = originatorMessages.entries.filter {
+            (timeNow - it.value.timeReceived) > originatingMessageNodeLostThreshold
+        }
+
+        nodesLost.forEach {
+            logger(Log.DEBUG, {"$logPrefix : checkLostNodesRunnable: " +
+                    "Lost ${it.key.addressToDotNotation()} - no contact for ${timeNow - it.value.timeReceived}ms"})
+            originatorMessages.remove(it.key)
+        }
+
+        _state.takeIf { !nodesLost.isEmpty() }?.value = originatorMessages.toMap()
+    }
+
     private val sendOriginatorMessagesFuture = scheduledExecutorService.scheduleAtFixedRate(
         sendOriginatingMessageRunnable, 1000, 3000, TimeUnit.MILLISECONDS
     )
 
     private val pingNeighborsFuture = scheduledExecutorService.scheduleAtFixedRate(
         pingNeighborsRunnable, 1000, 10000, TimeUnit.MILLISECONDS
+    )
+
+    private val checkLostNodesFuture = scheduledExecutorService.scheduleAtFixedRate(
+        checkLostNodesRunnable, lostNodeCheckInterval.toLong(), lostNodeCheckInterval.toLong(), TimeUnit.MILLISECONDS
     )
 
     @Volatile
@@ -385,6 +406,7 @@ class OriginatingMessageManager(
     fun close(){
         sendOriginatorMessagesFuture.cancel(true)
         pingNeighborsFuture.cancel(true)
+        checkLostNodesFuture.cancel(true)
         scope.cancel("$logPrefix closed")
         closed = true
     }
