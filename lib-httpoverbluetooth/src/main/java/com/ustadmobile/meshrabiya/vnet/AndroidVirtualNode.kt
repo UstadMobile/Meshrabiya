@@ -221,6 +221,10 @@ class AndroidVirtualNode(
         meshrabiyaWifiManager.connectToHotspot(config)
     }
 
+    suspend fun disconnectWifiStation() {
+        meshrabiyaWifiManager.disconnectStation()
+    }
+
     override suspend fun setWifiHotspotEnabled(
         enabled: Boolean,
         preferredBand: ConnectBand,

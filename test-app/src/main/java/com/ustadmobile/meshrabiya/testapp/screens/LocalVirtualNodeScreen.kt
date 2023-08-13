@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -146,6 +148,7 @@ fun LocalVirtualNodeScreen(
             }
         },
         onSetBand = viewModel::onConnectBandChanged,
+        onClickDisconnectWifiStation = viewModel::onClickDisconnectStation,
         node = node as AndroidVirtualNode,
         onConnectWifiLauncherResult = { result ->
             if(result.hotspotConfig != null) {
@@ -170,6 +173,7 @@ fun LocalVirtualNodeScreen(
     onSetIncomingConnectionsEnabled: (Boolean) -> Unit = { },
     onSetBand: (ConnectBand) -> Unit = { },
     onConnectWifiLauncherResult: (ConnectWifiLauncherResult) -> Unit,
+    onClickDisconnectWifiStation: () -> Unit = { },
     snackbarHostState: SnackbarHostState,
 ){
     val barcodeEncoder = remember {
@@ -433,6 +437,18 @@ fun LocalVirtualNodeScreen(
                                 Icon(
                                     imageVector = Icons.Default.Wifi,
                                     contentDescription = "",
+                                )
+                            }
+                        },
+                        trailingContent = {
+                            IconButton(
+                                onClick = {
+                                    onClickDisconnectWifiStation()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Disconnect",
                                 )
                             }
                         }

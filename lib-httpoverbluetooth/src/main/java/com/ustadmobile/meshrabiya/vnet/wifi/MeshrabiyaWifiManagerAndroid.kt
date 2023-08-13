@@ -379,6 +379,65 @@ class MeshrabiyaWifiManagerAndroid(
     }
 
     /**
+     * Disconnect the client station connection - remove the network request, close sockets. If
+     * the station mode is already inactive, this will have no effect.
+     */
+    suspend fun disconnectStation() {
+        val prevState = _state.getAndUpdate { prev ->
+            if(prev.wifiStationState.status != WifiStationState.Status.INACTIVE) {
+                prev.copy(
+                    wifiStationState = prev.wifiStationState.copy(
+                        status = WifiStationState.Status.INACTIVE,
+                    )
+                )
+            }else {
+                prev
+            }
+        }
+
+        if(prevState.wifiStationState.status != WifiStationState.Status.INACTIVE) {
+            val prevNetworkCallback = connectRequest.getAndUpdate {
+                null
+            }
+
+            val previousSockets = stationBoundSockets.getAndUpdate {
+                null
+            }
+
+            try {
+                previousSockets?.also {
+                    withContext(Dispatchers.IO) {
+                        it.first.close()
+                        it.second.close()
+                        logger(Log.DEBUG, "$logPrefix : disconnectStation: closed sockets")
+                    }
+                }
+            }catch(e: Exception) {
+                logger(Log.WARN, "$logPrefix : disconnectionStation: exception closing sockets", e)
+            }
+
+            try {
+                prevNetworkCallback?.second?.also {
+                    connectivityManager.unregisterNetworkCallback(it)
+                    logger(Log.DEBUG, "$logPrefix unregistered network request callback")
+                }
+            }catch(e: Exception) {
+                logger(Log.WARN, "$logPrefix disconnectStation: exception unregistering network callback")
+            }
+
+            _state.update { prev ->
+                prev.copy(
+                    wifiStationState = prev.wifiStationState.copy(
+                        config = null,
+                        network = null,
+                        stationBoundSocketsPort = -1,
+                    )
+                )
+            }
+        }
+    }
+
+    /**
      * Create a datagramsocket that is bound to the the network object for the wifi station network.
      */
     private suspend fun createStationNetworkBoundSockets(network: Network, config: WifiConnectConfig) {

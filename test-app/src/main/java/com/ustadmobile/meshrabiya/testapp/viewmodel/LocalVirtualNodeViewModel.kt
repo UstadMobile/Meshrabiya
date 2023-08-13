@@ -121,5 +121,11 @@ class LocalVirtualNodeViewModel(
         }
     }
 
+    fun onClickDisconnectStation() {
+        viewModelScope.launch {
+            node.disconnectWifiStation()
+        }
+    }
+
 
 }
