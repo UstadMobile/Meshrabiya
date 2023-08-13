@@ -15,7 +15,12 @@ sealed class MmcpMessage(
 
     abstract fun toBytes(): ByteArray
 
-    fun toVirtualPacket(toAddr: Int, fromAddr: Int): VirtualPacket {
+    fun toVirtualPacket(
+        toAddr: Int,
+        fromAddr: Int,
+        lastHopAddr: Int = 0,
+        hopCount: Byte = 0,
+    ): VirtualPacket {
         val packetPayload = toBytes()
         val packetData = ByteArray(packetPayload.size + VirtualPacketHeader.HEADER_SIZE)
 
@@ -27,8 +32,8 @@ sealed class MmcpMessage(
                 toPort = 0,
                 fromAddr = fromAddr,
                 fromPort = 0,
-                lastHopAddr = 0,
-                hopCount =  0,
+                lastHopAddr = lastHopAddr,
+                hopCount =  hopCount,
                 maxHops = 0,
                 payloadSize = packetPayload.size
             ),

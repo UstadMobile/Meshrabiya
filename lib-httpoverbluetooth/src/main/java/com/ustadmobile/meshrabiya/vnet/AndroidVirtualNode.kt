@@ -2,8 +2,6 @@ package com.ustadmobile.meshrabiya.vnet
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothServerSocket
-import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,8 +12,6 @@ import androidx.datastore.preferences.core.Preferences
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
-import com.ustadmobile.meshrabiya.server.AbstractHttpOverBluetoothServer
-import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
@@ -121,39 +117,9 @@ class AndroidVirtualNode(
 
     private val receiverRegistered = AtomicBoolean(false)
 
-    /**
-     * Listener that opens a bluetooth server socket
-     */
-    private val onUuidAllocatedListener = OnUuidAllocatedListener { uuid ->
-        val serverSocket: BluetoothServerSocket? = try {
-            bluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord("mnet", uuid)
-        } catch (e: SecurityException) {
-            null
-        }
-
-        val clientSocket: BluetoothSocket? = try {
-            logger(Log.DEBUG, "Waiting for client to connect on bluetooth classic UUID $uuid", null)
-            serverSocket?.accept(AbstractHttpOverBluetoothServer.SOCKET_ACCEPT_TIMEOUT) //Can add timeout here
-        } catch (e: IOException) {
-            logger(Log.ERROR,"Exception accepting socket", e)
-            null
-        }
-
-        clientSocket?.also { socket ->
-            try {
-                val iSocket = socket.asISocket()
-                handleNewSocketConnection(iSocket)
-            }catch(e: SecurityException) {
-                logger(Log.ERROR, "Accept new node via Bluetooth: security exception exception", e)
-            }catch(e: Exception) {
-                logger(Log.ERROR, "Accept new node via Bluetooth: connect exception", e)
-            }
-        }
-    }
 
 
     init {
-        //uuidAllocationServer.start()
         appContext.registerReceiver(
             bluetoothStateBroadcastReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
         )

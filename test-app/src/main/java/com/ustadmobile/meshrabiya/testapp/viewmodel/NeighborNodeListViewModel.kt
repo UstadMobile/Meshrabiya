@@ -1,13 +1,10 @@
 package com.ustadmobile.meshrabiya.testapp.viewmodel
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.appstate.FabState
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
-import com.ustadmobile.meshrabiya.vnet.NeighborNodeState
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiStationState
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +17,6 @@ import org.kodein.di.instance
 
 data class NeighborNodeListUiState(
     val appUiState: AppUiState = AppUiState(),
-    val neighborNodes: List<NeighborNodeState> = emptyList(),
     val filter: Filter = Filter.ALL_NODES,
     val connectingInProgressSsid: String? = null,
     internal val allNodes: Map<Int, VirtualNode.LastOriginatorMessage> = emptyMap(),

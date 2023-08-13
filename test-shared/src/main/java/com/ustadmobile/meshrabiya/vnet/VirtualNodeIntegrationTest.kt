@@ -98,51 +98,6 @@ abstract class VirtualNodeIntegrationTest {
         )
     }
 
-    @Test(timeout = 5000)
-    fun givenTwoNodesConnected_whenPacketSentUsingVirtualSocket_thenShouldBeReceived() {
-        val node1 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
-            logger = logger,
-            meshrabiyaWifiManager = mock { },
-            json = json,
-            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()).ip4AddressToInt()
-        )
-
-        val node2  = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
-            logger = logger,
-            meshrabiyaWifiManager = mock { },
-            json = json,
-            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()).ip4AddressToInt()
-        )
-        try {
-            node1.connectTo(node2)
-            val node1socket  = node1.createDatagramSocket()
-            node1socket.bind(InetSocketAddress(node1.localNodeInetAddress, 81))
-
-            val node2socket = node2.createDatagramSocket()
-            node2socket.bind(InetSocketAddress(node2.localNodeInetAddress, 82))
-
-            val packetData = "Hello World".encodeToByteArray()
-            val txPacket = DatagramPacket(packetData, 0, packetData.size)
-            txPacket.address = InetAddress.getByAddress(node2.localNodeAddress.addressToByteArray())
-            txPacket.port = 82
-            node1socket.send(txPacket)
-
-            val rxBuffer = ByteArray(1500)
-            val rxPacket = DatagramPacket(rxBuffer, 0, rxBuffer.size)
-            node2socket.receive(rxPacket)
-            assertByteArrayEquals(
-                packetData, 0, rxBuffer, rxPacket.offset, packetData.size
-            )
-            Assert.assertEquals(txPacket.length, rxPacket.length)
-        }finally {
-            node1.close()
-            node2.close()
-        }
-
-    }
-
 
 
     @Test
@@ -239,12 +194,6 @@ abstract class VirtualNodeIntegrationTest {
         try {
             node1.connectTo(node2)
 
-            //Wait for connection to be established
-            runBlocking {
-                node1.neighborNodesState.filter { it.isNotEmpty() }.test {
-                    awaitItem()
-                }
-            }
 
             val requestId = Random.nextInt()
 
@@ -351,17 +300,18 @@ abstract class VirtualNodeIntegrationTest {
             name: String,
         ) {
             runBlocking {
-                neighborNodesState.filter { neighbors ->
-                    (neighbors.firstOrNull { it.remoteAddress == otherNode.localNodeAddress }?.pingTime ?: 0) > 0
+                this@assertPingTimeDetermined.state.filter {
+                    (it.originatorMessages[otherNode.localNodeAddress]?.originatorMessage?.pingTimeSum ?: 0) > 0
                 }.test(timeout = 10000.milliseconds, name = name) {
-                    val pingTime = awaitItem().first { it.remoteAddress == otherNode.localNodeAddress }.pingTime
+                    val pingTime = awaitItem().originatorMessages.entries.first {
+                        it.key == otherNode.localNodeAddress
+                    }.value.originatorMessage.pingTimeSum
+
                     Assert.assertTrue(
                         "${localNodeAddress.addressToDotNotation()} -> " +
                                 "${otherNode.localNodeAddress.addressToDotNotation()} ping time > 0",
                         pingTime > 0
                     )
-                    println("Determined ping time from ${localNodeAddress.addressToDotNotation()} " +
-                            "-> ${otherNode.localNodeAddress.addressToDotNotation()} = ${pingTime}ms")
                 }
             }
         }
@@ -637,6 +587,52 @@ abstract class VirtualNodeIntegrationTest {
         assertFileContentsAreEqual(randomDataFile, downloadedFile)
         nodes.forEach { it.close() }
         mockWebServer.close()
+    }
+
+
+    @Test(timeout = 10000)
+    fun givenTwoNodesConnected_whenPacketSentUsingVirtualSocket_thenShouldBeReceived() {
+        val node1 = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            meshrabiyaWifiManager = mock { },
+            json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (1).toByte()).ip4AddressToInt()
+        )
+
+        val node2  = TestVirtualNode(
+            uuidMask = UUID.randomUUID(),
+            logger = logger,
+            meshrabiyaWifiManager = mock { },
+            json = json,
+            localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, (2).toByte()).ip4AddressToInt()
+        )
+        try {
+            node1.connectTo(node2)
+            val node1socket  = node1.createDatagramSocket()
+            node1socket.bind(InetSocketAddress(node1.localNodeInetAddress, 81))
+
+            val node2socket = node2.createDatagramSocket()
+            node2socket.bind(InetSocketAddress(node2.localNodeInetAddress, 82))
+
+            val packetData = "Hello World".encodeToByteArray()
+            val txPacket = DatagramPacket(packetData, 0, packetData.size)
+            txPacket.address = InetAddress.getByAddress(node2.localNodeAddress.addressToByteArray())
+            txPacket.port = 82
+            node1socket.send(txPacket)
+
+            val rxBuffer = ByteArray(1500)
+            val rxPacket = DatagramPacket(rxBuffer, 0, rxBuffer.size)
+            node2socket.receive(rxPacket)
+            assertByteArrayEquals(
+                packetData, 0, rxBuffer, rxPacket.offset, packetData.size
+            )
+            Assert.assertEquals(txPacket.length, rxPacket.length)
+        }finally {
+            node1.close()
+            node2.close()
+        }
+
     }
 
 

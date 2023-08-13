@@ -202,10 +202,13 @@ class VirtualNodeDatagramSocket(
         socket.send(datagramPacket)
     }
 
+    fun close(closeSocket: Boolean) {
+        future.cancel(true)
+        socket.takeIf { closeSocket }?.close()
+        listeners.clear()
+    }
 
     override fun close() {
-        future.cancel(true)
-        socket.close()
-        listeners.clear()
+        close(false)
     }
 }

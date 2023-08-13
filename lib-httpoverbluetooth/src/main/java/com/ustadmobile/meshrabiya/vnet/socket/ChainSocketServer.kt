@@ -51,14 +51,16 @@ class ChainSocketServer(
     private val clientFutures: MutableList<WeakReference<Future<*>>> = CopyOnWriteArrayList()
 
     private val acceptRunnable = Runnable {
-        while(!Thread.interrupted()) {
+        while(!Thread.interrupted() && !serverSocket.isClosed) {
             try {
                 val incomingSocket = serverSocket.accept()
                 logger(Log.DEBUG, "$logPrefix accepted new client")
                 executorService.submit(ClientInitRunnable(incomingSocket))
             }catch(e: Exception) {
-                logger(Log.WARN, "$logPrefix exception accepting client", e)
-                Thread.sleep(1000)
+                if(!serverSocket.isClosed) {
+                    logger(Log.WARN, "$logPrefix exception accepting client", e)
+                    Thread.sleep(1000)
+                }
             }
         }
     }
