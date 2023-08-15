@@ -38,6 +38,7 @@ import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.screens.InfoScreen
 import com.ustadmobile.meshrabiya.testapp.screens.LocalVirtualNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.NeighborNodeListScreen
+import com.ustadmobile.meshrabiya.testapp.screens.OpenSourceLicensesScreen
 import com.ustadmobile.meshrabiya.testapp.screens.ReceiveScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SelectDestNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
@@ -265,7 +266,16 @@ fun AppNavHost(
         }
 
         composable("info") {
-            InfoScreen(onSetAppUiState = onSetAppUiState)
+            InfoScreen(
+                onSetAppUiState = onSetAppUiState,
+                onClickLicenses = {
+                    navController.navigate("licenses")
+                }
+            )
+        }
+
+        composable("licenses") {
+            OpenSourceLicensesScreen()
         }
     }
 }

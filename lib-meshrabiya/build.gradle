@@ -2,6 +2,7 @@ plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
+    id 'maven-publish'
 }
 
 android {
@@ -64,4 +65,18 @@ dependencies {
     androidTestImplementation "app.cash.turbine:turbine:$version_turbine"
     androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"
     androidTestImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+}
+
+publishing {
+    publications {
+        release(MavenPublication) {
+            groupId = rootProject.group
+            artifactId = project.name
+            version = rootProject.version
+
+            afterEvaluate {
+                from components.release
+            }
+        }
+    }
 }

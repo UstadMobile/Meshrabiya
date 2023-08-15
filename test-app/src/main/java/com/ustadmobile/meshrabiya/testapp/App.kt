@@ -98,6 +98,8 @@ class App: Application(), DIAware {
                 port = TestAppServer.DEFAULT_PORT,
                 name = node.addressAsInt.addressToDotNotation(),
                 localVirtualAddr = node.address,
+                receiveDir = instance(tag = TAG_RECEIVE_DIR),
+                json = instance(),
             )
         }
 

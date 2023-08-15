@@ -12,12 +12,16 @@ if(project.file("buildconfig.local.properties").exists()) {
     ext.buildConfigProperties.load(new FileInputStream(project.file("buildconfig.local.properties")))
 }
 
+group 'com.github.UstadMobile.Meshrabiya'
+version '0.1-snapshot'
+
 ext {
 
     version_kotlin_mockito = "4.1.0"
     version_android_mockito = "5.1.1"
     version_turbine = "0.12.1"
     version_compose_bom = "2023.06.01"
+    version_compose_accompanist = "0.33.0-alpha"
     version_code_scanner = "2.3.2"
     version_navigation = "2.5.3"
     version_kodein_di = "7.20.2"

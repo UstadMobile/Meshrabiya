@@ -246,6 +246,21 @@ class WifiDirectManager(
         }
 
         appContext.registerReceiver(wifiDirectBroadcastReceiver, intentFilter)
+
+        nodeScope.launch {
+            initWifiDirectChannel()
+            val existingGroupInfo = wifiP2pManager?.requestGroupInfoAsync(channel)
+            if(existingGroupInfo != null) {
+                logger(
+                    Log.DEBUG,
+                    "$logPrefix: init: Group already exists on startup: ${existingGroupInfo.toPrettyString()}",
+                    null
+                )
+                onNewWifiP2pGroupInfoReceived(existingGroupInfo)
+            }else {
+                stopWifiDirectGroup()
+            }
+        }
     }
 
 

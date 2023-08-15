@@ -43,18 +43,20 @@ fun InfoScreen(
         )
     ),
     onSetAppUiState: (AppUiState) -> Unit,
+    onClickLicenses: () -> Unit = { },
 ) {
     val uiState by viewModel.uiState.collectAsState(initial = InfoUiState())
     LaunchedEffect(uiState.appUiState) {
         onSetAppUiState(uiState.appUiState)
     }
 
-    InfoScreen(uiState)
+    InfoScreen(uiState, onClickLicenses)
 }
 
 @Composable
 fun InfoScreen(
-    uiState: InfoUiState
+    uiState: InfoUiState,
+    onClickLicenses: () -> Unit,
 ) {
     val context = LocalContext.current
     val wifiManager = remember {
@@ -67,6 +69,29 @@ fun InfoScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize()
     ) {
+        item("copyright") {
+            ListItem(
+                headlineContent = {
+                    Text(text = "Meshrabiya - Copyright 2023 UstadMobile FZ-LLC.")
+                },
+                supportingContent = {
+                    Text("This software is free and open source, licensed under the LGPLv3.0 license.\n" +
+                            "As per https://www.gnu.org/licenses/lgpl-3.0.en.html")
+                }
+            )
+        }
+
+        item("opensourcelicenses") {
+            ListItem(
+                modifier = Modifier.clickable {
+                    onClickLicenses()
+                },
+                headlineContent = {
+                    Text("View open source component licenses")
+                }
+            )
+        }
+
         item("5ghz") {
             Text(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -76,18 +101,22 @@ fun InfoScreen(
 
         item("logheader") {
             Text(
-                modifier = Modifier.clickable {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                modifier = Modifier
+                    .clickable {
+                        val clipboard =
+                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-                    val clip: ClipData = ClipData.newPlainText("Logs",
-                        "===HttpOverBluetooth===\n" +
-                                uiState.recentLogs.joinToString(separator = ",\n") { it.line }
-                    )
-                    clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, "Copied logs!", Toast.LENGTH_LONG).show()
-                }
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .fillMaxWidth(),
+                        val clip: ClipData = ClipData.newPlainText("Logs",
+                            "===HttpOverBluetooth===\n" +
+                                    uiState.recentLogs.joinToString(separator = ",\n") { it.line }
+                        )
+                        clipboard.setPrimaryClip(clip)
+                        Toast
+                            .makeText(context, "Copied logs!", Toast.LENGTH_LONG)
+                            .show()
+                    }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .fillMaxWidth(),
                 text = "Logs"
             )
         }

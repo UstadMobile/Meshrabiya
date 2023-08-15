@@ -288,7 +288,7 @@ class OriginatingMessageManager(
         //Sometimes unit tests will run very quickly, and test may fail if ping time is 0
         val pingTime = maxOf((timeNow - pendingPing.timesent).toShort(), 1)
         logger(
-            Log.DEBUG, {"$logPrefix received ping from ${fromVirtualAddr.addressToDotNotation()} " +
+            Log.VERBOSE, {"$logPrefix received ping from ${fromVirtualAddr.addressToDotNotation()} " +
                 "pingTime=$pingTime"}
         )
 

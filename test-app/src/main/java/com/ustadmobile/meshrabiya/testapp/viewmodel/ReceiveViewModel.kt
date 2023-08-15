@@ -71,5 +71,21 @@ class ReceiveViewModel(
         }
     }
 
+    fun onClickDeclineIncomingTransfer(
+        transfer: TestAppServer.IncomingTransfer
+    ) {
+        viewModelScope.launch {
+            testAppServer.onDeclineIncomingTransfer(transfer)
+        }
+    }
+
+    fun onClickDeleteTransfer(
+        transfer: TestAppServer.IncomingTransfer
+    ) {
+        viewModelScope.launch {
+            testAppServer.onDeleteIncomingTransfer(transfer)
+        }
+    }
+
 
 }

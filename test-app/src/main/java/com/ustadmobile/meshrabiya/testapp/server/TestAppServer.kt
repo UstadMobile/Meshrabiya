@@ -7,6 +7,8 @@ import com.ustadmobile.meshrabiya.ext.copyToWithProgressCallback
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.ext.getUriNameAndSize
 import com.ustadmobile.meshrabiya.testapp.ext.updateItem
+import com.ustadmobile.meshrabiya.util.FileSerializer
+import com.ustadmobile.meshrabiya.util.InetAddressSerializer
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +19,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.internal.headersContentLength
@@ -27,6 +39,8 @@ import java.io.FileOutputStream
 import java.net.InetAddress
 import java.net.URLEncoder
 import java.util.concurrent.atomic.AtomicInteger
+
+
 
 /**
  * The TestAppServer is used to send/receive files between nodes. Flow as follows:
@@ -39,6 +53,8 @@ class TestAppServer(
     name: String,
     port: Int = 0,
     private val localVirtualAddr: InetAddress,
+    private val receiveDir: File,
+    private val json: Json,
 ) : NanoHTTPD(port), Closeable {
 
     private val logPrefix: String = "[TestAppServer - $name] "
@@ -46,7 +62,7 @@ class TestAppServer(
     private val scope = CoroutineScope(Dispatchers.IO + Job())
 
     enum class Status {
-        PENDING, IN_PROGRESS, COMPLETED, FAILED
+        PENDING, IN_PROGRESS, COMPLETED, FAILED, DECLINED
     }
     data class OutgoingTransfer(
         val id: Int,
@@ -58,14 +74,18 @@ class TestAppServer(
         val transferred: Int = 0,
     )
 
+    @Serializable
     data class IncomingTransfer(
         val id: Int,
+        val requestReceivedTime: Long = System.currentTimeMillis(),
+        @Serializable(with = InetAddressSerializer::class)
         val fromHost: InetAddress,
         val name: String,
         val status: Status = Status.PENDING,
         val size: Int,
         val transferred: Int = 0,
         val transferTime: Int = 1,
+        @Serializable(with = FileSerializer::class)
         val file: File? = null,
     )
 
@@ -81,6 +101,22 @@ class TestAppServer(
 
     val localPort: Int
         get() = super.getListeningPort()
+
+    init {
+        scope.launch {
+            val incomingFiles = receiveDir.listFiles { file, fileName: String? ->
+                fileName?.endsWith(".rx.json") == true
+            }?.map {
+                json.decodeFromString(IncomingTransfer.serializer(), it.readText())
+            } ?: emptyList()
+            _incomingTransfers.update { prev ->
+                buildList {
+                    addAll(prev)
+                    addAll(incomingFiles.sortedByDescending { it.requestReceivedTime })
+                }
+            }
+        }
+    }
 
 
     override fun serve(session: IHTTPSession): Response {
@@ -180,6 +216,20 @@ class TestAppServer(
                 mLogger(Log.INFO, "$logPrefix incomin transfer request - bad request - missing params")
                 return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Bad request")
             }
+        }else if(path.startsWith("/decline")){
+            val xferId = path.substringAfterLast("/").toInt()
+            _outgoingTransfers.update { prev ->
+                prev.updateItem(
+                    updatePredicate = { it.id == xferId },
+                    function = {
+                        it.copy(
+                            status = Status.DECLINED
+                        )
+                    }
+                )
+            }
+
+            return newFixedLengthResponse("OK")
         }else {
             mLogger(Log.INFO, "$logPrefix : $path - NOT FOUND")
             return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "not found: $path")
@@ -289,7 +339,7 @@ class TestAppServer(
             response.close()
 
             val transferDurationMs = (System.currentTimeMillis() - startTime).toInt()
-            _incomingTransfers.update { prev ->
+            val incomingTransfersVal = _incomingTransfers.updateAndGet { prev ->
                 prev.updateItem(
                     updatePredicate = { it.id == transfer.id },
                     function = { item ->
@@ -305,6 +355,16 @@ class TestAppServer(
                         )
                     }
                 )
+            }
+
+            //Write JSON to file so received files can be listed after app restarts etc.
+            val incomingTransfer = incomingTransfersVal.firstOrNull {
+                it.id == transfer.id
+            }
+
+            if(incomingTransfer != null) {
+                val jsonFile = File(receiveDir, "${incomingTransfer.name}.rx.json")
+                jsonFile.writeText(json.encodeToString(IncomingTransfer.serializer(), incomingTransfer))
             }
 
             val speedKBS = transfer.size / transferDurationMs
@@ -325,6 +385,52 @@ class TestAppServer(
             }
         }
     }
+
+    suspend fun onDeclineIncomingTransfer(
+        transfer: IncomingTransfer,
+        fromPort: Int = DEFAULT_PORT,
+    ) {
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url("http://${transfer.fromHost.hostAddress}:$fromPort/decline/${transfer.id}")
+                .build()
+
+            try {
+                val response = httpClient.newCall(request).execute()
+                val strResponse = response.body?.string()
+                mLogger(Log.DEBUG, "$logPrefix - onDeclineIncomingTransfer - request to: ${request.url} : response = $strResponse")
+            }catch(e: Exception) {
+                mLogger(Log.WARN, "$logPrefix - onDeclineIncomingTransfer : exception- request to: ${request.url} : FAIL", e)
+            }
+        }
+
+        _incomingTransfers.update { prev ->
+            prev.updateItem(
+                updatePredicate = { it.id == transfer.id },
+                function = {
+                    it.copy(
+                        status = Status.DECLINED,
+                    )
+                }
+            )
+        }
+    }
+
+    suspend fun onDeleteIncomingTransfer(
+        incomingTransfer: IncomingTransfer
+    ) {
+        withContext(Dispatchers.IO) {
+            val jsonFile = incomingTransfer.file?.let {
+                File(it.parentFile, it.name + ".rx.json")
+            }
+            incomingTransfer.file?.delete()
+            jsonFile?.delete()
+            _incomingTransfers.update { prev ->
+                prev.filter { it.id != incomingTransfer.id }
+            }
+        }
+    }
+
 
     override fun close() {
         stop()

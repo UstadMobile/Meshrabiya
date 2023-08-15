@@ -2,6 +2,7 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
+    id "com.jaredsburrows.license" version "0.9.3"
 }
 
 android {
@@ -10,12 +11,12 @@ android {
     }
 
     namespace 'com.ustadmobile.meshrabiya.testapp'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.ustadmobile.meshrabiya.testapp"
         minSdk 26
-        targetSdk 33
+        targetSdk 34
         versionCode 1
         versionName "1.0"
 
@@ -58,8 +59,7 @@ android {
 
 dependencies {
 
-    implementation project(":lib-httpoverbluetooth")
-
+    implementation project(':lib-meshrabiya')
     implementation "ch.acra:acra-http:$version_acra"
     implementation "ch.acra:acra-dialog:$version_acra"
 
@@ -92,6 +92,7 @@ dependencies {
     implementation "com.github.UstadMobile:agent15:$version_agent15"
     implementation "com.ustadmobile.flupke:flupke-common:$version_flupke"
     implementation "com.ustadmobile.flupke:flupke-android:$version_flupke"
+    implementation "com.google.accompanist:accompanist-webview:$version_compose_accompanist"
 
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs_nio:$version_android_desugaring"
 
