@@ -35,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,8 +49,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import java.io.Closeable
+import java.io.IOException
 import java.net.DatagramSocket
 import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.util.concurrent.ExecutorService
@@ -438,6 +441,26 @@ class MeshrabiyaWifiManagerAndroid(
         }
     }
 
+    private suspend fun createBoundSocket(
+        port: Int, bindAddress:
+        InetAddress?,
+        maxAttempts: Int,
+        interval: Long = 200,
+    ): DatagramSocket {
+        for(i in 0 until maxAttempts) {
+            try {
+                return DatagramSocket(port, bindAddress).also {
+                    logger(Log.DEBUG, "$logPrefix : createBoundSocket: success after ${i+1} attempts")
+                }
+            }catch(e: Exception) {
+                delay(interval)
+            }
+        }
+
+        logger(Log.WARN, "$logPrefix : createBoundSocket: failed after $maxAttempts")
+        throw IllegalStateException("createBoundSocket: failed after $maxAttempts")
+    }
+
     /**
      * Create a datagramsocket that is bound to the the network object for the wifi station network.
      */
@@ -450,23 +473,47 @@ class MeshrabiyaWifiManagerAndroid(
             val interfaceInet6Addrs = networkInterface.inetAddresses.toList()
             logger(Log.INFO, "$logPrefix : connectToHotspot - addrs = ${interfaceInet6Addrs.joinToString()}")
 
+            val netAddress = networkInterface.inetAddresses.firstOrNull {
+                it is Inet6Address && it.isLinkLocalAddress
+            }
+
+            logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address = " +
+                    "$netAddress on interface ${linkProperties?.interfaceName}", null)
+            val socketPort = findFreePort(0)
+
             /**
-             * Strange issue: Android 13 Samsung Tab A8 will not bind to link local ipv6 addr for
-             * station network if the wifi direct group is running.
+             * Strange issue: Android 13 will not bind to link local ipv6 addr for station network
+             * if the wifi direct group is running.
              *
              * If the station network is created first, then the group is added, everything is fine.
              * If the group is created and then the station network is connected, attempting to bind
              * to the station ipv6 local link addr will throw an exception
              */
-            val netAddress = networkInterface.inetAddresses.firstOrNull {
-                it is Inet6Address && it.isLinkLocalAddress
+            val socket = try {
+                DatagramSocket(socketPort, netAddress).also {
+                    network.bindSocket(it)
+                    logger(Log.DEBUG, "$logPrefix : createStationNetworkBoundSockets - created and bound socket to $netAddress:$socketPort")
+                }
+            }catch(e: IOException) {
+                if(_state.value.wifiDirectState.hotspotStatus == HotspotStatus.STARTED) {
+                    logger(Log.WARN, "$logPrefix : createStationNetworkBoundSockets : " +
+                            "Exception binding to network: this is a known issue on Android13+. " +
+                            "Will stop group, create/bind socket, then restart group"
+                    )
+                    val preferredBand = _state.value.wifiDirectState.config?.band ?: ConnectBand.BAND_2GHZ
+                    wifiDirectManager.stopWifiDirectGroup()
+
+                    createBoundSocket(socketPort, netAddress, 10).also {
+                        network.bindSocket(it)
+                        logger(Log.DEBUG, "$logPrefix : createStationNetworkBoundSockets : succeeded on retry")
+                        wifiDirectManager.startWifiDirectGroup(preferredBand)
+                    }
+                }else {
+                    logger(Log.ERROR, "$logPrefix : createStationNetworkBoundSockets - still failed", e)
+                    throw e
+                }
             }
 
-            logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address = $netAddress on interface ${linkProperties?.interfaceName}", null)
-            val socketPort = findFreePort(0)
-            val socket = DatagramSocket(socketPort, netAddress)
-
-            network.bindSocket(socket)
             val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
                 socket = socket,
                 localNodeVirtualAddress = localNodeAddr,
