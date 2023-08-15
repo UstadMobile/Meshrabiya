@@ -65,7 +65,7 @@ import com.ustadmobile.meshrabiya.testapp.ViewModelFactory
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.composable.ConnectWifiLauncherResult
 import com.ustadmobile.meshrabiya.testapp.composable.ConnectWifiLauncherStatus
-import com.ustadmobile.meshrabiya.testapp.composable.rememberConnectWifiLauncher
+import com.ustadmobile.meshrabiya.testapp.composable.rememberMeshrabiyaConnectLauncher
 import com.ustadmobile.meshrabiya.testapp.hasBluetoothConnectPermission
 import com.ustadmobile.meshrabiya.testapp.hasNearbyWifiDevicesOrLocationPermission
 import com.ustadmobile.meshrabiya.testapp.viewmodel.LocalVirtualNodeUiState
@@ -184,7 +184,7 @@ fun LocalVirtualNodeScreen(
         mutableStateOf(ConnectWifiLauncherStatus.INACTIVE)
     }
 
-    val connectLauncher = rememberConnectWifiLauncher(
+    val connectLauncher = rememberMeshrabiyaConnectLauncher(
         logger = logger,
         onStatusChange = {
             connectLauncherState = it

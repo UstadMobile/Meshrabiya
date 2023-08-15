@@ -58,7 +58,7 @@ enum class ConnectWifiLauncherStatus {
  * tracking which request is being answered.
  */
 @Composable
-fun rememberConnectWifiLauncher(
+fun rememberMeshrabiyaConnectLauncher(
     node: AndroidVirtualNode,
     logger: MNetLogger? = null,
     onStatusChange: ((ConnectWifiLauncherStatus) -> Unit)? = null,
@@ -118,9 +118,9 @@ fun rememberConnectWifiLauncher(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         val connectRequestVal = pendingPermissionRequest ?: return@rememberLauncherForActivityResult
+        pendingPermissionRequest = null
         if(granted) {
             logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: permission granted")
-            pendingPermissionRequest = null
             pendingAssociationRequest = connectRequestVal
         }else {
             onResult(

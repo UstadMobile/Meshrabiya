@@ -106,7 +106,7 @@ abstract class VirtualNode(
 
     private val mmcpMessageIdAtomic = AtomicInteger()
 
-    private val _state = MutableStateFlow(LocalNodeState())
+    protected val _state = MutableStateFlow(LocalNodeState())
 
     val state: Flow<LocalNodeState> = _state.asStateFlow()
 
