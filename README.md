@@ -124,7 +124,8 @@ val datagramSocket = myNode.createBoundDatagramSocket(port)
 ```
 
 The socket can be used the same as a normal DatagramSocket (e.g. by using send/receive), but it will 
-send/receive ONLY over the virtual network.
+send/receive ONLY over the virtual network. Broadcast packets are supported by setting the 
+destination address to 255.255.255.255
 
 ### Known issues
 
