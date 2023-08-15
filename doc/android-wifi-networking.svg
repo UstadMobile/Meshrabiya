@@ -1,0 +1,693 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="152.94994mm"
+   height="120.89072mm"
+   viewBox="0 0 152.94994 120.89072"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   sodipodi:docname="android-wifi-networking.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="1.5554293"
+     inkscape:cx="237.87645"
+     inkscape:cy="295.73829"
+     inkscape:window-width="1862"
+     inkscape:window-height="1527"
+     inkscape:window-x="1134"
+     inkscape:window-y="328"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="layer1"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0" />
+  <defs
+     id="defs2">
+    <rect
+       x="31.088205"
+       y="482.332"
+       width="670.8028"
+       height="225.13202"
+       id="rect28399" />
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-7.0025984,-15.957532)">
+    <ellipse
+       style="opacity:0.999;fill:#e1e1e1;fill-opacity:0.5;stroke:#000000;stroke-width:0.075;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:0.075, 0.225;stroke-dashoffset:0;stroke-opacity:1"
+       id="ellipse61361"
+       cx="19.115051"
+       cy="125.66212"
+       rx="12.076291"
+       ry="5.3889885" />
+    <ellipse
+       style="opacity:0.999;fill:#e1e1e1;fill-opacity:0.5;stroke:#000000;stroke-width:0.075;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:0.075, 0.225;stroke-dashoffset:0;stroke-opacity:1"
+       id="ellipse61201"
+       cx="54.124321"
+       cy="131.42206"
+       rx="12.076291"
+       ry="5.3889885" />
+    <ellipse
+       style="opacity:0.999;fill:#e1e1e1;fill-opacity:0.5;stroke:#000000;stroke-width:0.075;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:0.075, 0.225;stroke-dashoffset:0;stroke-opacity:1"
+       id="ellipse61199"
+       cx="89.727821"
+       cy="127.93938"
+       rx="12.076291"
+       ry="5.3889885" />
+    <ellipse
+       style="opacity:0.999;fill:#e1e1e1;fill-opacity:0.5;stroke:#000000;stroke-width:0.0749543;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:0.0749543, 0.299817;stroke-dashoffset:0;stroke-opacity:1"
+       id="ellipse61183"
+       cx="21.065548"
+       cy="79.222755"
+       rx="12.076291"
+       ry="5.3889885" />
+    <ellipse
+       style="opacity:0.999;fill:#e1e1e1;fill-opacity:0.5;stroke:#000000;stroke-width:0.075;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:0.075, 0.225;stroke-dashoffset:0;stroke-opacity:1"
+       id="ellipse61109"
+       cx="95.211891"
+       cy="82.527725"
+       rx="12.076291"
+       ry="5.3889885" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 94.848381,79.301949 -9.36782,4.144135"
+       id="path26455" />
+    <ellipse
+       style="opacity:0.999;fill:#e1e1e1;fill-opacity:1;stroke:none;stroke-width:0.267407;stroke-linecap:round;stroke-dasharray:0.267407, 0.267407;stroke-opacity:1"
+       id="ellipse61107"
+       cx="56.429398"
+       cy="95.581161"
+       rx="48.948013"
+       ry="16.870794" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 42.350784,87.606606 -21.0409,5.021323"
+       id="path7529" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 54.161412,87.879861 v 11.36446"
+       id="path7531" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 66.629196,87.606606 21.963928,7.643442"
+       id="path7533" />
+    <ellipse
+       style="opacity:0.999;fill:#e1e1e1;fill-opacity:1;stroke:none;stroke-width:0.267407;stroke-linecap:round;stroke-dasharray:0.267407, 0.267407;stroke-opacity:1"
+       id="path48339"
+       cx="56.429398"
+       cy="46.181538"
+       rx="48.948013"
+       ry="16.870794" />
+    <rect
+       style="opacity:0.999;fill:#ffffff;stroke:#55a99a;stroke-width:0.478643;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534"
+       width="24.237549"
+       height="29.071585"
+       x="9.9958687"
+       y="47.926048" />
+    <rect
+       style="opacity:0.999;fill:#55a99a;fill-opacity:1;stroke:none;stroke-width:0.265008;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-7"
+       width="24.237549"
+       height="8.9116945"
+       x="9.9958687"
+       y="47.926048" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0636123"
+       x="10.273385"
+       y="61.380318"
+       id="text25550"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="10.273385"
+         y="61.380318"
+         id="tspan25540">Station</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="10.273385"
+         y="64.560928"
+         id="tspan25542">wlan0 ipv6</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="10.273385"
+         y="67.741547"
+         id="tspan25544" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="10.273385"
+         y="70.922157"
+         id="tspan25546">WFD Group Owner</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="10.273385"
+         y="74.102768"
+         id="tspan25548">p2p0: ipv6</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 10.655717,67.277955 H 32.954858"
+       id="path25552" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264767px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 54.051855,58.292516 V 38.271437 l -34.691442,9.599411"
+       id="path26025" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 54.05198,38.271378 93.771819,49.464129"
+       id="path26027" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="M 20.973071,77.240235 11.605253,81.38437"
+       id="path26142" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 20.973071,77.240235 9.367817,4.144135"
+       id="path26224" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.264583, 0.264583;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 20.973071,77.240235 v 5.9853"
+       id="path26355" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 94.848381,79.301949 9.367819,4.144135"
+       id="path26457" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.264583, 0.264583;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 94.848381,79.301949 v 5.985296"
+       id="path26459" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 89.161825,124.94505 -9.36782,4.14413"
+       id="path26455-6" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 89.161825,124.94505 9.367817,4.14413"
+       id="path26457-8" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.264583, 0.264583;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 89.161825,124.94505 v 5.98529"
+       id="path26459-8" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="10.678315"
+       y="51.414772"
+       id="text14033"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="10.678315"
+         y="51.414772"
+         id="tspan14031">Device D</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="10.643859"
+       y="54.911549"
+       id="text14033-9"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="10.643859"
+         y="54.911549"
+         id="tspan14031-2">169.254.1.2</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#ffffff;stroke:#55a99a;stroke-width:0.478643;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-2"
+       width="24.237549"
+       height="29.071585"
+       x="42.350784"
+       y="58.535023" />
+    <rect
+       style="opacity:0.999;fill:#55a99a;fill-opacity:1;stroke:none;stroke-width:0.265008;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-7-9"
+       width="24.237549"
+       height="8.9116945"
+       x="42.350784"
+       y="58.535023" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0636123"
+       x="42.6283"
+       y="71.989288"
+       id="text25550-31"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.6283"
+         y="71.989288"
+         id="tspan25540-9">Station</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.6283"
+         y="75.169899"
+         id="tspan25542-4">wlan0 ipv6</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.6283"
+         y="78.350517"
+         id="tspan25544-7" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.6283"
+         y="81.531128"
+         id="tspan25546-8">WFD Group Owner</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.6283"
+         y="84.711739"
+         id="tspan25548-4">p2p0: ipv6</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 43.010632,77.88693 H 65.309773"
+       id="path25552-5" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="43.03323"
+       y="62.023746"
+       id="text14033-0"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="43.03323"
+         y="62.023746"
+         id="tspan14031-36">Device B</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="42.998775"
+       y="65.520523"
+       id="text14033-9-1"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="42.998775"
+         y="65.520523"
+         id="tspan14031-2-0">169.254.1.3</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#ffffff;stroke:#55a99a;stroke-width:0.478643;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-2-9"
+       width="24.237549"
+       height="29.071585"
+       x="8.1070814"
+       y="93.003708" />
+    <rect
+       style="opacity:0.999;fill:#55a99a;fill-opacity:1;stroke:none;stroke-width:0.265008;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-7-9-37"
+       width="24.237549"
+       height="8.9116945"
+       x="8.1070814"
+       y="93.003708" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0636123"
+       x="8.3845968"
+       y="106.45797"
+       id="text25550-31-4"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="8.3845968"
+         y="106.45797"
+         id="tspan25540-9-5">Station</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="8.3845968"
+         y="109.63858"
+         id="tspan25542-4-2">wlan0 ipv6</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="8.3845968"
+         y="112.8192"
+         id="tspan25544-7-5" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="8.3845968"
+         y="115.99981"
+         id="tspan25546-8-4">WFD Group Owner</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="8.3845968"
+         y="119.18042"
+         id="tspan25548-4-7">p2p0: ipv6</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 8.7669274,112.35561 H 31.066068"
+       id="path25552-5-44" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="8.7895269"
+       y="96.492432"
+       id="text14033-0-3"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="8.7895269"
+         y="96.492432"
+         id="tspan14031-36-0">Device F</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="8.7550726"
+       y="99.989204"
+       id="text14033-9-1-7"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="8.7550726"
+         y="99.989204"
+         id="tspan14031-2-0-8">169.254.1.5</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#ffffff;stroke:#55a99a;stroke-width:0.478643;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-2-6"
+       width="24.237549"
+       height="29.071585"
+       x="82.76313"
+       y="49.859169" />
+    <rect
+       style="opacity:0.999;fill:#55a99a;fill-opacity:1;stroke:none;stroke-width:0.265008;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-7-9-3"
+       width="24.237549"
+       height="8.9116945"
+       x="82.76313"
+       y="49.859169" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0636123"
+       x="83.040642"
+       y="63.313438"
+       id="text25550-31-2"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="83.040642"
+         y="63.313438"
+         id="tspan25540-9-0">Station</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="83.040642"
+         y="66.494049"
+         id="tspan25542-4-6">wlan0 ipv6</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="83.040642"
+         y="69.674667"
+         id="tspan25544-7-1" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="83.040642"
+         y="72.855278"
+         id="tspan25546-8-5">WFD Group Owner</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="83.040642"
+         y="76.035889"
+         id="tspan25548-4-5">p2p0: ipv6</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 83.422974,69.211081 H 105.72211"
+       id="path25552-5-4" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="83.445572"
+       y="53.347893"
+       id="text14033-0-7"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="83.445572"
+         y="53.347893"
+         id="tspan14031-36-6">Device E</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="83.411118"
+       y="56.844673"
+       id="text14033-9-1-5"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="83.411118"
+         y="56.844673"
+         id="tspan14031-2-0-6">169.254.1.4</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#ffffff;stroke:#55a99a;stroke-width:0.414568;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-0"
+       width="24.301622"
+       height="21.751602"
+       x="41.865517"
+       y="16.164816" />
+    <rect
+       style="opacity:0.999;fill:#55a99a;fill-opacity:1;stroke:none;stroke-width:0.265008;stroke-linecap:round;stroke-opacity:1"
+       id="rect25534-7-2"
+       width="24.237549"
+       height="8.9116945"
+       x="41.897552"
+       y="16.196854" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0636123"
+       x="42.175072"
+       y="29.651123"
+       id="text25550-3"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.175072"
+         y="29.651123"
+         id="tspan25546-2">WFD Group Owner</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.175072"
+         y="32.831738"
+         id="tspan25548-2">p2p0: ipv6</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="42.580002"
+       y="19.685577"
+       id="text14033-97"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="42.580002"
+         y="19.685577"
+         id="tspan14031-3">Device A</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="42.54554"
+       y="23.182354"
+       id="text14033-9-6"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="42.54554"
+         y="23.182354"
+         id="tspan14031-2-1">169.254.1.1</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#ffffff;stroke:#55a99a;stroke-width:0.478643;stroke-linecap:round;stroke-opacity:1"
+       id="rect38406"
+       width="24.237549"
+       height="29.071585"
+       x="42.720715"
+       y="99.487495" />
+    <rect
+       style="opacity:0.999;fill:#55a99a;fill-opacity:1;stroke:none;stroke-width:0.265008;stroke-linecap:round;stroke-opacity:1"
+       id="rect38408"
+       width="24.237549"
+       height="8.9116945"
+       x="42.720715"
+       y="99.487495" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0636123"
+       x="42.99823"
+       y="112.94176"
+       id="text38420"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.99823"
+         y="112.94176"
+         id="tspan38410">Station</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.99823"
+         y="116.12237"
+         id="tspan38412">wlan0 ipv6</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.99823"
+         y="119.30299"
+         id="tspan38414" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.99823"
+         y="122.4836"
+         id="tspan38416">WFD Group Owner</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="42.99823"
+         y="125.66421"
+         id="tspan38418">p2p0: ipv6</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 43.38056,118.8394 H 65.679701"
+       id="path38422" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="43.40316"
+       y="102.97622"
+       id="text38426"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="43.40316"
+         y="102.97622"
+         id="tspan38424">Device C</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="43.368706"
+       y="106.47299"
+       id="text38430"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="43.368706"
+         y="106.47299"
+         id="tspan38428">169.254.1.6</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#ffffff;stroke:#55a99a;stroke-width:0.478643;stroke-linecap:round;stroke-opacity:1"
+       id="rect38432"
+       width="24.237549"
+       height="29.071585"
+       x="76.985191"
+       y="95.548721" />
+    <rect
+       style="opacity:0.999;fill:#55a99a;fill-opacity:1;stroke:none;stroke-width:0.265008;stroke-linecap:round;stroke-opacity:1"
+       id="rect38434"
+       width="24.237549"
+       height="8.9116945"
+       x="76.985191"
+       y="95.548721" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.0636123"
+       x="77.262711"
+       y="109.00298"
+       id="text38446"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="77.262711"
+         y="109.00298"
+         id="tspan38436">Station</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="77.262711"
+         y="112.18359"
+         id="tspan38438">wlan0 ipv6</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="77.262711"
+         y="115.36421"
+         id="tspan38440" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="77.262711"
+         y="118.54482"
+         id="tspan38442">WFD Group Owner</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.0636123"
+         x="77.262711"
+         y="121.72543"
+         id="tspan38444">p2p0: ipv6</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 77.645037,114.90063 H 99.944178"
+       id="path38448" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="77.667641"
+       y="99.037445"
+       id="text38452"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="77.667641"
+         y="99.037445"
+         id="tspan38450">Device G</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+       x="77.633186"
+       y="102.53422"
+       id="text38456"><tspan
+         sodipodi:role="line"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
+         x="77.633186"
+         y="102.53422"
+         id="tspan38454">169.254.1.7</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 54.077065,128.54672 -9.36782,4.14413"
+       id="path38515" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 54.077065,128.54672 9.367817,4.14413"
+       id="path38517" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.264583, 0.264583;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 54.077065,128.54672 v 5.98529"
+       id="path38519" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 18.13908,122.2817 -9.3678198,4.14413"
+       id="path38521" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.265, 0.265;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 18.13908,122.2817 9.367817,4.14413"
+       id="path38523" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.264583, 0.264583;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 18.13908,122.2817 v 5.98529"
+       id="path38525" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.93889px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="94.84201"
+       y="34.746601"
+       id="text49941"><tspan
+         sodipodi:role="line"
+         id="tspan49939"
+         style="font-size:4.93889px;stroke-width:0.264583"
+         x="94.84201"
+         y="34.746601">Device A</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:4.93889px;stroke-width:0.264583"
+         x="94.84201"
+         y="40.920212"
+         id="tspan52397">WiFi Direct Group Hotspot</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.93889px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="96.197922"
+       y="86.867859"
+       id="text55889"><tspan
+         sodipodi:role="line"
+         id="tspan55885"
+         style="font-size:4.93889px;stroke-width:0.264583"
+         x="96.197922"
+         y="86.867859">Device C</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:4.93889px;stroke-width:0.264583"
+         x="96.197922"
+         y="93.041473"
+         id="tspan55887">WiFi Direct Group Hotspot</tspan></text>
+  </g>
+</svg>

@@ -29,10 +29,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Send
@@ -58,8 +56,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
-import com.ustadmobile.httpoverbluetooth.client.HttpOverBluetoothClient
 import com.ustadmobile.httpoverbluetooth.ui.theme.HttpOverBluetoothTheme
+import com.ustadmobile.meshrabiya.client.HttpOverBluetoothClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -147,10 +145,10 @@ class MainActivity : ComponentActivity() {
         HttpOverBluetoothClient(
             appContext = applicationContext,
             rawHttp = rawHttp,
-            onLog = { priority, message, exception ->
+            logger = { priority, message, exception ->
                 onLogLine(priority,"Client: $message", exception)
             }
-        )
+         )
     }
 
     fun onSetServerEnabled(enabled: Boolean) {
@@ -307,9 +305,7 @@ class MainActivity : ComponentActivity() {
         try {
             bluetothClient.sendRequest(
                 remoteAddress = remoteAddress,
-                remoteUuidAllocationUuid = UUID.fromString(MessageReplyBluetoothHttpServer.SERVICE_UUID),
-                remoteUuidAllocationCharacteristicUuid = UUID.fromString(
-                    MessageReplyBluetoothHttpServer.CHARACTERISTIC_UUID),
+                uuidMask = UUID.fromString(MessageReplyBluetoothHttpServer.UUID_MASK),
                 request = request
             ).use { response ->
                 val strBody = response.response.body.get().decodeBodyToString(Charsets.UTF_8)

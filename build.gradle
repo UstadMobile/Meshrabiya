@@ -1,12 +1,51 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
-    id 'com.android.application' version '8.0.1' apply false
-    id 'com.android.library' version '8.0.1' apply false
-    id 'org.jetbrains.kotlin.android' version '1.8.10' apply false
+    id 'com.android.application' version '8.1.0' apply false
+    id 'com.android.library' version '8.1.0' apply false
+    id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
+    id 'org.jetbrains.kotlin.plugin.serialization' version "1.9.0" apply false
 }
 
 ext.buildConfigProperties = new Properties()
 
 if(project.file("buildconfig.local.properties").exists()) {
     ext.buildConfigProperties.load(new FileInputStream(project.file("buildconfig.local.properties")))
+}
+
+ext {
+
+    version_kotlin_mockito = "4.1.0"
+    version_android_mockito = "5.1.1"
+    version_turbine = "0.12.1"
+    version_compose_bom = "2023.06.01"
+    version_code_scanner = "2.3.2"
+    version_navigation = "2.5.3"
+    version_kodein_di = "7.20.2"
+    version_zxing_embedded = "4.3.0"
+    version_datastore = "1.0.0"
+    version_bouncycastle = "1.75"
+    version_kwik = "0.1f-snapshot"
+    version_agent15 = "0.1b-snapshot"
+    version_flupke = "0.1r-snapshot"
+    version_android_desugaring = "2.0.3"
+    version_coroutines = "1.7.2"
+    version_androidx_core = "1.10.1"
+    version_rawhttp = "2.5.2"
+    version_junit = "4.13.2"
+    version_appcompat = "1.6.1"
+    version_android_test_ext_junit = "1.1.5"
+    version_acra = "5.11.0"
+    version_android_lifecycle = "2.6.1"
+    version_android_activity = "1.7.2"
+    version_nanohttpd = "2.3.1"
+    version_mockwebserver = "4.10.0"
+    version_okhttp = "4.10.0"
+
+    version_android_junit_runner = "1.5.2"
+    version_androidx_test_rules = "1.5.0"
+    version_androidx_orchestrator = "1.4.2"
+
+    version_kotlinx_serialization = "1.5.1"
+    version_android_junit_runner = "1.5.2"
+    version_androidx_test_rules = "1.5.0"
 }

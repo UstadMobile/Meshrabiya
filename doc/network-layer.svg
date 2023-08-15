@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="85.620781mm"
+   height="161.29927mm"
+   viewBox="0 0 85.620781 161.29927"
+   version="1.1"
+   id="svg50548"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   sodipodi:docname="network-layer.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview50550"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="1.0633188"
+     inkscape:cx="235.11294"
+     inkscape:cy="336.2115"
+     inkscape:window-width="1850"
+     inkscape:window-height="1016"
+     inkscape:window-x="70"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0" />
+  <defs
+     id="defs50545">
+    <rect
+       x="585.79565"
+       y="122.78882"
+       width="189.58087"
+       height="72.250473"
+       id="rect115675" />
+    <marker
+       style="overflow:visible"
+       id="Arrow1Mend"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Mend"
+       inkscape:isstock="true">
+      <path
+         transform="matrix(-0.4,0,0,-0.4,-4,0)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path47746" />
+    </marker>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-61.298287,-13.260321)">
+    <rect
+       style="opacity:0.999;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.263;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect118257"
+       width="86.512245"
+       height="162.01379"
+       x="60.955414"
+       y="12.955153" />
+    <rect
+       style="opacity:0.999;fill:none;stroke:#000000;stroke-width:0.207452;stroke-miterlimit:4;stroke-dasharray:0.207452, 0.414904;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect50631"
+       width="59.009655"
+       height="23.583113"
+       x="73.282005"
+       y="30.963165" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="78.388176"
+       y="38.272198"
+       id="text53025"><tspan
+         sodipodi:role="line"
+         id="tspan53023"
+         style="font-size:4.23333px;stroke-width:0.264583"
+         x="78.388176"
+         y="38.272198">VirtualDatagramSocket</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="88.397339"
+       y="16.47666"
+       id="text55463"><tspan
+         sodipodi:role="line"
+         id="tspan55461"
+         style="font-size:4.23333px;stroke-width:0.264583"
+         x="88.397339"
+         y="16.47666">Local device</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Mend)"
+       d="m 100.90183,19.423791 v 8.067685"
+       id="path57709" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="-42.070965"
+       y="64.754639"
+       id="text57713"
+       transform="rotate(-90)"><tspan
+         sodipodi:role="line"
+         id="tspan57711"
+         style="font-size:4.23333px;text-align:center;text-anchor:middle;stroke-width:0.264583"
+         x="-42.070965"
+         y="64.754639">Device A</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:4.23333px;text-align:center;text-anchor:middle;stroke-width:0.264583"
+         x="-42.070965"
+         y="70.046303"
+         id="tspan57737">169.255.100.101</tspan></text>
+    <rect
+       style="opacity:0.999;fill:none;stroke:#000000;stroke-width:0.207452;stroke-miterlimit:4;stroke-dasharray:0.207452, 0.414904;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect59203"
+       width="59.009655"
+       height="23.583113"
+       x="73.650192"
+       y="83.16655" />
+    <rect
+       style="opacity:0.999;fill:none;stroke:#000000;stroke-width:0.207452;stroke-miterlimit:4;stroke-dasharray:0.207452, 0.414904;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect50631-3"
+       width="59.009655"
+       height="23.583113"
+       x="73.711227"
+       y="135.59735" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="-97.178253"
+       y="64.514626"
+       id="text59308"
+       transform="rotate(-90)"><tspan
+         sodipodi:role="line"
+         id="tspan59304"
+         style="font-size:4.23333px;text-align:center;text-anchor:middle;stroke-width:0.264583"
+         x="-97.178253"
+         y="64.514626">Device B</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:4.23333px;text-align:center;text-anchor:middle;stroke-width:0.264583"
+         x="-97.178253"
+         y="69.80629"
+         id="tspan59306">169.255.100.102</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="-147.86293"
+       y="65.096039"
+       id="text64270"
+       transform="rotate(-90)"><tspan
+         sodipodi:role="line"
+         id="tspan64266"
+         style="font-size:4.23333px;text-align:center;text-anchor:middle;stroke-width:0.264583"
+         x="-147.86293"
+         y="65.096039">Device C</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:4.23333px;text-align:center;text-anchor:middle;stroke-width:0.264583"
+         x="-147.86293"
+         y="70.387703"
+         id="tspan64268">169.255.100.103</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.495297px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Mend)"
+       d="M 127.40145,54.611026 V 82.883064"
+       id="path79007" />
+    <rect
+       style="opacity:0.999;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.259336;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect64608"
+       width="37.818279"
+       height="8.2368641"
+       x="108.97112"
+       y="-72.69854"
+       transform="scale(1,-1)" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.01666px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.189061"
+       x="105.2661"
+       y="74.089493"
+       id="text76435"
+       transform="scale(1.1089844,0.90172594)"><tspan
+         sodipodi:role="line"
+         id="tspan76433"
+         style="font-size:2.01666px;stroke-width:0.189061"
+         x="105.2661"
+         y="74.089493">VirtualPacket</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:2.01666px;stroke-width:0.189061"
+         x="105.2661"
+         y="76.610321"
+         id="tspan77309">from: 192.168.100.101</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:2.01666px;stroke-width:0.189061"
+         x="105.2661"
+         y="79.131142"
+         id="tspan77311">to: 192.168.100.103</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="77.828293"
+       y="154.23285"
+       id="text77541"><tspan
+         sodipodi:role="line"
+         id="tspan77539"
+         style="font-size:4.23333px;stroke-width:0.264583"
+         x="77.828293"
+         y="154.23285">VirtualDatagramSocket</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="80.092148"
+       y="50.788212"
+       id="text77545"><tspan
+         sodipodi:role="line"
+         id="tspan77543"
+         style="font-size:4.23333px;stroke-width:0.264583"
+         x="80.092148"
+         y="50.788212">Network Layer (route)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="79.650047"
+       y="96.382141"
+       id="text78681"><tspan
+         sodipodi:role="line"
+         id="tspan78679"
+         style="font-size:4.23333px;stroke-width:0.264583"
+         x="79.650047"
+         y="96.382141">Network Layer (route)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="79.355263"
+       y="143.36163"
+       id="text78685"><tspan
+         sodipodi:role="line"
+         id="tspan78683"
+         style="font-size:4.23333px;stroke-width:0.264583"
+         x="79.355263"
+         y="143.36163">Network Layer (route)</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="88.974762"
+       y="174.49965"
+       id="text80893"><tspan
+         sodipodi:role="line"
+         id="tspan80891"
+         style="font-size:4.23333px;stroke-width:0.264583"
+         x="88.974762"
+         y="174.49965">Local device</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Mend)"
+       d="m 101.6946,161.10885 v 8.06769"
+       id="path80895" />
+    <rect
+       style="opacity:0.999;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.162432;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect80919"
+       width="55.423553"
+       height="0.26640534"
+       x="74.862846"
+       y="42.760517" />
+    <rect
+       style="opacity:0.999;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.162432;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect81145"
+       width="55.423553"
+       height="0.26640534"
+       x="75.115501"
+       y="147.6315" />
+    <rect
+       style="opacity:0.999;fill:#0000ff;fill-opacity:0.17;stroke:#0000ff;stroke-width:0.28988;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect87368"
+       width="12.742502"
+       height="28.504025"
+       x="78.362953"
+       y="54.490322" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="-74.195099"
+       y="87.719666"
+       id="text90788"
+       transform="matrix(0,-1.03562,0.96560515,0,0,0)"><tspan
+         sodipodi:role="line"
+         id="tspan90786"
+         style="font-size:1.41111px;stroke-width:0.248088"
+         x="-74.195099"
+         y="87.719666">Bluetooth (RFCOOMM)</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#0000ff;fill-opacity:0.17;stroke:#0000ff;stroke-width:0.289607;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect94054"
+       width="12.742776"
+       height="28.449759"
+       x="91.063438"
+       y="54.522045" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="-66.534622"
+       y="99.775925"
+       id="text94058"
+       transform="matrix(0,-1.03562,0.96560515,0,0,0)"><tspan
+         sodipodi:role="line"
+         id="tspan94056"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="-66.534622"
+         y="99.775925">WiFi - </tspan><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="-66.534622"
+         y="101.53981"
+         id="tspan94082">Device A LocalOnlyHotspot</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="94.167519"
+       y="58.160477"
+       id="text101796"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="94.167519"
+         y="58.160477"
+         id="tspan101822">192.168.43.1</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="94.280991"
+       y="85.547966"
+       id="text102324"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="94.280991"
+         y="85.547966"
+         id="tspan102322">192.168.43.101</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="81.904381"
+       y="58.160477"
+       id="text103193"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="81.904381"
+         y="58.160477"
+         id="tspan103191">Random UUID</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="81.904381"
+       y="85.561119"
+       id="text103467"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="81.904381"
+         y="85.561119"
+         id="tspan103465">Random UUID</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#0000ff;fill-opacity:0.17;stroke:#0000ff;stroke-width:0.28988;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect103475"
+       width="12.742502"
+       height="28.504025"
+       x="77.997932"
+       y="106.78735" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="-124.69338"
+       y="87.341637"
+       id="text103479"
+       transform="matrix(0,-1.03562,0.96560515,0,0,0)"><tspan
+         sodipodi:role="line"
+         id="tspan103477"
+         style="font-size:1.41111px;stroke-width:0.248088"
+         x="-124.69338"
+         y="87.341637">Bluetooth (RFCOOMM)</tspan></text>
+    <rect
+       style="opacity:0.999;fill:#0000ff;fill-opacity:0.17;stroke:#0000ff;stroke-width:0.289607;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect103481"
+       width="12.742776"
+       height="28.449759"
+       x="90.698418"
+       y="106.81908" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="-117.03291"
+       y="99.397896"
+       id="text103487"
+       transform="matrix(0,-1.03562,0.96560515,0,0,0)"><tspan
+         sodipodi:role="line"
+         id="tspan103483"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="-117.03291"
+         y="99.397896">WiFi - </tspan><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="-117.03291"
+         y="101.16178"
+         id="tspan103485">Device B LocalOnlyHotspot</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="93.815048"
+       y="112.32033"
+       id="text103491"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="93.815048"
+         y="112.32033"
+         id="tspan103489">192.168.43.1</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="81.55191"
+       y="112.32033"
+       id="text103495"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="81.55191"
+         y="112.32033"
+         id="tspan103493">Random UUID</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="81.55191"
+       y="139.72096"
+       id="text103499"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="81.55191"
+         y="139.72096"
+         id="tspan103497">Random UUID</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.495297px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Mend)"
+       d="m 127.20456,106.68865 v 28.27204"
+       id="path109105" />
+    <rect
+       style="opacity:0.999;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.259336;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect109107"
+       width="37.818279"
+       height="8.2368641"
+       x="108.77424"
+       y="-124.77617"
+       transform="scale(1,-1)" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:2.01666px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.189061"
+       x="105.08856"
+       y="131.84277"
+       id="text109115"
+       transform="scale(1.1089844,0.90172594)"><tspan
+         sodipodi:role="line"
+         id="tspan109109"
+         style="font-size:2.01666px;stroke-width:0.189061"
+         x="105.08856"
+         y="131.84277">VirtualPacket</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:2.01666px;stroke-width:0.189061"
+         x="105.08856"
+         y="134.3636"
+         id="tspan109111">from: 192.168.100.101</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:2.01666px;stroke-width:0.189061"
+         x="105.08856"
+         y="136.88443"
+         id="tspan109113">to: 192.168.100.103</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:1.41111px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.248088"
+       x="93.770027"
+       y="139.25327"
+       id="text109199"
+       transform="scale(1.03562,0.96560515)"><tspan
+         sodipodi:role="line"
+         style="font-size:1.41111px;text-align:center;text-anchor:middle;stroke-width:0.248088"
+         x="93.770027"
+         y="139.25327"
+         id="tspan109197">192.168.43.101</tspan></text>
+    <text
+       xml:space="preserve"
+       transform="scale(0.26458333)"
+       id="text115673"
+       style="font-style:normal;font-weight:normal;font-size:13.3333px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;white-space:pre;shape-inside:url(#rect115675);fill:#000000;fill-opacity:1;stroke:none" />
+  </g>
+</svg>
