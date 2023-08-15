@@ -3,16 +3,10 @@ package com.ustadmobile.meshrabiya.vnet
 import android.util.Log
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
-import com.ustadmobile.meshrabiya.mmcp.MmcpAck
-import com.ustadmobile.meshrabiya.mmcp.MmcpHello
-import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
-import com.ustadmobile.meshrabiya.mmcp.MmcpPing
-import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 
@@ -23,7 +17,6 @@ import java.util.concurrent.Future
  * VirtualPacket, and then give them to the VirtualRouter.
  *
  * @param socket - the underlying DatagramSocket to use - this can be bound to a network, interface etc if required
- * @param onMmcpHelloReceivedListener - Receives the Hello Event. This will be triggered when a new
  * neighbor connects.
  */
 class VirtualNodeDatagramSocket(
@@ -31,7 +24,6 @@ class VirtualNodeDatagramSocket(
     private val localNodeVirtualAddress: Int,
     ioExecutorService: ExecutorService,
     private val router: VirtualRouter,
-    private val onMmcpHelloReceivedListener: OnMmcpHelloReceivedListener,
     private val logger: MNetLogger,
     name: String? = null
 ):  Runnable, Closeable {
@@ -41,34 +33,6 @@ class VirtualNodeDatagramSocket(
     private val logPrefix: String
 
     val localPort: Int = socket.localPort
-
-    data class LinkLocalMmcpReceivedEvent(
-        val datagramPacket: DatagramPacket,
-        val virtualPacket: VirtualPacket,
-        val mmcpMessage: MmcpMessage,
-    )
-
-    fun interface LinkLocalMmcpListener {
-
-        fun onLinkLocalMmcpReceived(event: LinkLocalMmcpReceivedEvent)
-
-    }
-
-    /**
-     * Used to listen for new (e.g. incoming) connections being established over the datagram socket.
-     * The OnMmcpHelloReceivedListener may be invoked multiple times from the same client (e.g. in
-     * the event that a response is not received and the client retries).
-     */
-    fun interface OnMmcpHelloReceivedListener {
-
-        fun onMmcpHelloReceived(
-            helloEvent: HelloEvent
-        )
-
-    }
-
-
-    private val listeners: MutableList<LinkLocalMmcpListener> = CopyOnWriteArrayList()
 
     init {
         logPrefix = buildString {
@@ -84,109 +48,23 @@ class VirtualNodeDatagramSocket(
         val buffer = ByteArray(VirtualPacket.MAX_PAYLOAD_SIZE)
         logger(Log.DEBUG, "$logPrefix Started on ${socket.localPort} waiting for first packet", null)
 
-        while(!Thread.interrupted()) {
-            val rxPacket = DatagramPacket(buffer, 0, buffer.size)
-            socket.receive(rxPacket)
+        while(!Thread.interrupted() && !socket.isClosed) {
+            try {
+                val rxPacket = DatagramPacket(buffer, 0, buffer.size)
+                socket.receive(rxPacket)
 
-            val rxVirtualPacket = VirtualPacket.fromDatagramPacket(rxPacket)
-
-            //A virtual packet with toAddress = 0 means that this packet is only being sent
-            // over between two neighbors (linkLocal). This can include initial Hello packet and
-            // connection management e.g. pings
-            if(rxVirtualPacket.header.toAddr == 0 && rxVirtualPacket.header.toPort == 0) {
-                val mmcpMessage = MmcpMessage.fromVirtualPacket(rxVirtualPacket)
-
-                listeners.forEach {
-                    it.onLinkLocalMmcpReceived(LinkLocalMmcpReceivedEvent(
-                        rxPacket, rxVirtualPacket, mmcpMessage
-                    ))
-                }
-
-                logger(Log.VERBOSE, "$logPrefix received MMCP packet from ${rxPacket.address}/${rxPacket.port} id=${mmcpMessage.messageId} type=${mmcpMessage::class.simpleName}", null)
-                when(mmcpMessage) {
-                    is MmcpHello -> {
-                        logger(Log.DEBUG, "$logPrefix Received hello from ${rxPacket.address}/${rxPacket.port}", null)
-
-                        val replyAck = MmcpAck(
-                            messageId = router.nextMmcpMessageId(),
-                            ackOfMessageId = mmcpMessage.messageId
-                        )
-
-                        val replyDatagram = replyAck.toVirtualPacket(
-                            toAddr = 0,
-                            fromAddr = localNodeVirtualAddress,
-                        ).toDatagramPacket()
-
-                        replyDatagram.address = rxPacket.address
-                        replyDatagram.port = rxPacket.port
-                        socket.send(replyDatagram)
-
-                        onMmcpHelloReceivedListener.onMmcpHelloReceived(
-                            HelloEvent(
-                                address = rxPacket.address,
-                                port = rxPacket.port,
-                                virtualPacket = rxVirtualPacket,
-                                mmcpHello = mmcpMessage,
-                                socket = this,
-                            ),
-                        )
-                    }
-
-                    is MmcpPing -> {
-                        val replyPongPacket = MmcpPong(
-                            messageId = router.nextMmcpMessageId(),
-                            replyToMessageId = mmcpMessage.messageId,
-                        ).toVirtualPacket(
-                            toAddr = 0,
-                            fromAddr = localNodeVirtualAddress,
-                        ).toDatagramPacket()
-                        replyPongPacket.address = rxPacket.address
-                        replyPongPacket.port = rxPacket.port
-
-                        socket.send(replyPongPacket)
-                    }
-
-                    else -> {
-                        //do nothing
-                    }
-                }
-
-                if(mmcpMessage is MmcpAck) {
-                    logger(Log.VERBOSE, "Ack: messageId = ${mmcpMessage.messageId} from ${rxPacket.address}/${rxPacket.port}", null)
-                }
-            }else {
+                val rxVirtualPacket = VirtualPacket.fromDatagramPacket(rxPacket)
                 router.route(
                     packet = rxVirtualPacket,
                     datagramPacket = rxPacket,
                     virtualNodeDatagramSocket = this,
                 )
+            }catch(e: Exception) {
+                logger(Log.WARN, "$logPrefix : run : exception handling packet", e)
             }
         }
     }
 
-    fun addLinkLocalMmmcpListener(listener: LinkLocalMmcpListener) {
-        listeners += listener
-    }
-
-    fun removeLinkLocalMmcpListener(listener: LinkLocalMmcpListener) {
-        listeners -= listener
-    }
-
-
-    fun sendHello(
-        messageId: Int,
-        nextHopAddress: InetAddress,
-        nextHopPort: Int
-    ) {
-        send(
-            nextHopPort = nextHopPort,
-            nextHopAddress = nextHopAddress,
-            virtualPacket = MmcpHello(messageId).toVirtualPacket(
-                toAddr = 0,
-                fromAddr = localNodeVirtualAddress,
-            )
-        )
-    }
 
     /**
      *
@@ -205,7 +83,6 @@ class VirtualNodeDatagramSocket(
     fun close(closeSocket: Boolean) {
         future.cancel(true)
         socket.takeIf { closeSocket }?.close()
-        listeners.clear()
     }
 
     override fun close() {

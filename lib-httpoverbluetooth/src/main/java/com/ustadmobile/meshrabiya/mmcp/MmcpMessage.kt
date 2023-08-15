@@ -67,8 +67,6 @@ sealed class MmcpMessage(
 
         const val WHAT_PONG = 2.toByte()
 
-        const val WHAT_HELLO = 3.toByte()
-
         const val WHAT_ACK = 4.toByte()
 
         const val WHAT_HOTSPOT_REQUEST = 5.toByte()
@@ -98,7 +96,6 @@ sealed class MmcpMessage(
             return when(val what = byteArray[offset]) {
                 WHAT_PING -> MmcpPing.fromBytes(byteArray, offset, len)
                 WHAT_PONG -> MmcpPong.fromBytes(byteArray, offset, len)
-                WHAT_HELLO -> MmcpHello.fromBytes(byteArray, offset, len)
                 WHAT_ACK -> MmcpAck.fromBytes(byteArray, offset, len)
                 WHAT_HOTSPOT_REQUEST -> MmcpHotspotRequest.fromBytes(byteArray, offset, len)
                 WHAT_HOTSPOT_RESPONSE -> MmcpHotspotResponse.fromBytes(byteArray, offset, len)

@@ -106,7 +106,7 @@ abstract class VirtualNode(
 
     private val mmcpMessageIdAtomic = AtomicInteger()
 
-    val _state = MutableStateFlow(LocalNodeState())
+    private val _state = MutableStateFlow(LocalNodeState())
 
     val state: Flow<LocalNodeState> = _state.asStateFlow()
 
@@ -155,15 +155,6 @@ abstract class VirtualNode(
         ioExecutorService = connectionExecutor,
         router = this,
         localNodeVirtualAddress = localNodeAddress,
-        onMmcpHelloReceivedListener = {
-            logger(Log.DEBUG, { "$logPrefix onMmcpHelloReceived from ${it.address}" })
-            addNewNeighborConnection(
-                address = it.address,
-                port = it.port,
-                neighborNodeVirtualAddr = it.virtualPacket.header.fromAddr,
-                socket = it.socket
-            )
-        },
         logger = logger,
     )
 

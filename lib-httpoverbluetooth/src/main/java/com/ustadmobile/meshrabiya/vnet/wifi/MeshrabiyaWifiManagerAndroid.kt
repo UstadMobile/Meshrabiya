@@ -455,9 +455,8 @@ class MeshrabiyaWifiManagerAndroid(
              * station network if the wifi direct group is running.
              *
              * If the station network is created first, then the group is added, everything is fine.
-             * If the group is created and then the station netwokr is connected, attempting to bind
+             * If the group is created and then the station network is connected, attempting to bind
              * to the station ipv6 local link addr will throw an exception
-             *
              */
             val netAddress = networkInterface.inetAddresses.firstOrNull {
                 it is Inet6Address && it.isLinkLocalAddress
@@ -473,9 +472,6 @@ class MeshrabiyaWifiManagerAndroid(
                 localNodeVirtualAddress = localNodeAddr,
                 ioExecutorService = ioExecutor,
                 router = router,
-                onMmcpHelloReceivedListener = {
-                    //Do nothing - this will never receive an incoming hello.
-                },
                 logger = logger,
                 name = "network bound to ${config.ssid}"
             )
