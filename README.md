@@ -34,6 +34,8 @@ How it works:
   due to the fact that Android assigns the IP address 192.168.49.1 to all nodes that operate as a 
   WiFi direct group owner.
 
+Want to try it yourself? Download the test app APK from [releases](releases/).
+
 ![Diagram](doc/android-wifi-networking.svg)
 
 ## Getting started
@@ -48,26 +50,81 @@ Add the dependency
 Create a Virtual Node:
 
 ```
+//Create a DataStore instance that Meshrabiya can use to remember networks etc.
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "meshr_settings")
+
+val myNode = AndroidVirtualNode(
+    appContext = applicationContext,
+    dataStore = applicationContext.dataStore,
+    //optionally - set address, network prefix length, etc.
+)
 
 ```
 
 Create a hotspot on one node:
 
 ```
+myNode.setWifiHotspotEnabled(
+  enabled = true,
+  preferredBand = ConnectBand.BAND_5GHZ,
+)
+
+val connectLink = myNode.state.filter {
+   it.connectUri != null
+}.first()
 
 ```
 
 Use the connect link to connect from another node:
 ```
 
+//Optional - but recommended - use CompanionDeviceManager to associate the app with the hotspot
+// to avoid dialogs when reconnecting
+
+val connectLink = ... //Get this from QR code scan etc.
+val connectConfig = MeshrabiyaConnectLink.parseUri(connectLink).hotspotConfig
+if(connectConfig != null) {
+  myNode.connectAsStation(connectConfig)
+}
+
 ```
 
-### Connect using TCP
+### Exchange data using TCP
 
+1. On the server side - create a normal server socket:
+```
+val serverVirtualAddr: InetAddress = myNode.address 
+val serverSocket = ServerSocket(port)
+```
 
-### Connect using UDP
+2. On the client side - use the socket factory to create a socket
+```
+val socketFactory = myNode.socketFactory
+val clientSocket = socketFactory.createSocket(serverVirtualAddr, port)
+```
 
+The Socket Factory uses a "socket chain" under the hood. It will lookup the next hop to reach the
+given destination. It will then connect to the next hop and write its destination to socket stream,
+similar to how an http proxy uses the host header. Each node runs a chain socket forwarding server. 
+Once the next hop is the destination (e.g. it reaches a node that has a direct connection to the 
+destination node), then the socket is connected to the destination port. See ChainSocketServer for
+further details.
 
+The Socket factory will fallback to using the system default socket factory for any destination that
+is not on the virtual network (e.g where the ip address does not match the netmask of the virtual 
+node). It is therefor possible to use the socket factory anywhere, even when connections to non-virtual
+destinations are required - e.g. it can be used with an OKHttp Client and the client will be able to
+connect to both virtual and non-virtual addresses.
+
+### Exchange data using UDP
+
+Create a DatagramSocket with a given port (or use 0 to get a random port assignment)
+```
+val datagramSocket = myNode.createBoundDatagramSocket(port)
+```
+
+The socket can be used the same as a normal DatagramSocket (e.g. by using send/receive), but it will 
+send/receive ONLY over the virtual network.
 
 ### Known issues
 

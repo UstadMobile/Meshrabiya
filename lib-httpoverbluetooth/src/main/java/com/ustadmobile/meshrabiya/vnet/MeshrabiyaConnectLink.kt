@@ -63,7 +63,10 @@ data class MeshrabiyaConnectLink(
             )
         }
 
-        fun parseUri(uri: String, json: Json): MeshrabiyaConnectLink {
+        fun parseUri(
+            uri: String,
+            json: Json = Json,
+        ): MeshrabiyaConnectLink {
             val uriLowerCase = uri.lowercase()
             if(!uriLowerCase.startsWith(PROTO_PREFIX))
                 throw IllegalArgumentException("Meshrabiya connect url must start with $PROTO://")

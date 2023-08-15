@@ -14,7 +14,7 @@ class ChainSocketFactoryImpl(
     private val logger: MNetLogger,
 ) : ChainSocketFactory() {
 
-    private val logPrefix: String = "[ChainSocketFactoryImpl for ${virtualRouter.localNodeInetAddress}]"
+    private val logPrefix: String = "[ChainSocketFactoryImpl for ${virtualRouter.address}]"
 
     private fun createSocketForVirtualAddress(
         address: InetAddress,
@@ -34,7 +34,7 @@ class ChainSocketFactoryImpl(
                 ChainSocketInitRequest(
                     virtualDestAddr = address,
                     virtualDestPort = port,
-                    fromAddr = virtualRouter.localNodeInetAddress
+                    fromAddr = virtualRouter.address
                 ),
                 nextHop
             )
@@ -49,7 +49,7 @@ class ChainSocketFactoryImpl(
     }
 
     private fun InetAddress.isVirtualAddress(): Boolean {
-        return prefixMatches(virtualRouter.networkPrefixLength, virtualRouter.localNodeInetAddress)
+        return prefixMatches(virtualRouter.networkPrefixLength, virtualRouter.address)
     }
 
     override fun createSocket(host: String, port: Int): Socket {

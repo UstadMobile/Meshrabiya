@@ -11,18 +11,18 @@ fun VirtualNode.connectTo(other: VirtualNode, timeout: Long = 5000) {
     addNewNeighborConnection(
         address = InetAddress.getLoopbackAddress(),
         port = other.localDatagramPort,
-        neighborNodeVirtualAddr = other.localNodeAddress,
+        neighborNodeVirtualAddr = other.addressAsInt,
         socket = this.datagramSocket
     )
 
     //wait for connections to be ready
     runBlocking {
         withTimeout(timeout) {
-            state.filter { it.originatorMessages.containsKey(other.localNodeAddress) }
+            state.filter { it.originatorMessages.containsKey(other.addressAsInt) }
                 .first()
 
             other.state.filter {
-                it.originatorMessages.containsKey(localNodeAddress)
+                it.originatorMessages.containsKey(addressAsInt)
             }.first()
 
         }

@@ -23,13 +23,13 @@
      inkscape:pagecheckerboard="0"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="0.5499273"
-     inkscape:cx="261.85279"
-     inkscape:cy="370.04891"
-     inkscape:window-width="1488"
-     inkscape:window-height="1082"
-     inkscape:window-x="167"
-     inkscape:window-y="122"
+     inkscape:zoom="1.5554293"
+     inkscape:cx="237.87645"
+     inkscape:cy="295.73829"
+     inkscape:window-width="1862"
+     inkscape:window-height="1527"
+     inkscape:window-x="1134"
+     inkscape:window-y="328"
      inkscape:window-maximized="0"
      inkscape:current-layer="layer1"
      fit-margin-top="0"
@@ -214,7 +214,7 @@
          style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
          x="10.678315"
          y="51.414772"
-         id="tspan14031">Device B</tspan></text>
+         id="tspan14031">Device D</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
@@ -285,7 +285,7 @@
          style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
          x="43.03323"
          y="62.023746"
-         id="tspan14031-36">Device C</tspan></text>
+         id="tspan14031-36">Device B</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
@@ -356,7 +356,7 @@
          style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
          x="8.7895269"
          y="96.492432"
-         id="tspan14031-36-0">Device E</tspan></text>
+         id="tspan14031-36-0">Device F</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
@@ -427,7 +427,7 @@
          style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
          x="83.445572"
          y="53.347893"
-         id="tspan14031-36-6">Device D</tspan></text>
+         id="tspan14031-36-6">Device E</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
@@ -550,7 +550,7 @@
          style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"
          x="43.40316"
          y="102.97622"
-         id="tspan38424">Device F</tspan></text>
+         id="tspan38424">Device C</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-weight:normal;font-size:2.54449px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.0636123;stroke-opacity:1"

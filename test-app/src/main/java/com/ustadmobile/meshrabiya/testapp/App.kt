@@ -6,10 +6,10 @@ import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.asInetAddress
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
-import com.ustadmobile.meshrabiya.testapp.VNetTestActivity.Companion.UUID_MASK
 import com.ustadmobile.meshrabiya.testapp.server.TestAppServer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -26,6 +26,7 @@ import org.kodein.di.bind
 import org.kodein.di.instance
 import org.kodein.di.singleton
 import java.io.File
+import java.net.InetAddress
 
 class App: Application(), DIAware {
 
@@ -33,20 +34,20 @@ class App: Application(), DIAware {
 
     private val diModule = DI.Module("meshrabiya-module") {
 
-        bind<Int>(tag = TAG_VIRTUAL_ADDRESS) with singleton() {
+        bind<InetAddress>(tag = TAG_VIRTUAL_ADDRESS) with singleton() {
             runBlocking {
                 val addr = applicationContext.dataStore.data.map { preferences ->
                     preferences[ADDRESS_PREF_KEY] ?: 0
                 }.first()
 
                 if(addr != 0) {
-                    addr
+                    addr.asInetAddress()
                 }else {
                     randomApipaAddr().also { randomAddress ->
                         applicationContext.dataStore.edit {
                             it[ADDRESS_PREF_KEY] = randomAddress
                         }
-                    }
+                    }.asInetAddress()
                 }
             }
         }
@@ -74,10 +75,9 @@ class App: Application(), DIAware {
         bind<AndroidVirtualNode>() with singleton {
             AndroidVirtualNode(
                 appContext = applicationContext,
-                uuidMask = UUID_MASK,
                 logger = instance(),
                 json = instance(),
-                localMNodeAddress = instance(tag = TAG_VIRTUAL_ADDRESS),
+                address = instance(tag = TAG_VIRTUAL_ADDRESS),
                 dataStore = applicationContext.dataStore
             )
         }
@@ -96,8 +96,8 @@ class App: Application(), DIAware {
                 httpClient = instance(),
                 mLogger = instance(),
                 port = TestAppServer.DEFAULT_PORT,
-                name = node.localNodeAddress.addressToDotNotation(),
-                localVirtualAddr = node.localNodeInetAddress,
+                name = node.addressAsInt.addressToDotNotation(),
+                localVirtualAddr = node.address,
             )
         }
 

@@ -96,7 +96,7 @@ class ChainSocketServerTest {
         val chainServerSocket2 = ServerSocket(0)
 
         val virtualRouter1: VirtualRouter = mock {
-            on { localNodeInetAddress }.thenReturn(InetAddress.getByAddress(randomApipaAddr().addressToByteArray()))
+            on { address }.thenReturn(InetAddress.getByAddress(randomApipaAddr().addressToByteArray()))
             on { networkPrefixLength }.thenReturn(16)
             on { lookupNextHopForChainSocket(any(), any()) }.thenReturn(ChainSocketNextHop(
                 address = InetAddress.getLoopbackAddress(),
@@ -106,7 +106,7 @@ class ChainSocketServerTest {
         }
 
         val virtualRouter2: VirtualRouter = mock {
-            on { localNodeInetAddress }.thenReturn(InetAddress.getByAddress(randomApipaAddr().addressToByteArray()))
+            on { address }.thenReturn(InetAddress.getByAddress(randomApipaAddr().addressToByteArray()))
             on { networkPrefixLength }.thenReturn(16)
             on { lookupNextHopForChainSocket(any(), any()) }.thenAnswer {
                 ChainSocketNextHop(

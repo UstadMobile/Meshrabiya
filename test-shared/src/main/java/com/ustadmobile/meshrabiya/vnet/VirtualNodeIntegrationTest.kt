@@ -63,7 +63,6 @@ import java.net.DatagramSocket
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -103,13 +102,11 @@ abstract class VirtualNodeIntegrationTest {
     @Test
     fun givenTwoVirtualNodesConnectedOverDatagramSocket_whenPingSent_thenReplyWillBeReceived() {
         val node1 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
         )
         val node2 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
@@ -134,8 +131,8 @@ abstract class VirtualNodeIntegrationTest {
 
             node1.route(
                 node1ToNode2Ping.toVirtualPacket(
-                    toAddr = node2.localNodeAddress,
-                    fromAddr = node1.localNodeAddress
+                    toAddr = node2.addressAsInt,
+                    fromAddr = node1.addressAsInt
                 )
             )
 
@@ -178,14 +175,12 @@ abstract class VirtualNodeIntegrationTest {
         val json = Json { encodeDefaults = true }
 
         val node1 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mockHotspotManager,
             json = json,
         )
 
         val node2 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
@@ -200,8 +195,8 @@ abstract class VirtualNodeIntegrationTest {
             node1.route(
                 packet = MmcpHotspotRequest(requestId, LocalHotspotRequest(ConnectBand.BAND_5GHZ))
                     .toVirtualPacket(
-                        toAddr = node1.localNodeAddress,
-                        fromAddr = node2.localNodeAddress
+                        toAddr = node1.addressAsInt,
+                        fromAddr = node2.addressAsInt
                     )
             )
 
@@ -251,7 +246,7 @@ abstract class VirtualNodeIntegrationTest {
             val pingMessageId = 1000042
             val broadcastPing = MmcpPing(pingMessageId).toVirtualPacket(
                 toAddr = VirtualPacket.ADDR_BROADCAST,
-                fromAddr = connectedNodes.first().localNodeAddress
+                fromAddr = connectedNodes.first().addressAsInt
             )
 
             val otherJobs = (1 until 3).map {nodeIndex ->
@@ -280,20 +275,18 @@ abstract class VirtualNodeIntegrationTest {
     @Test
     fun givenTwoNodes_whenConnected_thenPingTimesWillBeDetermined() {
         val node1 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, 1).ip4AddressToInt()
         )
         val node2 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
             localNodeAddress = byteArrayOf(169.toByte(), 254.toByte(), 1, 2).ip4AddressToInt()
         )
-        println("Test node1=${node1.localNodeAddress.addressToDotNotation()} node2=${node2.localNodeAddress.addressToDotNotation()}")
+        println("Test node1=${node1.addressAsInt.addressToDotNotation()} node2=${node2.addressAsInt.addressToDotNotation()}")
 
         fun VirtualNode.assertPingTimeDetermined(
             otherNode: VirtualNode,
@@ -301,15 +294,15 @@ abstract class VirtualNodeIntegrationTest {
         ) {
             runBlocking {
                 this@assertPingTimeDetermined.state.filter {
-                    (it.originatorMessages[otherNode.localNodeAddress]?.originatorMessage?.pingTimeSum ?: 0) > 0
+                    (it.originatorMessages[otherNode.addressAsInt]?.originatorMessage?.pingTimeSum ?: 0) > 0
                 }.test(timeout = 10000.milliseconds, name = name) {
                     val pingTime = awaitItem().originatorMessages.entries.first {
-                        it.key == otherNode.localNodeAddress
+                        it.key == otherNode.addressAsInt
                     }.value.originatorMessage.pingTimeSum
 
                     Assert.assertTrue(
-                        "${localNodeAddress.addressToDotNotation()} -> " +
-                                "${otherNode.localNodeAddress.addressToDotNotation()} ping time > 0",
+                        "${addressAsInt.addressToDotNotation()} -> " +
+                                "${otherNode.addressAsInt.addressToDotNotation()} ping time > 0",
                         pingTime > 0
                     )
                 }
@@ -330,7 +323,6 @@ abstract class VirtualNodeIntegrationTest {
     fun givenThreeNodes_whenConnected_thenShouldReceiveOriginatingMessagesFromOthers() {
         val nodes = (0 until 3).map {
             TestVirtualNode(
-                uuidMask = UUID.randomUUID(),
                 logger = logger,
                 meshrabiyaWifiManager = mock { },
                 json = json,
@@ -350,8 +342,8 @@ abstract class VirtualNodeIntegrationTest {
             nodes.forEach { node ->
                 runBlocking {
                     val otherNodeAddresses = nodes
-                        .filter { it.localNodeAddress != node.localNodeAddress }
-                        .map { it.localNodeAddress }
+                        .filter { it.addressAsInt != node.addressAsInt }
+                        .map { it.addressAsInt }
 
                     node.state.filter { nodeState ->
                         otherNodeAddresses.all { otherNodeAddr ->
@@ -374,7 +366,6 @@ abstract class VirtualNodeIntegrationTest {
         val  scope = CoroutineScope(Dispatchers.Default + Job())
         val nodes = (0 until 3).map {
             TestVirtualNode(
-                uuidMask = UUID.randomUUID(),
                 logger = logger,
                 meshrabiyaWifiManager = mock { },
                 json = json,
@@ -396,12 +387,12 @@ abstract class VirtualNodeIntegrationTest {
                 println("test: wait for discovery")
                 nodes.first().state
                     .filter {
-                        it.originatorMessages.containsKey(nodes.last().localNodeAddress)
+                        it.originatorMessages.containsKey(nodes.last().addressAsInt)
                     }
                     .first()
                 println("test: node 1 knows about node 3")
                 nodes.last().state
-                    .filter { it.originatorMessages.containsKey(nodes.first().localNodeAddress) }
+                    .filter { it.originatorMessages.containsKey(nodes.first().addressAsInt) }
                     .first()
                 println("test: node 3 knows about node 1 : discovery done")
 
@@ -414,8 +405,8 @@ abstract class VirtualNodeIntegrationTest {
 
                 nodes.first().route(
                     MmcpPing(pingId).toVirtualPacket(
-                    toAddr = nodes.last().localNodeAddress,
-                    fromAddr = nodes.first().localNodeAddress
+                    toAddr = nodes.last().addressAsInt,
+                    fromAddr = nodes.first().addressAsInt
                 ))
 
                 val pong = pongReply.await()
@@ -434,7 +425,6 @@ abstract class VirtualNodeIntegrationTest {
     fun givenTwoNodes_whenForwardingSetup_thenEchoWillBeReceived(){
         val executorService = Executors.newCachedThreadPool()
         val node1 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
@@ -447,7 +437,6 @@ abstract class VirtualNodeIntegrationTest {
         )
 
         val node2  = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
@@ -502,7 +491,7 @@ abstract class VirtualNodeIntegrationTest {
         val node2ServerSocket = FileEchoSocketServer(randomFile, 0)
         val downloadedFile = tempFolder.newFile("downloaded.dat")
         node1.socketFactory.createSocket(
-            node2.localNodeInetAddress, node2ServerSocket.localPort
+            node2.address, node2ServerSocket.localPort
         ).use { clientSocket ->
             FileOutputStream(downloadedFile).use { fileOutStream ->
                 clientSocket.getInputStream().copyToWithProgressCallback(fileOutStream)
@@ -528,7 +517,7 @@ abstract class VirtualNodeIntegrationTest {
         val node3ServerSocket = FileEchoSocketServer(randomFile, 0)
         val downloadedFile = tempFolder.newFile("download.dat")
         nodes.first().socketFactory.createSocket(
-            nodes.last().localNodeInetAddress, node3ServerSocket.localPort
+            nodes.last().address, node3ServerSocket.localPort
         ).use {clientSocket ->
             FileOutputStream(downloadedFile).use { fileOut ->
                 clientSocket.getInputStream().copyToWithProgressCallback(fileOut)
@@ -593,7 +582,6 @@ abstract class VirtualNodeIntegrationTest {
     @Test(timeout = 10000)
     fun givenTwoNodesConnected_whenPacketSentUsingVirtualSocket_thenShouldBeReceived() {
         val node1 = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
@@ -601,7 +589,6 @@ abstract class VirtualNodeIntegrationTest {
         )
 
         val node2  = TestVirtualNode(
-            uuidMask = UUID.randomUUID(),
             logger = logger,
             meshrabiyaWifiManager = mock { },
             json = json,
@@ -610,14 +597,14 @@ abstract class VirtualNodeIntegrationTest {
         try {
             node1.connectTo(node2)
             val node1socket  = node1.createDatagramSocket()
-            node1socket.bind(InetSocketAddress(node1.localNodeInetAddress, 81))
+            node1socket.bind(InetSocketAddress(node1.address, 81))
 
             val node2socket = node2.createDatagramSocket()
-            node2socket.bind(InetSocketAddress(node2.localNodeInetAddress, 82))
+            node2socket.bind(InetSocketAddress(node2.address, 82))
 
             val packetData = "Hello World".encodeToByteArray()
             val txPacket = DatagramPacket(packetData, 0, packetData.size)
-            txPacket.address = InetAddress.getByAddress(node2.localNodeAddress.addressToByteArray())
+            txPacket.address = InetAddress.getByAddress(node2.addressAsInt.addressToByteArray())
             txPacket.port = 82
             node1socket.send(txPacket)
 

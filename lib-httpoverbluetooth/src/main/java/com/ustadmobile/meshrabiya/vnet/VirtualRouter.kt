@@ -4,14 +4,13 @@ import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
 import java.net.DatagramPacket
 import java.net.InetAddress
-import java.net.SocketAddress
 
 /**
  * Represents the netwrok
  */
 interface VirtualRouter {
 
-    val localNodeInetAddress: InetAddress
+    val address: InetAddress
 
     val networkPrefixLength: Int
 

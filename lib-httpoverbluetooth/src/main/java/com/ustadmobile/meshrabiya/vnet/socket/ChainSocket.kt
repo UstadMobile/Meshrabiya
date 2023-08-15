@@ -24,14 +24,14 @@ class ChainSocket(
     private val logger: MNetLogger,
 ): Socket() {
 
-    private val logPrefix = "[ChainSocket for ${virtualRouter.localNodeInetAddress}]"
+    private val logPrefix = "[ChainSocket for ${virtualRouter.address}]"
 
     override fun connect(endpoint: SocketAddress, timeout: Int) {
         val endpointInetAddr = endpoint as? InetSocketAddress
         val address = endpointInetAddr?.address
         if(
             address?.prefixMatches(
-                virtualRouter.networkPrefixLength, virtualRouter.localNodeInetAddress
+                virtualRouter.networkPrefixLength, virtualRouter.address
             ) == true
         ) {
             try {
@@ -45,7 +45,7 @@ class ChainSocket(
                     ChainSocketInitRequest(
                         virtualDestAddr = address,
                         virtualDestPort = endpointInetAddr.port,
-                        fromAddr = virtualRouter.localNodeInetAddress
+                        fromAddr = virtualRouter.address
                     ),
                     nextHop
                 )

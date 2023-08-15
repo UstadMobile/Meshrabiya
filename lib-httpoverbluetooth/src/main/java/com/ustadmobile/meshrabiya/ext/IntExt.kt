@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.ext
 
+import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -19,3 +20,8 @@ fun Int.encodeAsHex(): String {
         it.toString(radix = 16).padStart(2, '0')
     }
 }
+
+fun Int.asInetAddress(): InetAddress {
+    return InetAddress.getByAddress(addressToByteArray())
+}
+

@@ -15,7 +15,7 @@ dependencyResolutionManagement {
         maven { url "https://devserver3.ustadmobile.com/maven2/" }
     }
 }
-rootProject.name = "HttpOverBluetooth"
+rootProject.name = "Meshrabiya"
 include ':app'
 include ':lib-httpoverbluetooth'
 include ':test-app'

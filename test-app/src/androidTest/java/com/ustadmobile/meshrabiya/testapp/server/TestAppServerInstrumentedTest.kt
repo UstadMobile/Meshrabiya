@@ -44,8 +44,8 @@ class TestAppServerInstrumentedTest {
             httpClient = okHttpClient,
             mLogger = testNode.logger,
             port = 0,
-            name = testNode.localNodeAddress.addressToDotNotation(),
-            localVirtualAddr = testNode.localNodeInetAddress,
+            name = testNode.addressAsInt.addressToDotNotation(),
+            localVirtualAddr = testNode.address,
         ).also {
             it.start()
         }
@@ -86,7 +86,7 @@ class TestAppServerInstrumentedTest {
 
             val outgoingTransfer = testNode1.testServer.addOutgoingTransfer(
                 uri = randomFile.toUri(),
-                toNode = testNode2.testNode.localNodeInetAddress,
+                toNode = testNode2.testNode.address,
                 toPort = testNode2.testServer.localPort
             )
 

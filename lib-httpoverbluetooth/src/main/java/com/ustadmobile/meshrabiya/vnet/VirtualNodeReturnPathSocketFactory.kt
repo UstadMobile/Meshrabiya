@@ -21,7 +21,7 @@ class VirtualNodeReturnPathSocketFactory(
 
     override fun createSocket(destAddress: InetAddress, port: Int): DatagramSocket {
         return if(
-            destAddress.address.prefixMatches(node.networkPrefixLength, node.localNodeAddressByteArray)
+            destAddress.address.prefixMatches(node.networkPrefixLength, node.address.address)
         ) {
             node.createBoundDatagramSocket(0)
         }else{

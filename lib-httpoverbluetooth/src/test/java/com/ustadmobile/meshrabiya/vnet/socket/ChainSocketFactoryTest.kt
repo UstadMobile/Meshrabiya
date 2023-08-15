@@ -44,7 +44,7 @@ class ChainSocketFactoryTest {
         prefixLength: Int = 16,
     ): VirtualRouter {
         return mock {
-            on { localNodeInetAddress }.thenReturn (
+            on { address }.thenReturn (
                 InetAddress.getByAddress(localNodeAddr.addressToByteArray())
             )
             on { networkPrefixLength }.thenReturn(prefixLength)

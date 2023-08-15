@@ -112,7 +112,7 @@ class LocalVirtualNodeViewModel(
     ) {
         viewModelScope.launch {
             try {
-                node.addWifiConnection(hotspotConfig)
+                node.connectAsStation(hotspotConfig)
             }catch(e: Exception) {
                 _snackbars.tryEmit(SnackbarMessage("Failed to connect: $e"))
                 logger(Log.ERROR, "Failed to connect", e)

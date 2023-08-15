@@ -11,43 +11,34 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.log.MNetLogger
-import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManagerAndroid
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import java.io.IOException
-import java.util.UUID
+import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 
 class AndroidVirtualNode(
     val appContext: Context,
-    uuidMask: UUID,
     port: Int = 0,
+    json: Json = Json,
     logger: MNetLogger = MNetLoggerStdout(),
-    localMNodeAddress: Int = randomApipaAddr(),
-    json: Json,
     dataStore: DataStore<Preferences>,
+    address: InetAddress = randomApipaInetAddr(),
     config: NodeConfig = NodeConfig.DEFAULT_CONFIG,
 ): VirtualNode(
-    uuidMask = uuidMask,
     port = port,
     logger = logger,
-    localNodeAddress = localMNodeAddress,
+    address = address,
     json = json,
     config = config,
 ) {
-
 
     private val bluetoothManager: BluetoothManager by lazy {
         appContext.getSystemService(BluetoothManager::class.java)
@@ -59,8 +50,8 @@ class AndroidVirtualNode(
     }
 
     /**
-     * Listen to the WifiManager for new wifi connections being established.. When they are
-     * established call addNewDatagramNeighborConnection to setup the neighbor connection.
+     * Listen to the WifiManager for new wifi station connections being established.. When they are
+     * established call addNewNeighborConnection to initialize the exchange of originator messages.
      */
     private val newWifiConnectionListener = MeshrabiyaWifiManagerAndroid.OnNewWifiConnectionListener {
         addNewNeighborConnection(
@@ -74,7 +65,7 @@ class AndroidVirtualNode(
     override val meshrabiyaWifiManager: MeshrabiyaWifiManagerAndroid = MeshrabiyaWifiManagerAndroid(
         appContext = appContext,
         logger = logger,
-        localNodeAddr = localMNodeAddress,
+        localNodeAddr = addressAsInt,
         router = this,
         chainSocketFactory = chainSocketFactory,
         ioExecutor = connectionExecutor,
@@ -144,34 +135,6 @@ class AndroidVirtualNode(
         }
     }
 
-    suspend fun addWifiConnection(remoteVirtualAddr: Int) {
-        if(remoteVirtualAddr == localNodeAddress)
-            logger(Log.DEBUG, "Nah, not now", null)
-
-        coroutineScope {
-            val responseCompleteableDeferred = CompletableDeferred<MmcpHotspotResponse>()
-            launch {
-                val response = incomingMmcpMessages.mapNotNull {
-                    it as? MmcpHotspotResponse //Need to filter better
-                }.first()
-
-                responseCompleteableDeferred.complete(response)
-            }
-
-            sendRequestWifiConnectionMmcpMessage(remoteVirtualAddr)
-            val hotspotResponse = responseCompleteableDeferred.await()
-
-            logger(Log.INFO, "$logPrefix : addWifiConnection (by remote address): got response ${hotspotResponse.result}", null)
-            val config = hotspotResponse.result.config
-
-            if(config != null) {
-                addWifiConnection(config)
-            }else {
-                logger(Log.ERROR, "$logPrefix: addWifiConnection: Received null config", null)
-            }
-        }
-    }
-
 
     override fun close() {
         super.close()
@@ -181,7 +144,7 @@ class AndroidVirtualNode(
         }
     }
 
-    suspend fun addWifiConnection(
+    suspend fun connectAsStation(
         config: WifiConnectConfig,
     ) {
         meshrabiyaWifiManager.connectToHotspot(config)
