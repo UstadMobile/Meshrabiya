@@ -16,7 +16,6 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Meshrabiya"
-include ':app'
 include ':lib-httpoverbluetooth'
 include ':test-app'
 include ':test-shared'

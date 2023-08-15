@@ -11,8 +11,8 @@ infrastructure, when hiking, etc. WiFi enables high-speed connections with tests
 Using multiple hops over multiple WiFi direct groups enables more devices to connect than is possible
 using a single device hotspot.
 
-Meshrabiya provides socket factories (for both TCP and UDP) that can create route data over multiple
-hops as if they were directly connected.
+Meshrabiya provides socket factories (for both TCP and UDP) that can create sockets to route data 
+between nodes over multiple hops as if they were directly connected.
 
 How it works:
 
@@ -34,7 +34,9 @@ How it works:
   due to the fact that Android assigns the IP address 192.168.49.1 to all nodes that operate as a 
   WiFi direct group owner.
 
-Want to try it yourself? Download the test app APK from [releases](releases/).
+Want to try it yourself? Download the test app APK from [https://github.com/UstadMobile/Meshrabiya/releases](releases/).
+
+Want to collaborate on development? Join us on discord: [https://discord.gg/WHe35Sbsg4](https://discord.gg/WHe35Sbsg4).
 
 ![Diagram](doc/android-wifi-networking.svg)
 
