@@ -42,9 +42,20 @@ Want to collaborate on development? Join us on discord: [https://discord.gg/WHe3
 
 ## Getting started
 
-Add the dependency
+Add repository to settings.gradle :
+```
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+      ...
+      maven { url "https://devserver3.ustadmobile.com/maven2/" }
+    }
+}       
 ```
 
+Add the dependency
+```
+implementation "com.github.UstadMobile.Meshrabiya:lib-meshrabiya:0.1-snapshot"
 ```
 
 ### Connect devices
