@@ -6,7 +6,9 @@ import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 
 fun WifiP2pGroup.toPrettyString(): String {
     return buildString {
-        append("WifiP2pGroup: interface=${`interface`} groupOwner = $isGroupOwner, networkName=$networkName, passphrase=${passphrase}")
+        val frequencyStr = if(Build.VERSION.SDK_INT >= 29) " frequency=$frequency " else ""
+        append("WifiP2pGroup: interface=${`interface`} groupOwner = $isGroupOwner, " +
+                "networkName=$networkName, passphrase=${passphrase} frequency=$frequencyStr")
     }
 }
 

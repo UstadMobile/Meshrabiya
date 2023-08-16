@@ -3,7 +3,7 @@ package com.ustadmobile.meshrabiya.testapp.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.testapp.App
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.appstate.FabState

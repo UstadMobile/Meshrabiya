@@ -7,10 +7,11 @@ import android.net.wifi.WifiManager
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CopyAll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,13 +22,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants
+import com.ustadmobile.meshrabiya.log.MNetLogger
+import com.ustadmobile.meshrabiya.testapp.MNetLoggerAndroid
 import com.ustadmobile.meshrabiya.testapp.ViewModelFactory
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.meshrabiyaDeviceInfoStr
 import com.ustadmobile.meshrabiya.testapp.viewmodel.InfoUiState
 import com.ustadmobile.meshrabiya.testapp.viewmodel.InfoViewModel
 import org.kodein.di.compose.localDI
+import org.kodein.di.instance
 
 
 @Composable
@@ -59,12 +64,14 @@ fun InfoScreen(
     onClickLicenses: () -> Unit,
 ) {
     val context = LocalContext.current
-    val wifiManager = remember {
-        context.getSystemService(WifiManager::class.java)
+
+    val deviceInfo = remember {
+        context.meshrabiyaDeviceInfoStr()
     }
-    val is5GhzSupported = remember(wifiManager) {
-        wifiManager.is5GHzBandSupported
-    }
+
+    val localDi = localDI()
+    val logger: MNetLogger by localDi.instance()
+    val androidLogger = logger as MNetLoggerAndroid
 
     LazyColumn(
         modifier = Modifier.fillMaxSize()
@@ -72,11 +79,12 @@ fun InfoScreen(
         item("copyright") {
             ListItem(
                 headlineContent = {
-                    Text(text = "Meshrabiya - Copyright 2023 UstadMobile FZ-LLC.")
+                    Text(text = "Meshrabiya - ${MeshrabiyaConstants.VERSION}")
                 },
                 supportingContent = {
-                    Text("This software is free and open source, licensed under the LGPLv3.0 license.\n" +
-                            "As per https://www.gnu.org/licenses/lgpl-3.0.en.html")
+                    Text("Copyright 2023 UstadMobile FZ-LLC. This software is free and open " +
+                            "source, licensed under the LGPLv3.0 license " +
+                            "as per https://www.gnu.org/licenses/lgpl-3.0.en.html")
                 }
             )
         }
@@ -92,32 +100,39 @@ fun InfoScreen(
             )
         }
 
-        item("5ghz") {
-            Text(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                text= "5Ghz supported: $is5GhzSupported"
+        item("deviceinfo") {
+            ListItem(
+                headlineContent = {
+                    Text("Device Info")
+                },
+                supportingContent = {
+                    Text(deviceInfo)
+                }
             )
         }
 
         item("logheader") {
-            Text(
-                modifier = Modifier
-                    .clickable {
-                        val clipboard =
-                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            ListItem(
+                modifier = Modifier.clickable {
+                    val clipboard =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-                        val clip: ClipData = ClipData.newPlainText("Logs",
-                            "===HttpOverBluetooth===\n" +
-                                    uiState.recentLogs.joinToString(separator = ",\n") { it.line }
-                        )
-                        clipboard.setPrimaryClip(clip)
-                        Toast
-                            .makeText(context, "Copied logs!", Toast.LENGTH_LONG)
-                            .show()
-                    }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .fillMaxWidth(),
-                text = "Logs"
+                    val clip: ClipData = ClipData.newPlainText("Logs",
+                        androidLogger.exportAsString(context)
+                    )
+
+                    clipboard.setPrimaryClip(clip)
+                    Toast
+                        .makeText(context, "Copied logs!", Toast.LENGTH_LONG)
+                        .show()
+
+                },
+                headlineContent = {
+                    Text("Logs")
+                },
+                trailingContent = {
+                    Icon(imageVector = Icons.Default.CopyAll, contentDescription = "Copy")
+                }
             )
         }
 
@@ -127,7 +142,7 @@ fun InfoScreen(
         ) {
             ListItem(
                 headlineContent = {
-                    Text(it.line)
+                    Text(it.toString(androidLogger.epochTime))
                 }
             )
         }

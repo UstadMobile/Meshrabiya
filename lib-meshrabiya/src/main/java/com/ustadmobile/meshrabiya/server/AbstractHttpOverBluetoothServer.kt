@@ -6,7 +6,7 @@ import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.bluetooth.VirtualNodeGattServer

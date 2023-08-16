@@ -3,7 +3,7 @@ package com.ustadmobile.meshrabiya.testapp.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.log.MNetLogger
-import com.ustadmobile.meshrabiya.testapp.LogLine
+import com.ustadmobile.meshrabiya.log.LogLine
 import com.ustadmobile.meshrabiya.testapp.MNetLoggerAndroid
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.appstate.FabState

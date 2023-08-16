@@ -1,16 +1,24 @@
 package com.ustadmobile.meshrabiya.log
 
 import android.util.Log
+import java.util.concurrent.atomic.AtomicInteger
 
 class MNetLoggerStdout(
     private val minLogLevel: Int = Log.VERBOSE,
 ): MNetLogger() {
 
+    private val lineIdAtomic = AtomicInteger()
+
+    private val epochTime = System.currentTimeMillis()
+
     private fun doLog(priority: Int, message: String, exception: Exception?) {
+        val line = LogLine(message, priority, System.currentTimeMillis(), lineIdAtomic.incrementAndGet())
         println(buildString {
-            append("[${priorityLabel(priority)}]: $message")
-            if(exception != null)
+            append(line.toString(epochTime))
+            if(exception != null) {
+                append(" ")
                 append(exception.stackTraceToString())
+            }
         })
     }
 

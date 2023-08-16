@@ -1,17 +1,22 @@
 package com.ustadmobile.meshrabiya.testapp
 
+import android.content.Context
 import android.util.Log
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.ext.trimIfExceeds
+import com.ustadmobile.meshrabiya.log.LogLine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 class MNetLoggerAndroid(
-    private val minLogLevel: Int = Log.VERBOSE
+    private val minLogLevel: Int = Log.VERBOSE,
+    private val logHistoryLines: Int = 300,
 ): MNetLogger() {
+
+    val epochTime = System.currentTimeMillis()
 
     private val _recentLogs = MutableStateFlow(emptyList<LogLine>())
 
@@ -19,12 +24,12 @@ class MNetLoggerAndroid(
 
     private fun doLog(priority: Int, message: String, exception: Exception?) {
         when (priority) {
-            Log.VERBOSE -> Log.v(HttpOverBluetoothConstants.LOG_TAG, message, exception)
-            Log.DEBUG -> Log.d(HttpOverBluetoothConstants.LOG_TAG, message, exception)
-            Log.INFO -> Log.i(HttpOverBluetoothConstants.LOG_TAG, message, exception)
-            Log.WARN -> Log.w(HttpOverBluetoothConstants.LOG_TAG, message, exception)
-            Log.ERROR -> Log.e(HttpOverBluetoothConstants.LOG_TAG, message, exception)
-            Log.ASSERT -> Log.wtf(HttpOverBluetoothConstants.LOG_TAG, message, exception)
+            Log.VERBOSE -> Log.v(MeshrabiyaConstants.LOG_TAG, message, exception)
+            Log.DEBUG -> Log.d(MeshrabiyaConstants.LOG_TAG, message, exception)
+            Log.INFO -> Log.i(MeshrabiyaConstants.LOG_TAG, message, exception)
+            Log.WARN -> Log.w(MeshrabiyaConstants.LOG_TAG, message, exception)
+            Log.ERROR -> Log.e(MeshrabiyaConstants.LOG_TAG, message, exception)
+            Log.ASSERT -> Log.wtf(MeshrabiyaConstants.LOG_TAG, message, exception)
         }
 
         val logDisplay = buildString {
@@ -37,8 +42,8 @@ class MNetLoggerAndroid(
 
         _recentLogs.update { prev ->
             buildList {
-                add(LogLine(logDisplay))
-                addAll(prev.trimIfExceeds(100))
+                add(LogLine(logDisplay, priority, System.currentTimeMillis()))
+                addAll(prev.trimIfExceeds(logHistoryLines - 1))
             }
         }
     }
@@ -51,5 +56,20 @@ class MNetLoggerAndroid(
     override fun invoke(priority: Int, message: String, exception: Exception?) {
         if(priority >= minLogLevel)
             doLog(priority, message, exception)
+    }
+
+    /**
+     * Export logs with time/date stamp, device info, etc.
+     */
+    fun exportAsString(context: Context): String {
+        return buildString {
+            append(context.meshrabiyaDeviceInfoStr())
+            append("==Logs==\n")
+
+            _recentLogs.value.reversed().forEach {
+                append(it.toString(epochTime))
+                append("\n")
+            }
+        }
     }
 }

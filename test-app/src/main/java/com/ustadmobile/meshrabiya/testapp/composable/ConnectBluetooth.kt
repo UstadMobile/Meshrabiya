@@ -21,7 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants.LOG_TAG
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import java.util.regex.Pattern
 

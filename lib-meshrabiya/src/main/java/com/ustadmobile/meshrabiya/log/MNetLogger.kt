@@ -11,12 +11,12 @@ abstract class MNetLogger {
     companion object {
 
         fun priorityLabel(priority: Int) = when(priority) {
-            Log.DEBUG -> "Debug"
-            Log.ERROR -> "Error"
-            Log.WARN -> "Warn"
-            Log.ASSERT -> "Assert"
-            Log.VERBOSE -> "Verbose"
-            Log.INFO -> "Info"
+            Log.DEBUG -> "D"
+            Log.ERROR -> "E"
+            Log.WARN -> "W"
+            Log.ASSERT -> "A"
+            Log.VERBOSE -> "V"
+            Log.INFO -> "I"
             else -> "Err-Priority-unknown"
         }
 

@@ -5,8 +5,8 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.util.Log
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.UUID_BUSY
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants.LOG_TAG
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants.UUID_BUSY
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

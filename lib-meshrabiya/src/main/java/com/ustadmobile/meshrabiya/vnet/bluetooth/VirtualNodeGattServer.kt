@@ -13,8 +13,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.LOG_TAG
-import com.ustadmobile.meshrabiya.HttpOverBluetoothConstants.UUID_BUSY
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants.LOG_TAG
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants.UUID_BUSY
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.server.OnUuidAllocatedListener

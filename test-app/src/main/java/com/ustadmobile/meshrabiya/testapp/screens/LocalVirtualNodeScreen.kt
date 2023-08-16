@@ -202,6 +202,7 @@ fun LocalVirtualNodeScreen(
         val link = result.contents
         if(link != null) {
             try {
+                logger(Log.INFO, "VirtualNodeScreen: scanned link: $link")
                 val connectLink = MeshrabiyaConnectLink.parseUri(
                     uri = link,
                     json = di.direct.instance(),
@@ -215,7 +216,10 @@ fun LocalVirtualNodeScreen(
                     }
                 }
             }catch(e: Exception) {
-                Log.e("TestApp", "Exception", e)
+                scope.launch {
+                    snackbarHostState.showSnackbar("ERROR: Not a valid link scanned")
+                }
+                logger(Log.WARN, "VirtualNodeScreen: Invalid link: $link", e)
             }
         }
     }

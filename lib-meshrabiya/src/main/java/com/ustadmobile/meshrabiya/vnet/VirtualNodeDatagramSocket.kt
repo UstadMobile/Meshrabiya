@@ -60,9 +60,11 @@ class VirtualNodeDatagramSocket(
                     virtualNodeDatagramSocket = this,
                 )
             }catch(e: Exception) {
-                logger(Log.WARN, "$logPrefix : run : exception handling packet", e)
+                if(!socket.isClosed)
+                    logger(Log.WARN, "$logPrefix : run : exception handling packet", e)
             }
         }
+        logger(Log.DEBUG, "$logPrefix : run : finished")
     }
 
 
