@@ -52,6 +52,8 @@ fun Context.meshrabiyaDeviceInfoStr(): String {
     val wifiManager = getSystemService(WifiManager::class.java)
     val hasStaConcurrency = Build.VERSION.SDK_INT >= 31 &&
             wifiManager.isStaConcurrencyForLocalOnlyConnectionsSupported
+    val hasStaApConcurrency = Build.VERSION.SDK_INT >= 30 &&
+            wifiManager.isStaApConcurrencySupported
 
     return buildString {
         append("Meshrabiya: Version :${MeshrabiyaConstants.VERSION}\n")
@@ -59,5 +61,6 @@ fun Context.meshrabiyaDeviceInfoStr(): String {
         append("Device: ${Build.MANUFACTURER} - ${Build.MODEL}\n")
         append("5Ghz supported: ${wifiManager.is5GHzBandSupported}\n")
         append("Local-only station concurrency: $hasStaConcurrency\n")
+        append("Station-AP concurrency: $hasStaApConcurrency\n")
     }
 }

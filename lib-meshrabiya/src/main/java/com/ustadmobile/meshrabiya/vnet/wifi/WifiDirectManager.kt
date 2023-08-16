@@ -257,8 +257,6 @@ class WifiDirectManager(
                     null
                 )
                 onNewWifiP2pGroupInfoReceived(existingGroupInfo)
-            }else {
-                stopWifiDirectGroup()
             }
         }
     }
@@ -436,6 +434,8 @@ class WifiDirectManager(
                     logger(Log.ERROR, "INVALID STATE: wifidirect group status = STARTED but channel is null")
                 }
             }
+        }else {
+            logger(Log.DEBUG, "$logPrefix stopWifiDirectGroup - nothing to do - status is already stopped", null)
         }
 
         return withTimeoutOrNull(MeshrabiyaWifiManagerAndroid.HOTSPOT_TIMEOUT) {
