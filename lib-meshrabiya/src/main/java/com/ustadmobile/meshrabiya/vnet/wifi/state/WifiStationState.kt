@@ -1,6 +1,7 @@
 package com.ustadmobile.meshrabiya.vnet.wifi.state
 
 import android.net.Network
+import com.ustadmobile.meshrabiya.vnet.VirtualNodeDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 
 /**
@@ -16,6 +17,7 @@ data class WifiStationState(
     val network: Network? = null,
     val config: WifiConnectConfig? = null,
     val stationBoundSocketsPort: Int = -1,
+    val stationBoundDatagramSocket: VirtualNodeDatagramSocket? = null,
 ) {
 
     enum class Status {

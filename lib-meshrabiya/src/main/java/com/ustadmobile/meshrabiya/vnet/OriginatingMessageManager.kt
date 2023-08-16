@@ -9,7 +9,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
-import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
+import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,7 +38,7 @@ class OriginatingMessageManager(
     private val logger: MNetLogger,
     private val scheduledExecutorService: ScheduledExecutorService,
     private val nextMmcpMessageId: () -> Int,
-    private val getWifiConfig: () -> WifiConnectConfig?,
+    private val getWifiState: () -> MeshrabiyaWifiState,
     private val pingTimeout: Int = 15_000,
     private val originatingMessageNodeLostThreshold: Int = 10000,
     private val lostNodeCheckInterval: Int = 1_000,
@@ -96,9 +96,11 @@ class OriginatingMessageManager(
             hopCount = 1,
         )
 
-        originatorMessages.filter {
+        val neighbors = originatorMessages.filter {
             it.value.hopCount == 1.toByte()
-        }.forEach {
+        }
+
+        neighbors.forEach {
             val lastOriginatorMessage = it.value
             try {
                 lastOriginatorMessage.receivedFromSocket.send(
@@ -112,6 +114,36 @@ class OriginatingMessageManager(
                     e)
             }
         }
+
+        //check if we have an active station connection but have lost the originating message from
+        // the hotspot node e.g. node slowed down for a while, app restart, etc.
+        //Send it an originating message even if we haven't receive one from it lately
+        //This could help restore a connection that died temporarily.
+        val stationState = getWifiState().wifiStationState
+        val stationNeighborInetAddr = stationState.config?.linkLocalAddr
+        val stationDatagramPort = stationState.config?.port
+        if(stationNeighborInetAddr != null &&
+            !neighbors.any { it.value.lastHopRealInetAddr == stationNeighborInetAddr }
+            && stationDatagramPort != null
+            && stationState.stationBoundDatagramSocket != null
+        ) {
+            logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable: have not received " +
+                    " originating message from hotspot we are connected to as station. Retrying")
+            try {
+                stationState.stationBoundDatagramSocket.send(
+                    nextHopAddress = stationNeighborInetAddr,
+                    nextHopPort = stationDatagramPort,
+                    virtualPacket = packet,
+                )
+            }catch(e: Exception) {
+                logger(Log.ERROR, "$logPrefix : sendOriginatingMessagesRunnable: could not " +
+                        "send originating message to group owner", e)
+            }
+        }else if(stationNeighborInetAddr != null && stationState.stationBoundDatagramSocket == null) {
+            logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable : could not send " +
+                    "originating message to group owner socket not set on state")
+        }
+
     }
 
     private val pingNeighborsRunnable = Runnable {
@@ -178,7 +210,7 @@ class OriginatingMessageManager(
         return MmcpOriginatorMessage(
             messageId = nextMmcpMessageId(),
             pingTimeSum = 0,
-            connectConfig = getWifiConfig(),
+            connectConfig = getWifiState().config,
             sentTime = System.currentTimeMillis()
         )
     }

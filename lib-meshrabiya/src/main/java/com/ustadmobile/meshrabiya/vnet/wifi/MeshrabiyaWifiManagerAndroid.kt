@@ -7,7 +7,6 @@ import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.wifi.ScanResult
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
@@ -441,6 +440,7 @@ class MeshrabiyaWifiManagerAndroid(
                         config = null,
                         network = null,
                         stationBoundSocketsPort = -1,
+                        stationBoundDatagramSocket = null,
                     )
                 )
             }
@@ -539,6 +539,7 @@ class MeshrabiyaWifiManagerAndroid(
                         WifiRole.CLIENT
                     },
                     wifiStationState = prev.wifiStationState.copy(
+                        stationBoundDatagramSocket = networkBoundDatagramSocket,
                         stationBoundSocketsPort = socketPort,
                     )
                 )

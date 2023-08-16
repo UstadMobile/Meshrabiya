@@ -138,7 +138,7 @@ abstract class VirtualNode(
         logger = logger,
         scheduledExecutorService = scheduledExecutor,
         nextMmcpMessageId = this::nextMmcpMessageId,
-        getWifiConfig = { _state.value.wifiState.config },
+        getWifiState = { _state.value.wifiState },
     )
 
     private val localPort = findFreePort(0)
