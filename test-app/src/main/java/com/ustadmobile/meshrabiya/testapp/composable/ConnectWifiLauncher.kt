@@ -20,12 +20,12 @@ import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
-import com.ustadmobile.meshrabiya.ext.isAssociatedWithCompat
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.testapp.NEARBY_WIFI_PERMISSION_NAME
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectException
+import inet.ipaddr.IPAddressString
 import java.util.regex.Pattern
 
 
@@ -136,11 +136,17 @@ fun rememberMeshrabiyaConnectLauncher(
         val connectRequestVal = pendingAssociationRequest ?: return@LaunchedEffect
         val ssid = connectRequestVal.connectConfig.ssid
         logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: check for assocation with $ssid")
-        val storedBssid = node.lookupStoredBssid(connectRequestVal.connectConfig.ssid)
+        val addr = IPAddressString(connectRequestVal.connectConfig.linkLocalAddr.hostAddress)
+            .getAddress().toIPv6()
+        val macAddr = addr.toEUI(false)
+        logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: Calculated mac addr = $macAddr")
+
+
+        val storedBssid: String? = macAddr.toString() // = node.lookupStoredBssid(connectRequestVal.connectConfig.ssid)
         val deviceManager : CompanionDeviceManager =
             context.getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
 
-        if(storedBssid != null && deviceManager.isAssociatedWithCompat(storedBssid)) {
+        if(storedBssid != null /*&& deviceManager.isAssociatedWithCompat(storedBssid)*/) {
             logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: already associated with $ssid (bssid=$storedBssid)")
             onStatusChange?.invoke(ConnectWifiLauncherStatus.INACTIVE)
             onResult(

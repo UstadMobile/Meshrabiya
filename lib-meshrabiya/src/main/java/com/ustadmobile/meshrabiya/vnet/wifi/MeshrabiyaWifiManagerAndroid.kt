@@ -7,6 +7,7 @@ import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.ScanResult
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
@@ -282,6 +283,10 @@ class MeshrabiyaWifiManagerAndroid(
                     if(bssid != null) {
                         setBssid(MacAddress.fromString(bssid))
                     }
+
+                    //Testing on Android 13 / Samsung Tab: specifying the band caused connection to fail
+                    //Will receive callback that network is available followed immediately by unavailable callback
+                    //Thanks, Google.
                 }
                 .setWpa2Passphrase(config.passphrase)
                 .build()
@@ -289,6 +294,7 @@ class MeshrabiyaWifiManagerAndroid(
             NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                 .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+
                 .setNetworkSpecifier(specifier)
                 .build()
         }else {
@@ -482,36 +488,20 @@ class MeshrabiyaWifiManagerAndroid(
             val socketPort = findFreePort(0)
 
             /**
-             * Strange issue: Android 13 will not bind to link local ipv6 addr for station network
-             * if the wifi direct group is running.
-             *
-             * If the station network is created first, then the group is added, everything is fine.
-             * If the group is created and then the station network is connected, attempting to bind
-             * to the station ipv6 local link addr will throw an exception
+             * Strange issue: Android 13 (not exclusively) will not bind (immediately) to link local
+             * ipv6 addr for station network if the wifi direct group is running, but will
+             * eventually bind.
              */
             val socket = try {
-                DatagramSocket(socketPort, netAddress).also {
+                createBoundSocket(socketPort, netAddress, 10).also {
                     network.bindSocket(it)
-                    logger(Log.DEBUG, "$logPrefix : createStationNetworkBoundSockets - created and bound socket to $netAddress:$socketPort")
+                    logger(Log.DEBUG, "$logPrefix : createStationNetworkBoundSockets : succeeded on retry")
                 }
             }catch(e: IOException) {
-                if(_state.value.wifiDirectState.hotspotStatus == HotspotStatus.STARTED) {
-                    logger(Log.WARN, "$logPrefix : createStationNetworkBoundSockets : " +
-                            "Exception binding to network: this is a known issue on Android13+. " +
-                            "Will stop group, create/bind socket, then restart group"
-                    )
-                    val preferredBand = _state.value.wifiDirectState.config?.band ?: ConnectBand.BAND_2GHZ
-                    wifiDirectManager.stopWifiDirectGroup()
-
-                    createBoundSocket(socketPort, netAddress, 10).also {
-                        network.bindSocket(it)
-                        logger(Log.DEBUG, "$logPrefix : createStationNetworkBoundSockets : succeeded on retry")
-                        wifiDirectManager.startWifiDirectGroup(preferredBand)
-                    }
-                }else {
-                    logger(Log.ERROR, "$logPrefix : createStationNetworkBoundSockets - still failed", e)
-                    throw e
-                }
+                logger(Log.ERROR, "$logPrefix : createStationNetworkBoundSockets : " +
+                        "Exception trying to create bound sockets. Cannot continue", e
+                )
+                throw e
             }
 
             val networkBoundDatagramSocket = VirtualNodeDatagramSocket(

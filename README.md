@@ -32,7 +32,10 @@ How it works:
 * Each node can simultaneously operate both a hotspot for incoming connections and make one outgoing
   connection via its WiFi station (client). IPv6 link local addresses are used to avoid an IP conflict
   due to the fact that Android assigns the IP address 192.168.49.1 to all nodes that operate as a 
-  WiFi direct group owner.
+  WiFi direct group owner. We also use the link local IPv6 address to calculate the MAC Address, 
+  which needs to be specified to avoid a user prompt each time a user reconnects. Using the link local
+  address avoids the need to use CompanionDeviceManager to discover the Mac address (which requires
+  using an intent result and results in users seeing two dialog boxes on Android 10).
 
 Want to try it yourself? Download the test app APK from [releases](https://github.com/UstadMobile/Meshrabiya/releases).
 
@@ -90,9 +93,6 @@ val connectLink = myNode.state.filter {
 
 Use the connect link to connect from another node:
 ```
-
-//Optional - but recommended - use CompanionDeviceManager to associate the app with the hotspot
-// to avoid dialogs when reconnecting
 
 val connectLink = ... //Get this from QR code scan etc.
 val connectConfig = MeshrabiyaConnectLink.parseUri(connectLink).hotspotConfig

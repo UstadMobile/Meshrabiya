@@ -22,7 +22,7 @@ import java.nio.ByteOrder
  * @param ssid the Wifi ssid to connect to
  * @param passphrase the passphrase for the Wifi to connect to
  * @param linkLocalAddr the ipv6 link local address of the node on the interface that provides the
- *                      hotspot. See architecture docs for why this is important.
+ *                      hotspot. See the README.
  * @param port the UDP port that is used for virtualpackets. The same port will be used for socket
  *             chains on TCP.
  * @param hotspotType the type of connection being offered - currently only Wifi Direct group is

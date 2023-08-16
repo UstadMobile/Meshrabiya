@@ -70,6 +70,7 @@ dependencies {
     implementation "androidx.datastore:datastore-preferences:$version_datastore"
     implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
     implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"
+    implementation "com.github.seancfoley:ipaddress:$version_ip_address"
 
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
     implementation "com.journeyapps:zxing-android-embedded:$version_zxing_embedded"

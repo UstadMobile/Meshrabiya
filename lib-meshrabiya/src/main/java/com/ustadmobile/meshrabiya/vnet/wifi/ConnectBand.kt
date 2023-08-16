@@ -10,7 +10,7 @@ import kotlinx.serialization.encoding.Encoder
 
 @Serializable(with = ConnectBandSerializer::class)
 enum class ConnectBand(val flag: Byte) {
-    //Ids are as per WifiP2pConfig
+    //Ids are as per WifiP2pConfig GROUP_OWNER_BAND_
     BAND_2GHZ(1), BAND_5GHZ(2), BAND_UNKNOWN(0),
     ;
 

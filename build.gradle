@@ -41,6 +41,7 @@ ext {
     version_nanohttpd = "2.3.1"
     version_mockwebserver = "4.10.0"
     version_okhttp = "4.10.0"
+    version_ip_address = "5.4.0"
 
     version_android_junit_runner = "1.5.2"
     version_androidx_test_rules = "1.5.0"
