@@ -232,9 +232,22 @@ class MeshrabiyaWifiManagerAndroid(
         assertNotClosed()
 
         logger(Log.DEBUG, "$logPrefix requestHotspot requestId=$requestMessageId", null)
+
+        /**
+         * The user might explicityl specify WifiDirect or Localonlyhotspot. If so, honor that
+         * request.
+         */
+        fun HotspotType.overrideWithRequestTypeIfSpecified(): HotspotType? {
+            return HotspotType.forceTypeIfSpecified(
+                specifiedType = request.preferredType,
+                autoType = this,
+            )
+        }
+
         val spotTypeCreated = withContext(Dispatchers.Main) {
+
             val prevState = _state.getAndUpdate { prev ->
-                when(prev.hotspotTypeToCreate) {
+                when(prev.hotspotTypeToCreate?.overrideWithRequestTypeIfSpecified()) {
                     HotspotType.WIFIDIRECT_GROUP -> prev.copy(
                         wifiDirectState = prev.wifiDirectState.copy(
                             hotspotStatus = HotspotStatus.STARTING
@@ -245,11 +258,13 @@ class MeshrabiyaWifiManagerAndroid(
                 }
             }
 
-            when(prevState.hotspotTypeToCreate) {
+            when(prevState.hotspotTypeToCreate?.overrideWithRequestTypeIfSpecified()) {
                 HotspotType.WIFIDIRECT_GROUP -> {
+                    localOnlyHotspotManager.stopLocalOnlyHotspot(waitForStop = true)
                     wifiDirectManager.startWifiDirectGroup(request.preferredBand)
                 }
                 HotspotType.LOCALONLY_HOTSPOT -> {
+                    wifiDirectManager.stopWifiDirectGroup()
                     localOnlyHotspotManager.startLocalOnlyHotspot(request.preferredBand)
                 }
                 else -> {
@@ -266,7 +281,7 @@ class MeshrabiyaWifiManagerAndroid(
 
         return LocalHotspotResponse(
             responseToMessageId = requestMessageId,
-            errorCode = configResult.wifiDirectState.error,
+            errorCode = spotTypeCreated?.let { configResult.hotspotError(it) } ?: 0,
             config = configResult.connectConfig,
             redirectAddr = 0
         )
@@ -276,6 +291,7 @@ class MeshrabiyaWifiManagerAndroid(
         assertNotClosed()
 
         wifiDirectManager.stopWifiDirectGroup()
+        localOnlyHotspotManager.stopLocalOnlyHotspot(waitForStop = false)
     }
 
     /**
@@ -308,7 +324,7 @@ class MeshrabiyaWifiManagerAndroid(
              * https://cs.android.com/android/platform/superproject/+/android-10.0.0_r47:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1224
              */
             logger(Log.DEBUG, "$logPrefix connectToHotspot: building network specifier", null)
-            val bssid = config.bssid ?: config.linkLocalAsMacAddress?.toString()
+            val bssid = config.bssid ?: config.linkLocalToMacAddress?.toString()
             val specifier = WifiNetworkSpecifier.Builder()
                 .apply {
                     setSsid(config.ssid)

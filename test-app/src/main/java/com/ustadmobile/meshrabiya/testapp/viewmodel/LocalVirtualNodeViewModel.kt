@@ -10,6 +10,7 @@ import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiDirectError
 import kotlinx.coroutines.channels.BufferOverflow
@@ -26,7 +27,10 @@ import org.kodein.di.instance
 data class LocalVirtualNodeUiState(
     val localAddress: Int = 0,
     val bandOptions: List<ConnectBand> = listOf(ConnectBand.BAND_2GHZ),
+    val hotspotTypeOptions: List<HotspotType> = listOf(HotspotType.AUTO,
+        HotspotType.WIFIDIRECT_GROUP, HotspotType.LOCALONLY_HOTSPOT),
     val band: ConnectBand = bandOptions.first(),
+    val hotspotTypeToCreate: HotspotType = hotspotTypeOptions.first(),
     val wifiState: MeshrabiyaWifiState? = null,
     val bluetoothState: MeshrabiyaBluetoothState? = null,
     val connectUri: String? = null,
@@ -93,11 +97,20 @@ class LocalVirtualNodeViewModel(
         }
     }
 
+    fun onSetHotspotTypeToCreate(hotspotType: HotspotType) {
+        _uiState.update { prev ->
+            prev.copy(
+                hotspotTypeToCreate = hotspotType
+            )
+        }
+    }
+
     fun onSetIncomingConnectionsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             val response = node.setWifiHotspotEnabled(
                 enabled = enabled,
                 preferredBand = _uiState.value.band,
+                hotspotType = _uiState.value.hotspotTypeToCreate,
             )
             if(response != null && response.errorCode != 0) {
                 val errorStr = WifiDirectError.errorString(response.errorCode)

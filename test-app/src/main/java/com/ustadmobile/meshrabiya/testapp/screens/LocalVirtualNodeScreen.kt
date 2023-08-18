@@ -73,6 +73,7 @@ import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.MeshrabiyaConnectLink
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.state.WifiStationState
 import kotlinx.coroutines.launch
 import org.kodein.di.compose.localDI
@@ -148,6 +149,7 @@ fun LocalVirtualNodeScreen(
             }
         },
         onSetBand = viewModel::onConnectBandChanged,
+        onSetHotspotTypeToCreate = viewModel::onSetHotspotTypeToCreate,
         onClickDisconnectWifiStation = viewModel::onClickDisconnectStation,
         node = node as AndroidVirtualNode,
         onConnectWifiLauncherResult = { result ->
@@ -172,6 +174,7 @@ fun LocalVirtualNodeScreen(
     node: AndroidVirtualNode,
     onSetIncomingConnectionsEnabled: (Boolean) -> Unit = { },
     onSetBand: (ConnectBand) -> Unit = { },
+    onSetHotspotTypeToCreate: (HotspotType) -> Unit = { },
     onConnectWifiLauncherResult: (ConnectWifiLauncherResult) -> Unit,
     onClickDisconnectWifiStation: () -> Unit = { },
     snackbarHostState: SnackbarHostState,
@@ -266,56 +269,106 @@ fun LocalVirtualNodeScreen(
             )
         }
 
-        if(uiState.connectBandVisible) {
-            item(key = "band") {
-                var expanded: Boolean by remember {
-                    mutableStateOf(false)
-                }
+        item(key = "band") {
+            var expanded: Boolean by remember {
+                mutableStateOf(false)
+            }
 
-                ExposedDropdownMenuBox(
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                onExpandedChange = {
+                    expanded = !expanded
+                },
+            ) {
+                OutlinedTextField(
+                    value = uiState.band.toString(),
+                    readOnly = true,
+                    enabled = uiState.connectBandVisible,
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    label = {
+                        Text("Band")
+                    },
+                    onValueChange = { },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(
+                            expanded = expanded
+                        )
+                    },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                )
+
+                ExposedDropdownMenu(
                     expanded = expanded,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    onExpandedChange = {
-                        expanded = !expanded
+                    onDismissRequest = {
+                        expanded = false
                     }
                 ) {
-                    OutlinedTextField(
-                        value = uiState.band.toString(),
-                        readOnly = true,
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        label = {
-                            Text("Band")
-                        },
-                        onValueChange = { },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(
-                                expanded = expanded
-                            )
-                        },
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                    )
-
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = {
-                            expanded = false
-                        }
-                    ) {
-                        uiState.bandOptions.forEach {
-                            DropdownMenuItem(
-                                text = { Text(it.toString()) },
-                                onClick = {
-                                    expanded = false
-                                    onSetBand(it)
-                                }
-                            )
-                        }
+                    uiState.bandOptions.forEach {
+                        DropdownMenuItem(
+                            text = { Text(it.toString()) },
+                            onClick = {
+                                expanded = false
+                                onSetBand(it)
+                            }
+                        )
                     }
                 }
             }
         }
+
+        item(key = "preferredhotspottype") {
+            var expanded: Boolean by remember {
+                mutableStateOf(false)
+            }
+
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                onExpandedChange = {
+                    expanded = !expanded
+                },
+            ) {
+                OutlinedTextField(
+                    value = uiState.hotspotTypeToCreate.toString(),
+                    readOnly = true,
+                    enabled = uiState.connectBandVisible,
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    label = {
+                        Text("Type")
+                    },
+                    onValueChange = { },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(
+                            expanded = expanded
+                        )
+                    },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = {
+                        expanded = false
+                    }
+                ) {
+                    uiState.hotspotTypeOptions.forEach {
+                        DropdownMenuItem(
+                            text = { Text(it.toString()) },
+                            onClick = {
+                                expanded = false
+                                onSetHotspotTypeToCreate(it)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
 
         item(key = "hotspotswitch") {
             Column {
@@ -389,7 +442,7 @@ fun LocalVirtualNodeScreen(
                     text = "SSID: ${uiState.wifiState?.connectConfig?.ssid} (${uiState.wifiState?.connectConfig?.band})\n" +
                             "Passphrase: ${uiState.wifiState?.connectConfig?.passphrase}\n" +
                             "LinkLocal: ${uiState.wifiState?.connectConfig?.linkLocalAddr}\n" +
-                            "MAC Address: ${uiState.wifiState?.connectConfig?.linkLocalAsMacAddress}\n" +
+                            "MAC Address: ${uiState.wifiState?.connectConfig?.bssid ?: uiState.wifiState?.connectConfig?.linkLocalToMacAddress}\n" +
                             "Port: ${uiState.wifiState?.connectConfig?.port}\n"
                 )
             }

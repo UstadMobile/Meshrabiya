@@ -1,6 +1,5 @@
 package com.ustadmobile.meshrabiya.vnet.wifi.state
 
-import android.os.Build
 import com.ustadmobile.meshrabiya.vnet.WifiRole
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.HotspotStatus
@@ -34,6 +33,7 @@ data class MeshrabiyaWifiState(
         return when(hotspotType) {
             HotspotType.LOCALONLY_HOTSPOT -> localOnlyHotspotState.error
             HotspotType.WIFIDIRECT_GROUP -> wifiDirectState.error
+            HotspotType.AUTO -> 0
         }
     }
 
@@ -52,7 +52,7 @@ data class MeshrabiyaWifiState(
                 hotspotIsStarting
             ) {
                 null
-            } else if(Build.VERSION.SDK_INT >= 30/* && concurrentApStationSupported*/){
+            } else if(concurrentApStationSupported){
                 HotspotType.LOCALONLY_HOTSPOT
             }else {
                 HotspotType.WIFIDIRECT_GROUP

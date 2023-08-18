@@ -9,12 +9,28 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 @Serializable(with = HotspotTypeSerializer::class)
 enum class HotspotType(val flag: Byte) {
-    LOCALONLY_HOTSPOT(1), WIFIDIRECT_GROUP(2);
+    LOCALONLY_HOTSPOT(1), WIFIDIRECT_GROUP(2), AUTO(4);
 
     companion object {
         fun fromFlag(flag: Byte): HotspotType {
             return values().first { it.flag == flag }
         }
+
+        /**
+         * Normally the system will determine what type of hotspot should be created (wifi direct)
+         * or local only. However the user might override this.
+         */
+        fun forceTypeIfSpecified(
+            specifiedType: HotspotType,
+            autoType: HotspotType?,
+        ): HotspotType? {
+            return if(specifiedType != AUTO) {
+                specifiedType
+            }else {
+                autoType
+            }
+        }
+
     }
 }
 

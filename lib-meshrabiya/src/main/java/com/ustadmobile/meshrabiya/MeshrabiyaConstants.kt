@@ -6,7 +6,7 @@ object MeshrabiyaConstants {
 
     const val LOG_TAG = "Meshrabiya"
 
-    const val VERSION = "0.1d5"
+    const val VERSION = "0.1d6"
 
     val UUID_BUSY = UUID(0, 0)
 

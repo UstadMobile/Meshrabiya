@@ -1,6 +1,7 @@
 package com.ustadmobile.meshrabiya.mmcp
 
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -13,8 +14,9 @@ class MmcpHotspotRequest(
 
     override fun toBytes(): ByteArray {
         return headerAndPayloadToBytes(header,
-            ByteBuffer.wrap(ByteArray(4))
+            ByteBuffer.wrap(ByteArray(2))
                 .put(hotspotRequest.preferredBand.flag)
+                .put(hotspotRequest.preferredType.flag)
                 .array()
         )
     }
@@ -46,15 +48,15 @@ class MmcpHotspotRequest(
                 byteArray, offset, len
             )
 
-            val preferredBand = ConnectBand.fromFlag(
-                ByteBuffer.wrap(payload)
-                    .order(ByteOrder.BIG_ENDIAN)
-                    .get()
-            )
+            val byteBuffer = ByteBuffer.wrap(payload)
+                .order(ByteOrder.BIG_ENDIAN)
+
+            val preferredBand = ConnectBand.fromFlag(byteBuffer.get())
+            val preferredHotspotType = HotspotType.fromFlag(byteBuffer.get())
 
             return MmcpHotspotRequest(
                 messageId = header.messageId,
-                hotspotRequest = LocalHotspotRequest(preferredBand)
+                hotspotRequest = LocalHotspotRequest(preferredBand, preferredHotspotType)
             )
         }
 

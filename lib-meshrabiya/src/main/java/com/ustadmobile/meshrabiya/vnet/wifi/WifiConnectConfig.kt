@@ -97,7 +97,7 @@ data class WifiConnectConfig(
      * Does not work on:
      * Xiaomi Redmi A3 (Android 11)
      */
-    val linkLocalAsMacAddress: MACAddress?
+    val linkLocalToMacAddress: MACAddress?
         get() = linkLocalAddr?.let {
             IPAddressString(it.hostAddress).getAddress().toIPv6().toEUI(false)
         }

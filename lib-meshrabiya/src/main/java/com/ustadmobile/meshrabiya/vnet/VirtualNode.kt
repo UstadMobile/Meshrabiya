@@ -26,6 +26,7 @@ import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactoryImpl
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketServer
 import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
+import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
 import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
 import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
 import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
@@ -543,37 +544,17 @@ abstract class VirtualNode(
         pongListeners -= listener
     }
 
-
-
-    fun sendRequestWifiConnectionMmcpMessage(virtualAddr: Int)  {
-        val request = MmcpHotspotRequest(
-            messageId = nextMmcpMessageId(),
-            hotspotRequest = LocalHotspotRequest(
-                preferredBand = if(meshrabiyaWifiManager.is5GhzSupported)
-                    ConnectBand.BAND_5GHZ
-                else
-                    ConnectBand.BAND_2GHZ
-            )
-        )
-
-        //Send MMCP request to the other node
-        route(
-            packet = request.toVirtualPacket(
-                toAddr = virtualAddr,
-                fromAddr = addressAsInt
-            ),
-        )
-    }
-
     open suspend fun setWifiHotspotEnabled(
         enabled: Boolean,
         preferredBand: ConnectBand = ConnectBand.BAND_2GHZ,
+        hotspotType: HotspotType = HotspotType.AUTO,
     ): LocalHotspotResponse? {
         return if(enabled){
              meshrabiyaWifiManager.requestHotspot(
                 requestMessageId = nextMmcpMessageId(),
                 request = LocalHotspotRequest(
-                    preferredBand = preferredBand
+                    preferredBand = preferredBand,
+                    preferredType = hotspotType,
                 )
             )
         }else {

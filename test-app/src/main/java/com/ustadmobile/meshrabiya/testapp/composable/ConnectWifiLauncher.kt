@@ -136,12 +136,12 @@ fun rememberMeshrabiyaConnectLauncher(
         val ssid = connectRequestVal.connectConfig.ssid
         logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: check for assocation with $ssid")
 
-        val macAddr = connectRequestVal.connectConfig.linkLocalAsMacAddress
+        val macAddr = connectRequestVal.connectConfig.linkLocalToMacAddress
         logger?.invoke(Log.DEBUG, "ConnectWifiLauncher: Calculated mac addr = $macAddr")
 
-
-        val knownBssid: String? = macAddr?.toString()
+        val knownBssid: String? = connectRequestVal.connectConfig.bssid ?: macAddr?.toString()
             ?: node.lookupStoredBssid(connectRequestVal.connectConfig.ssid)
+
         val deviceManager : CompanionDeviceManager =
             context.getSystemService(Context.COMPANION_DEVICE_SERVICE) as CompanionDeviceManager
 
