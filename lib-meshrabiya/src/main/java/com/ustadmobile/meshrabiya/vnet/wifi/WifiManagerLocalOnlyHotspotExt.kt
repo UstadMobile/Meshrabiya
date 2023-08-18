@@ -4,7 +4,10 @@ import android.net.MacAddress
 import android.net.wifi.SoftApConfiguration
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiManager.LocalOnlyHotspotCallback
+import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import java.util.concurrent.Executor
 import kotlin.random.Random
 
@@ -96,7 +99,7 @@ fun WifiManager.startLocalOnlyHotspotWithConfig(
  * set randomization to NONE. Won't work: AP config util uses a system resource
  * R.bool.config_wifi_ap_mac_randomization_supported as per:
  * https://cs.android.com/android/platform/superproject/+/android-12.0.0_r1:packages/modules/Wifi/service/java/com/android/server/wifi/util/ApConfigUtil.java;l=699
- * The only way to override that would be a "Runtime Resourc Overlay" RRO, which can only be installed
+ * The only way to override that would be a "Runtime Resource Overlay" RRO, which can only be installed
  * with system level permission.
  *
  * Option 3: Try using global settings as per
@@ -110,3 +113,67 @@ fun WifiManager.startLocalOnlyHotspotWithConfig(
  * https://cs.android.com/android/platform/superproject/+/master:packages/apps/Settings/src/com/android/settings/wifi/tether/WifiTetherSettings.java;l=231
  *
  */
+
+
+@Suppress("DEPRECATION") //Must use deperecated properties to support pre-SDK30
+fun WifiManager.LocalOnlyHotspotReservation.toLocalHotspotConfig(
+    nodeVirtualAddr: Int,
+    port: Int,
+    logger: MNetLogger? = null,
+): WifiConnectConfig {
+    return if(Build.VERSION.SDK_INT >= 30) {
+        val softApConfig = softApConfiguration
+        val ssid = if(Build.VERSION.SDK_INT >= 33) {
+            //As per https://developer.android.com/reference/android/net/wifi/WifiSsid#toString()
+            // Any WiFi ssid that is in UTF-8 will be as a string with quotes.
+            // No support for ssid with non UTF-8 SSID.
+            softApConfig.wifiSsid.toString().removeSurrounding("\"")
+        }else {
+            softApConfig.ssid
+        }
+        val passphrase = softApConfig.passphrase
+        val bssid = softApConfig.bssid
+        val linkLocalIpv6 = bssid?.linkLocalIpv6FromEui48Mac
+        logger?.invoke(Log.DEBUG,
+            "toLocalHotspotConfig: passphrase=$passphrase bssid=$bssid linkLocalIpv6=$linkLocalIpv6"
+        )
+
+        if(ssid != null && passphrase != null) {
+            WifiConnectConfig(
+                nodeVirtualAddr = nodeVirtualAddr,
+                ssid = ssid,
+                passphrase = passphrase,
+                port = port,
+                hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+                bssid = bssid?.toString(),
+                linkLocalAddr =linkLocalIpv6
+            )
+        }else {
+            logger?.invoke(Log.ERROR, "toLocalHotspotConfig: ssid and passphrase " +
+                    "not provided by SoftApConfig: $softApConfig")
+            throw IllegalStateException("toLocalHotspotConfig: ssid and passphrase not provided by " +
+                    "SoftApConfig: $softApConfig!")
+        }
+    }else {
+        val wifiConfig = wifiConfiguration
+        val ssid = wifiConfig?.SSID
+        val passphrase = wifiConfig?.preSharedKey?.removeSurrounding("\"")
+        val bssid = wifiConfig?.BSSID
+        if(ssid != null && passphrase != null) {
+            WifiConnectConfig(
+                nodeVirtualAddr = nodeVirtualAddr,
+                ssid = ssid,
+                passphrase = passphrase,
+                port = port,
+                hotspotType = HotspotType.LOCALONLY_HOTSPOT,
+                linkLocalAddr = null,
+                bssid = bssid,
+            )
+        }else {
+            logger?.invoke(Log.ERROR, "toLocalHotspotConfig: ssid and passphrase " +
+                    "not provided by WifiConfig: $wifiConfig")
+            throw IllegalStateException("toLocalHotspotConfig: ssid and passphrase not provided by " +
+                    "SoftApConfig: $wifiConfig!")
+        }
+    }
+}

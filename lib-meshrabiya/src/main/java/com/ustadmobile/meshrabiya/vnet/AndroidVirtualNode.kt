@@ -126,7 +126,7 @@ class AndroidVirtualNode(
                         wifiState = it.first,
                         bluetoothState = it.second,
                         connectUri = generateConnectLink(
-                            hotspot = it.first.config,
+                            hotspot = it.first.connectConfig,
                             bluetoothConfig = it.second,
                         ).uri
                     )

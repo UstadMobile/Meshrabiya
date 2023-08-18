@@ -55,6 +55,8 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -80,10 +82,19 @@ class MeshrabiyaWifiManagerAndroid(
         dataStore = dataStore,
         json = json,
         ioExecutorService = ioExecutor,
+    ),
+
+    private val localOnlyHotspotManager: LocalOnlyHotspotManager = LocalOnlyHotspotManager(
+        appContext = appContext,
+        logger = logger,
+        name = localNodeAddr.addressToDotNotation(),
+        localNodeAddr = localNodeAddr,
+        router = router,
+        dataStore = dataStore,
     )
 ) : Closeable, MeshrabiyaWifiManager {
 
-    private val logPrefix = "[LocalHotspotManagerAndroid: ${localNodeAddr.addressToDotNotation()}] "
+    private val logPrefix = "[MeshrabiyaWifiManagerAndroid: ${localNodeAddr.addressToDotNotation()}] "
 
     private val nodeScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -143,7 +154,13 @@ class MeshrabiyaWifiManagerAndroid(
 
     private val wifiManager: WifiManager = appContext.getSystemService(WifiManager::class.java)
 
-    private val _state = MutableStateFlow(MeshrabiyaWifiState())
+    private val _state = MutableStateFlow(MeshrabiyaWifiState(
+        concurrentApStationSupported = if(Build.VERSION.SDK_INT >= 30) {
+            wifiManager.isStaApConcurrencySupported
+        }else {
+            false
+        }
+    ))
 
     override val state: Flow<MeshrabiyaWifiState> = _state.asStateFlow()
 
@@ -186,6 +203,17 @@ class MeshrabiyaWifiManagerAndroid(
                 }
             }
         }
+
+        nodeScope.launch {
+            localOnlyHotspotManager.state.collect {
+                _state.update { prev ->
+                    prev.copy(
+                        localOnlyHotspotState = it
+                    )
+                }
+            }
+        }
+
     }
 
     private fun assertNotClosed() {
@@ -204,7 +232,7 @@ class MeshrabiyaWifiManagerAndroid(
         assertNotClosed()
 
         logger(Log.DEBUG, "$logPrefix requestHotspot requestId=$requestMessageId", null)
-        withContext(Dispatchers.Main) {
+        val spotTypeCreated = withContext(Dispatchers.Main) {
             val prevState = _state.getAndUpdate { prev ->
                 when(prev.hotspotTypeToCreate) {
                     HotspotType.WIFIDIRECT_GROUP -> prev.copy(
@@ -221,20 +249,25 @@ class MeshrabiyaWifiManagerAndroid(
                 HotspotType.WIFIDIRECT_GROUP -> {
                     wifiDirectManager.startWifiDirectGroup(request.preferredBand)
                 }
+                HotspotType.LOCALONLY_HOTSPOT -> {
+                    localOnlyHotspotManager.startLocalOnlyHotspot(request.preferredBand)
+                }
                 else -> {
                     //Do nothing
                 }
             }
+
+            prevState.hotspotTypeToCreate
         }
 
         val configResult = _state.filter {
-            it.wifiDirectState.hotspotStatus == HotspotStatus.STARTED || it.wifiDirectState.error != 0
+            it.hotspotIsStarted || spotTypeCreated != null && it.hotspotError(spotTypeCreated) != 0
         }.first()
 
         return LocalHotspotResponse(
             responseToMessageId = requestMessageId,
             errorCode = configResult.wifiDirectState.error,
-            config = configResult.config,
+            config = configResult.connectConfig,
             redirectAddr = 0
         )
     }
@@ -275,14 +308,16 @@ class MeshrabiyaWifiManagerAndroid(
              * https://cs.android.com/android/platform/superproject/+/android-10.0.0_r47:frameworks/opt/net/wifi/service/java/com/android/server/wifi/WifiNetworkFactory.java;l=1224
              */
             logger(Log.DEBUG, "$logPrefix connectToHotspot: building network specifier", null)
-            val bssid = config.bssid
+            val bssid = config.bssid ?: config.linkLocalAsMacAddress?.toString()
             val specifier = WifiNetworkSpecifier.Builder()
                 .apply {
                     setSsid(config.ssid)
-                    if(bssid != null) {
+                    if(bssid != null)
                         setBssid(MacAddress.fromString(bssid))
-                    }
 
+                    //Normally it would be nice to set the band here to speed up connection (avoid
+                    //the need to scan other bands).
+                    //
                     //Testing on Android 13 / Samsung Tab: specifying the band caused connection to fail
                     //Will receive callback that network is available followed immediately by unavailable callback
                     //Thanks, Google.
@@ -469,6 +504,12 @@ class MeshrabiyaWifiManagerAndroid(
 
     /**
      * Create a datagramsocket that is bound to the the network object for the wifi station network.
+     *
+     * Binding to the network object (network.bindSocket etc) helps to avoid Android deciding to
+     * disconnect from the network because it doesn't have Internet access. This is especially true
+     * on older versions (pre-Android 10) where we use WifiManager itself to connect to the network
+     * (without user intervention). On Android 10+ because the connection required user approval,
+     * this behavior does not seem to be as prevalent.
      */
     private suspend fun createStationNetworkBoundSockets(network: Network, config: WifiConnectConfig) {
         withContext(Dispatchers.IO) {
@@ -485,24 +526,42 @@ class MeshrabiyaWifiManagerAndroid(
 
             logger(Log.INFO, "$logPrefix : connectToHotspot: Got link local address = " +
                     "$netAddress on interface ${linkProperties?.interfaceName}", null)
+
             val socketPort = findFreePort(0)
 
-            /**
-             * Strange issue: Android 13 (not exclusively) will not bind (immediately) to link local
-             * ipv6 addr for station network if the wifi direct group is running, but will
-             * eventually bind.
-             */
-            val socket = try {
-                createBoundSocket(socketPort, netAddress, 10).also {
-                    network.bindSocket(it)
-                    logger(Log.DEBUG, "$logPrefix : createStationNetworkBoundSockets : succeeded on retry")
+            val socket = if(config.hotspotType == HotspotType.WIFIDIRECT_GROUP) {
+                /**
+                 * When using a Wifi Direct group we MUST use the LinkLocal IPv6 address to the
+                 * IPv4 conflict issue - where all WiFi Direct group owners are assigned 192.168.49.1
+                 *  See README
+                 *
+                 * Strange issue: Android 13 (perhaps not exclusively) will not bind (immediately)
+                 * to link local ipv6 addr for station network. This can take longer if the WiFi
+                 * direct group has been created. It will bind eventually, so we can retry at short
+                 * intervals until its ready.
+                 *
+                 * If the socket is created before this is ready, it wont even send traffic via the
+                 * link local address.
+                 */
+                try {
+                    createBoundSocket(socketPort, netAddress, 10).also {
+                        logger(Log.DEBUG, "$logPrefix : createStationNetworkBoundSockets : succeeded on retry")
+                    }
+                }catch(e: IOException) {
+                    logger(Log.ERROR, "$logPrefix : createStationNetworkBoundSockets : " +
+                            "Exception trying to create bound sockets. Cannot continue", e
+                    )
+                    throw e
                 }
-            }catch(e: IOException) {
-                logger(Log.ERROR, "$logPrefix : createStationNetworkBoundSockets : " +
-                        "Exception trying to create bound sockets. Cannot continue", e
-                )
-                throw e
+            }else {
+                /**
+                 * LocalOnlyHotspot IP address ranges are randomized and do not appear to suffer from
+                 * this issue.
+                 */
+                DatagramSocket(socketPort)
             }
+
+            network.bindSocket(socket)
 
             val networkBoundDatagramSocket = VirtualNodeDatagramSocket(
                 socket = socket,
@@ -528,8 +587,6 @@ class MeshrabiyaWifiManagerAndroid(
             previousSockets?.first?.close()
             previousSockets?.second?.close(true)
 
-            //Binding something to the network helps to avoid older versions of Android
-            //deciding to disconnect from this network.
             logger(Log.INFO, "$logPrefix : addWifiConnection:Created network bound port on ${networkBoundDatagramSocket.localPort}", null)
             _state.update { prev ->
                 prev.copy(
@@ -545,22 +602,41 @@ class MeshrabiyaWifiManagerAndroid(
                 )
             }
 
-
-
-            //Create a scoped Inet6 address using the given local link
-            val peerAddr = Inet6Address.getByAddress(
-                config.linkLocalAddr.requireHostAddress(), config.linkLocalAddr.address, networkInterface
-            )
+            val peerAddr = config.linkLocalAddr?.let {
+                logger(Log.DEBUG,
+                    "$logPrefix : createStationBoundSockets: determining peer address using " +
+                            "linkLocalAddr supplied in config")
+                Inet6Address.getByAddress(it.requireHostAddress(), it.address, networkInterface)
+            } ?: if(Build.VERSION.SDK_INT >= 30) {
+                logger(Log.DEBUG, "$logPrefix - createStationBoundSockets : determining peer " +
+                        "address using linkProperties.dhcpServerAddress")
+                linkProperties?.dhcpServerAddress
+            }else {
+                logger(Log.DEBUG, "$logPrefix - createStationBoundSockets : determining peer " +
+                        "address using wifimanager.dhcpInfo")
+                @Suppress("DEPRECATION") //Must use deprecated property to support PRE-SDK30
+                wifiManager.dhcpInfo?.serverAddress?.let {
+                    //Strangely - seems like these are Little Endian
+                    InetAddress.getByAddress(
+                        ByteBuffer.wrap(ByteArray(4))
+                            .order(ByteOrder.LITTLE_ENDIAN)
+                            .putInt(it)
+                            .array()
+                    )
+                }
+            }
 
             logger(Log.DEBUG, "$logPrefix : addWifiConnectionConnect: Peer address is: $peerAddr", null)
 
-            //Once connected,
-            onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
-                neighborPort = config.port,
-                neighborInetAddress = peerAddr,
-                socket = networkBoundDatagramSocket,
-                neighborVirtualAddress = config.nodeVirtualAddr,
-            ))
+            if(peerAddr != null) {
+                //Once connected,
+                onNewWifiConnectionListener.onNewWifiConnection(WifiConnectEvent(
+                    neighborPort = config.port,
+                    neighborInetAddress = peerAddr,
+                    socket = networkBoundDatagramSocket,
+                    neighborVirtualAddress = config.nodeVirtualAddr,
+                ))
+            }
         }
     }
 

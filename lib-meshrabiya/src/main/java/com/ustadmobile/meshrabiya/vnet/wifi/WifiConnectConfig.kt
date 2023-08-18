@@ -1,8 +1,12 @@
 package com.ustadmobile.meshrabiya.vnet.wifi
 
+import com.ustadmobile.meshrabiya.ext.getBoolean
 import com.ustadmobile.meshrabiya.ext.getStringOrThrow
+import com.ustadmobile.meshrabiya.ext.putBoolean
 import com.ustadmobile.meshrabiya.ext.putStringFromBytes
 import com.ustadmobile.meshrabiya.ext.requireHostAddress
+import inet.ipaddr.IPAddressString
+import inet.ipaddr.mac.MACAddress
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -22,11 +26,12 @@ import java.nio.ByteOrder
  * @param ssid the Wifi ssid to connect to
  * @param passphrase the passphrase for the Wifi to connect to
  * @param linkLocalAddr the ipv6 link local address of the node on the interface that provides the
- *                      hotspot. See the README.
+ *                      hotspot, if known. This is required when using WiFi direct hotspots because
+ *                      the system will assign the same ipv4 address (192.168.49.1) to all devices.
  * @param port the UDP port that is used for virtualpackets. The same port will be used for socket
  *             chains on TCP.
- * @param hotspotType the type of connection being offered - currently only Wifi Direct group is
- *                    supported. Wifi Aware may be added in future.
+ * @param hotspotType the type of connection being offered - currently only Wifi Direct group and
+ *                    LocalOnlyHotspot is supported. Wifi Aware may be added in future.
  * @param persistenceType the expected persistence of this config. This helps the client decide
  *        whether or not to prompt the user to save the config via companiondevicemanager.
  * @param bssid the expected bssid (if known), optional
@@ -40,7 +45,7 @@ data class WifiConnectConfig(
     val ssid: String,
     val passphrase: String,
     @Serializable(with = Inet6AddressSerializer::class)
-    val linkLocalAddr: Inet6Address,
+    val linkLocalAddr: Inet6Address?,
     val port: Int,
     val hotspotType: HotspotType,
     val persistenceType: HotspotPersistenceType = HotspotPersistenceType.NONE,
@@ -64,17 +69,44 @@ data class WifiConnectConfig(
      * hotspotType: 1 byte
      * band: 1 byte
      * persistenceType: 1 byte
+     * linkLocalAddrPresent: 1 byte (0 or 1)
      * linkLocalAddr: 16 bytes (IPv6 address)
      *
      */
     val sizeInBytes: Int
-        get() = 4 + (4 + (ssidBytes?.size ?: 0) ) + (4 + (passphraseBytes?.size ?: 0)) + 4 + 1 + 1 + 1 + 16
+        get() = 4 + (4 + (ssidBytes?.size ?: 0) ) + (4 + (passphraseBytes?.size ?: 0)) + 4 + 1 + 1 + 1 + 1 + 16
+
+    /**
+     * We need to provide the BSSID when connecting on Android 10+ to avoid a dialog on
+     * subsequent connection attempts.
+     *
+     * 90%+ of the time, the IPv6 link local address contains the Mac Address (BSSID) - hence we can
+     * use this to avoid the need to use CompanionDeviceManager or a WiFi scan.
+     *
+     * This is done using the IPAddress lib - as per:
+     * https://github.com/seancfoley/IPAddress/wiki/Code-Examples-4:-Converting-to-and-from-Other-Formats#convert-tofrom-ipv6-address-fromto-mac-address
+     *
+     * This is known to work successfully to get the Mac Address for the Wifi Direct Group owner on:
+     * Nokia 1 (Android 10),
+     * Nokia 5 Plus (Android 10),
+     * OnePlus N10 (Android 11),
+     * Samsung SM-X200 (Android 13)
+     * Nokia 5.4 (Android 12)
+     * Nothing
+     *
+     * Does not work on:
+     * Xiaomi Redmi A3 (Android 11)
+     */
+    val linkLocalAsMacAddress: MACAddress?
+        get() = linkLocalAddr?.let {
+            IPAddressString(it.hostAddress).getAddress().toIPv6().toEUI(false)
+        }
 
     fun toBytes(
         byteArray: ByteArray,
         offset: Int,
     ): Int {
-        if(linkLocalAddr.address.size != 16)
+        if(linkLocalAddr != null && linkLocalAddr.address.size != 16)
             throw IllegalStateException("Inet6Address is not 16 bytes!")
 
         ByteBuffer.wrap(byteArray, offset, sizeInBytes)
@@ -86,7 +118,12 @@ data class WifiConnectConfig(
             .put(hotspotType.flag)
             .put(band.flag)
             .put(persistenceType.flag)
-            .put(linkLocalAddr.address)
+            .putBoolean(linkLocalAddr != null)
+            .apply {
+                linkLocalAddr?.also {
+                    put(it.address)
+                }
+            }
 
         return sizeInBytes
     }
@@ -113,8 +150,12 @@ data class WifiConnectConfig(
             val hotspotType = HotspotType.fromFlag(byteBuf.get())
             val connectBand = ConnectBand.fromFlag(byteBuf.get())
             val persistenceType = HotspotPersistenceType.fromFlag(byteBuf.get())
-            val linkLocalAddr = Inet6Address
-                .getByAddress(ByteArray(16).also { byteBuf.get(it) }) as Inet6Address
+            val hasLinkLocalAddr = byteBuf.getBoolean()
+            val linkLocalAddr = if(hasLinkLocalAddr) {
+                Inet6Address.getByAddress(ByteArray(16).also { byteBuf.get(it) }) as Inet6Address
+            }else {
+                null
+            }
 
             return WifiConnectConfig(
                 nodeVirtualAddr = nodeVirtualAddr,

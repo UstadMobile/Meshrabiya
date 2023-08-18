@@ -386,9 +386,11 @@ fun LocalVirtualNodeScreen(
                 Text(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
-                    text = "SSID: ${uiState.wifiState?.config?.ssid} (${uiState.wifiState?.config?.band})\n" +
-                            "Passphrase: ${uiState.wifiState?.config?.passphrase}\n" +
-                            "Port: ${uiState.wifiState?.config?.port}\n"
+                    text = "SSID: ${uiState.wifiState?.connectConfig?.ssid} (${uiState.wifiState?.connectConfig?.band})\n" +
+                            "Passphrase: ${uiState.wifiState?.connectConfig?.passphrase}\n" +
+                            "LinkLocal: ${uiState.wifiState?.connectConfig?.linkLocalAddr}\n" +
+                            "MAC Address: ${uiState.wifiState?.connectConfig?.linkLocalAsMacAddress}\n" +
+                            "Port: ${uiState.wifiState?.connectConfig?.port}\n"
                 )
             }
         }

@@ -35,6 +35,14 @@ fun ByteBuffer.getString(): String? {
     }
 }
 
+fun ByteBuffer.putBoolean(boolean: Boolean) : ByteBuffer {
+    return put(if(boolean) 1 else 0)
+}
+
+fun ByteBuffer.getBoolean() : Boolean {
+    return get() != 0.toByte()
+}
+
 fun ByteBuffer.getStringOrThrow() : String {
     return getString() ?: throw NullPointerException("ByteBuffer.getStringOrThrow: stored string was null")
 }

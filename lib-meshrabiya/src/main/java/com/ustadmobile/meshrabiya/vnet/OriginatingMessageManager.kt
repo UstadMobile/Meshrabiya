@@ -41,7 +41,7 @@ class OriginatingMessageManager(
     private val getWifiState: () -> MeshrabiyaWifiState,
     private val pingTimeout: Int = 15_000,
     private val originatingMessageNodeLostThreshold: Int = 10000,
-    private val lostNodeCheckInterval: Int = 1_000,
+    lostNodeCheckInterval: Int = 1_000,
 ) {
 
     private val logPrefix ="[OriginatingMessageManager for ${localNodeInetAddr}] "
@@ -210,7 +210,7 @@ class OriginatingMessageManager(
         return MmcpOriginatorMessage(
             messageId = nextMmcpMessageId(),
             pingTimeSum = 0,
-            connectConfig = getWifiState().config,
+            connectConfig = getWifiState().connectConfig,
             sentTime = System.currentTimeMillis()
         )
     }

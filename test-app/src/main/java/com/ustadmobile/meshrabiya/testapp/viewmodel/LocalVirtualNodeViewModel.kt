@@ -33,10 +33,10 @@ data class LocalVirtualNodeUiState(
     val appUiState: AppUiState = AppUiState(),
 ){
     val incomingConnectionsEnabled: Boolean
-        get() = wifiState?.config != null
+        get() = wifiState?.connectConfig != null
 
     val connectBandVisible: Boolean
-        get() = Build.VERSION.SDK_INT >= 29 && wifiState?.config == null
+        get() = Build.VERSION.SDK_INT >= 29 && wifiState?.connectConfig == null
 }
 
 class LocalVirtualNodeViewModel(

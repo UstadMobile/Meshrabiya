@@ -3,10 +3,13 @@ package com.ustadmobile.meshrabiya.vnet.wifi
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pManager
+import android.net.wifi.p2p.WifiP2pManager.ActionListener
 import android.net.wifi.p2p.WifiP2pManager.Channel
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest
+import android.util.Log
 import androidx.annotation.RequiresApi
+import com.ustadmobile.meshrabiya.ext.prettyPrint
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import kotlinx.coroutines.CompletableDeferred
 
@@ -101,9 +104,9 @@ suspend fun WifiP2pManager.createGroupAsync(
     logger: MNetLogger?
 ) {
     val actionListener = WifiP2pActionListenerAdapter(
-        onFailLogMessage = "${logPrefix ?: ""} failed to request group creation w/config",
+        onFailLogMessage = "${logPrefix ?: ""} failed to request group creation w/config ${config.prettyPrint()}",
         logger = logger,
-        onSuccessLogMessage = "${logPrefix ?: ""} createGroup: onSuccess w/config",
+        onSuccessLogMessage = "${logPrefix ?: ""} createGroup: onSuccess w/config ${config.prettyPrint()}",
     )
 
     createGroup(channel, config, actionListener)
@@ -151,5 +154,40 @@ suspend fun WifiP2pManager.removeGroupAsync(
     )
     removeGroup(channel, actionListener)
     actionListener.await()
+}
+
+
+fun WifiP2pManager.setWifiP2pChannelsUnhidden(
+    channel: Channel,
+    listeningChannel: Int,
+    operatingChannel: Int,
+    actionListener: ActionListener
+) {
+    val method = this::class.java.getMethod("setWifiP2pChannels",
+        Channel::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+        ActionListener::class.java)
+    method.invoke(this, channel, listeningChannel, operatingChannel, actionListener)
+}
+
+@Suppress("unused") //Reserved for future use: can be used to try and use 5Ghz on pre-SDK30 devices
+suspend fun WifiP2pManager.setWifiP2pChannelsAsync(
+    channel: Channel,
+    listeningChannel: Int,
+    operatingChannel: Int,
+    logger: MNetLogger?,
+) {
+    val actionListener = WifiP2pActionListenerAdapter(onFailLogMessage = "Failed to set Wifip2p channels")
+    logger?.invoke(Log.DEBUG, "WifiP2pManager.setWifip2pchannels " +
+            "listening=$listeningChannel, operating=$operatingChannel : start attempt")
+    try {
+        setWifiP2pChannelsUnhidden(channel, listeningChannel, operatingChannel, actionListener)
+        actionListener.await()
+        logger?.invoke(Log.DEBUG, "WifiP2pManager.setWifip2pchannels " +
+                "listening=$listeningChannel, operating=$operatingChannel :Success")
+    }catch(e: Exception) {
+        logger?.invoke(Log.ERROR, "WifiP2pManager.setWifip2pchannels " +
+                "listening=$listeningChannel, operating=$operatingChannel : FAILED", e)
+        throw e
+    }
 }
 
