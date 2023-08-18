@@ -10,30 +10,26 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,10 +45,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import kotlin.math.min as mathmin
-import com.ustadmobile.meshrabiya.testapp.viewmodel.LocalVirtualNodeViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
@@ -69,6 +62,7 @@ import com.ustadmobile.meshrabiya.testapp.composable.rememberMeshrabiyaConnectLa
 import com.ustadmobile.meshrabiya.testapp.hasBluetoothConnectPermission
 import com.ustadmobile.meshrabiya.testapp.hasNearbyWifiDevicesOrLocationPermission
 import com.ustadmobile.meshrabiya.testapp.viewmodel.LocalVirtualNodeUiState
+import com.ustadmobile.meshrabiya.testapp.viewmodel.LocalVirtualNodeViewModel
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.MeshrabiyaConnectLink
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
@@ -79,6 +73,8 @@ import kotlinx.coroutines.launch
 import org.kodein.di.compose.localDI
 import org.kodein.di.direct
 import org.kodein.di.instance
+import kotlin.math.min as mathmin
+
 
 @Composable
 fun LocalVirtualNodeScreen(
@@ -269,145 +265,126 @@ fun LocalVirtualNodeScreen(
             )
         }
 
-        item(key = "band") {
-            var expanded: Boolean by remember {
-                mutableStateOf(false)
-            }
+        if(uiState.connectBandVisible) {
+            item(key = "band") {
+                Column {
+                    Text(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        text = "Band",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        uiState.bandOptions.forEach {band ->
+                            FilterChip(
+                                selected = uiState.band == band,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                onClick = {
+                                    onSetBand(band)
+                                },
+                                label = {
+                                    Text(band.toString())
+                                },
+                                leadingIcon = if (uiState.band == band) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Filled.Done,
+                                            contentDescription = "Selected",
+                                            modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                        )
+                                    }
+                                } else {
+                                    null
+                                }
 
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                onExpandedChange = {
-                    expanded = !expanded
-                },
-            ) {
-                OutlinedTextField(
-                    value = uiState.band.toString(),
-                    readOnly = true,
-                    enabled = uiState.connectBandVisible,
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth(),
-                    label = {
-                        Text("Band")
-                    },
-                    onValueChange = { },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(
-                            expanded = expanded
-                        )
-                    },
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                )
-
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = {
-                        expanded = false
-                    }
-                ) {
-                    uiState.bandOptions.forEach {
-                        DropdownMenuItem(
-                            text = { Text(it.toString()) },
-                            onClick = {
-                                expanded = false
-                                onSetBand(it)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        item(key = "preferredhotspottype") {
-            var expanded: Boolean by remember {
-                mutableStateOf(false)
-            }
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                onExpandedChange = {
-                    expanded = !expanded
-                },
-            ) {
-                OutlinedTextField(
-                    value = uiState.hotspotTypeToCreate.toString(),
-                    readOnly = true,
-                    enabled = uiState.connectBandVisible,
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth(),
-                    label = {
-                        Text("Type")
-                    },
-                    onValueChange = { },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(
-                            expanded = expanded
-                        )
-                    },
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                )
-
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = {
-                        expanded = false
-                    }
-                ) {
-                    uiState.hotspotTypeOptions.forEach {
-                        DropdownMenuItem(
-                            text = { Text(it.toString()) },
-                            onClick = {
-                                expanded = false
-                                onSetHotspotTypeToCreate(it)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-
-        item(key = "hotspotswitch") {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .toggleable(
-                            role = Role.Switch,
-                            value = uiState.incomingConnectionsEnabled,
-                            onValueChange = {
-                                onSetIncomingConnectionsEnabled(it)
-                            },
-                        )
-                ) {
-                    Switch(checked = uiState.incomingConnectionsEnabled, onCheckedChange = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Hotspot enabled")
-                }
-
-                ListItem(
-                    headlineContent = {
-
-                    },
-                    supportingContent = {
-                        Row {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Info",
-                                modifier = Modifier.padding(end = 8.dp)
                             )
-                            Text("This creates a hotspot that other devices can use to connect to " +
-                                    "this device as a WiFi station (client). It will not share mobile Internet. " +
-                                    "Any device can operate as a WiFi hotspot and station (client) " +
-                                    "simultaneously.")
                         }
                     }
-                )
+                }
+
+            }
+
+            item(key = "preferredhotspottype") {
+                Column {
+                    Text(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        text = "Hotspot Type",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        uiState.hotspotTypeOptions.forEach { hotspotType ->
+                            FilterChip(
+                                selected = hotspotType == uiState.hotspotTypeToCreate,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                onClick = { onSetHotspotTypeToCreate(hotspotType) },
+                                label = { Text(hotspotType.toString()) },
+                                leadingIcon = if (hotspotType == uiState.hotspotTypeToCreate) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Filled.Done,
+                                            contentDescription = "Selected",
+                                            modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                        )
+                                    }
+                                } else {
+                                    null
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            item("hotspot_on_button") {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    onClick = {
+                        onSetIncomingConnectionsEnabled(true)
+                    }
+                ) {
+                    Text("Start Hotspot")
+                }
+            }
+        }else {
+            item("hotspot_off_button") {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    onClick = {
+                        onSetIncomingConnectionsEnabled(false)
+                    }
+                ) {
+                    Text("Stop Hotspot")
+                }
             }
         }
+
+        item("hotspot_info") {
+            ListItem(
+                headlineContent = {
+
+                },
+                supportingContent = {
+                    Row {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info",
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("This creates a hotspot that other devices can use to connect to " +
+                                "this device as a WiFi station (client). It will not share mobile Internet. " +
+                                "Any device can operate as a WiFi hotspot and station (client) " +
+                                "simultaneously. Once the hotspot is created a QR code will be " +
+                                "displayed that can be used to connect devices.")
+                    }
+                }
+            )
+        }
+
+
 
         val connectUri = uiState.connectUri
         if(connectUri != null && uiState.incomingConnectionsEnabled) {

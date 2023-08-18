@@ -11,6 +11,14 @@ import kotlinx.serialization.encoding.Encoder
 enum class HotspotType(val flag: Byte) {
     LOCALONLY_HOTSPOT(1), WIFIDIRECT_GROUP(2), AUTO(4);
 
+    override fun toString(): String {
+        return when(this) {
+            LOCALONLY_HOTSPOT -> "Local Only Hotspot"
+            WIFIDIRECT_GROUP -> "WiFi Direct Group"
+            AUTO -> "Auto"
+        }
+    }
+
     companion object {
         fun fromFlag(flag: Byte): HotspotType {
             return values().first { it.flag == flag }
