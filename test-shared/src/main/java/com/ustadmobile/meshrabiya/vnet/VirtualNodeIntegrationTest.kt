@@ -193,7 +193,7 @@ abstract class VirtualNodeIntegrationTest {
             val requestId = Random.nextInt()
 
             node1.route(
-                packet = MmcpHotspotRequest(requestId, LocalHotspotRequest(ConnectBand.BAND_5GHZ))
+                packet = MmcpHotspotRequest(requestId, LocalHotspotRequest(ConnectBand.BAND_5GHZ, HotspotType.WIFIDIRECT_GROUP))
                     .toVirtualPacket(
                         toAddr = node1.addressAsInt,
                         fromAddr = node2.addressAsInt

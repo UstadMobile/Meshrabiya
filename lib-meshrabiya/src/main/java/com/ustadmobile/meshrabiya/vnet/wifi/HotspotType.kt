@@ -13,8 +13,8 @@ enum class HotspotType(val flag: Byte) {
 
     override fun toString(): String {
         return when(this) {
-            LOCALONLY_HOTSPOT -> "Local Only Hotspot"
-            WIFIDIRECT_GROUP -> "WiFi Direct Group"
+            LOCALONLY_HOTSPOT -> "Local Only"
+            WIFIDIRECT_GROUP -> "WiFi Direct"
             AUTO -> "Auto"
         }
     }

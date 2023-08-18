@@ -346,18 +346,20 @@ class OriginatingMessageManager(
         return when {
             //Destination address is this node
             addressInt == localNodeAddress -> {
-                ChainSocketNextHop(InetAddress.getLoopbackAddress(), port, true)
+                ChainSocketNextHop(InetAddress.getLoopbackAddress(), port, true, null)
             }
 
             //Destination is a direct neighbor (final destination) - connect to the actual socket itself
             originatorMessage != null && originatorMessage.hopCount == 1.toByte() -> {
-                ChainSocketNextHop(originatorMessage.lastHopRealInetAddr, port, true)
+                ChainSocketNextHop(originatorMessage.lastHopRealInetAddr, port, true,
+                        originatorMessage.receivedFromSocket.boundNetwork)
             }
 
             //Destination is not a direct neighbor, but we have a route there
             originatorMessage != null -> {
                 ChainSocketNextHop(originatorMessage.lastHopRealInetAddr,
-                    originatorMessage.lastHopRealPort, false)
+                    originatorMessage.lastHopRealPort, false,
+                    originatorMessage.receivedFromSocket.boundNetwork)
             }
 
             //No route available to reach the given address

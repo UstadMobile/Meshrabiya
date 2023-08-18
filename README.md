@@ -17,25 +17,45 @@ between nodes over multiple hops as if they were directly connected.
 How it works:
 
 * Node A creates a hotspot [Wifi Direct Group](https://developer.android.com/reference/android/net/wifi/p2p/WifiP2pManager#createGroup(android.net.wifi.p2p.WifiP2pManager.Channel,%20android.net.wifi.p2p.WifiP2pManager.ActionListener)). 
-  It generates a "connect link" that includes the hotspot SSID, passphrase, ipv6 link local address, 
-  and the service port number.
+  or [Local Only Hotspot](https://developer.android.com/guide/topics/connectivity/localonlyhotspot).
+  It generates a "connect link" that includes the hotspot SSID, passphrase, ipv6 link local address
+  (if a WiFi direct group), and the service port number.
 * Node B obtains the connect link by scanning a QR code (this could also potentially be sent over
   Bluetooth Low Energy and/or Wifi Direct Service Discovery). Node B connects to the hotspot of 
-  Node A using the [Wifi Bootstrap API](https://developer.android.com/guide/topics/connectivity/wifi-bootstrap).
-  Node B sends a UDP packet to the ipv6 address / service port of Node A to enable Node A to discover
-  Node B. Node A and Node B can now communicate.
+  Node A using the [Wifi Bootstrap API](https://developer.android.com/guide/topics/connectivity/wifi-bootstrap). 
+  If Node A created a WiFi direct group, then Node B will use the ipv6 link local address to reach Node 
+  A. If Node A created a Local Only Hotspot, then Node B will use the DHCP server address to reach 
+  Node A. Node B sends a UDP packet to the known address / service port of Node A to enable Node A 
+  to discover Node B. Node A and Node B can now communicate.
 * Node B creates its own hotspot. Node C (and so forth) can connect. All nodes periodically broadcast
   originator messages that include their virtual IP address and connect link. The propogation of
   originator messages is subject to limits on the maximum number of hops. When a node receives an
   originator message it knows the other node, and it knows the next hop if it wants to send traffic
   to that node. This is based on the [BATMAN Originator Message concept](https://www.open-mesh.org/doc/batman-adv/OGM.html).
 * Each node can simultaneously operate both a hotspot for incoming connections and make one outgoing
-  connection via its WiFi station (client). IPv6 link local addresses are used to avoid an IP conflict
+  connection via its WiFi station (client). There are two possible ways to do this, each of which has
+  some advantages and disadvantages:
+** *WiFi Direct Group* Almost all Android devices (except it seems Android 11+ devices that support 
+  [WiFi station - Access Point concurrency](https://developer.android.com/reference/android/net/wifi/WifiManager#isStaApConcurrencySupported())) 
+  can create a WiFi direct group and
+  simultaneously remain connected to a WiFi access point (as a station). Creating a WiFi direct 
+  group creates a hotspot for "legacy devices" that operates a normal hotspot (and does not share 
+  Internet). IPv6 link local must be used to avoid an IP conflict
   due to the fact that Android assigns the IP address 192.168.49.1 to all nodes that operate as a 
-  WiFi direct group owner. We also use the link local IPv6 address to calculate the MAC Address, 
+  WiFi direct group owner. We also use the link local IPv6 address to attempt to calculate the MAC Address, 
   which needs to be specified to avoid a user prompt each time a user reconnects. Using the link local
-  address avoids the need to use CompanionDeviceManager to discover the Mac address (which requires
-  using an intent result and results in users seeing two dialog boxes on Android 10).
+  address to calculate the MAC address avoids the need to use CompanionDeviceManager to discover the 
+  Mac address (which requires using an intent result and results in users seeing two dialog boxes on 
+  Android 10).
+  It is possible to specify the hotspot SSID, passphrase and band (2.4Ghz or 5Ghz) on any Android 10+
+  device.
+** *Local Only Hotspot* This is supported on all Android 8 devices, however it can only operate
+ concurrently with being connected to another hotspot if [WiFi station - Access Point concurrency](https://developer.android.com/reference/android/net/wifi/WifiManager#isStaApConcurrencySupported())
+ is supported. Android generates a random subnet range so there is no IP address conflict when one
+ device is both operating as a Local Only Hotspot provider and connected to another Local Only 
+ Hotspot at the same time.
+ It is only possible to specify the hotspot SSID, passphrase, and band on Android 13+ using a hidden
+ API.
 
 Want to try it yourself? Download the test app APK from [releases](https://github.com/UstadMobile/Meshrabiya/releases).
 

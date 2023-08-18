@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet
 
+import android.net.Network
 import android.util.Log
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
@@ -18,6 +19,11 @@ import java.util.concurrent.Future
  *
  * @param socket - the underlying DatagramSocket to use - this can be bound to a network, interface etc if required
  * neighbor connects.
+ * @param boundNetwork The Network object that the DatagramSocket is/will be bound to, if any. This
+ *                     is needed if/when we want to establish a TCP connection. Because the
+ *                     VirtualNodeDatagramSocket reference is kept as part of the originator message,
+ *                     and it is created at the time the network object is available, this is the
+ *                     most convenient and logical place to keep this reference.
  */
 class VirtualNodeDatagramSocket(
     private val socket: DatagramSocket,
@@ -25,7 +31,8 @@ class VirtualNodeDatagramSocket(
     ioExecutorService: ExecutorService,
     private val router: VirtualRouter,
     private val logger: MNetLogger,
-    name: String? = null
+    name: String? = null,
+    val boundNetwork: Network? = null,
 ):  Runnable, Closeable {
 
     private val future: Future<*>

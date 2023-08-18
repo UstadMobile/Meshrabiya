@@ -24,10 +24,11 @@ class ChainSocketFactoryImpl(
     ) : ChainSocketResult {
         try {
             val nextHop = virtualRouter.lookupNextHopForChainSocket(address, port)
+            val socketFactory = nextHop.network?.socketFactory ?: systemSocketFactory
             val socket = if(localAddress != null && localPort != null) {
-                systemSocketFactory.createSocket(nextHop.address, nextHop.port, localAddress, localPort)
+                socketFactory.createSocket(nextHop.address, nextHop.port, localAddress, localPort)
             }else {
-                systemSocketFactory.createSocket(nextHop.address, nextHop.port)
+                socketFactory.createSocket(nextHop.address, nextHop.port)
             }
 
             socket.initializeChainIfNotFinalDest(

@@ -64,7 +64,7 @@ class ChainSocketFactoryTest {
                 lookupNextHopForChainSocket(any(), any())
             }.thenAnswer {
                 val port = it.arguments[1] as Int
-                ChainSocketNextHop(InetAddress.getByName("127.0.0.1"), port, true)
+                ChainSocketNextHop(InetAddress.getByName("127.0.0.1"), port, true, null)
             }
         }
 
@@ -91,7 +91,7 @@ class ChainSocketFactoryTest {
                 lookupNextHopForChainSocket(any(), any())
             }.thenAnswer {
                 ChainSocketNextHop(
-                    InetAddress.getByName("127.0.0.1"), initResponseSocketServer.localPort, false
+                    InetAddress.getByName("127.0.0.1"), initResponseSocketServer.localPort, false, null
                 )
             }
         }

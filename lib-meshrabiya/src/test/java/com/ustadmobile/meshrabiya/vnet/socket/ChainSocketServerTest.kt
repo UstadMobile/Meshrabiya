@@ -47,7 +47,8 @@ class ChainSocketServerTest {
                     ChainSocketNextHop(
                         address = InetAddress.getLoopbackAddress(),
                         port = randomFileSocketServer.localPort,
-                        isFinalDest = true
+                        isFinalDest = true,
+                        network = null,
                     )
                 )
             }
@@ -102,6 +103,7 @@ class ChainSocketServerTest {
                 address = InetAddress.getLoopbackAddress(),
                 port = chainServerSocket2.localPort,
                 isFinalDest = false,
+                network = null,
             ))
         }
 
@@ -112,7 +114,8 @@ class ChainSocketServerTest {
                 ChainSocketNextHop(
                     address = InetAddress.getLoopbackAddress(),
                     port = it.arguments[1] as Int,
-                    isFinalDest = true
+                    isFinalDest = true,
+                    network = null,
                 )
             }
         }

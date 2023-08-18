@@ -34,11 +34,17 @@ class ChainSocket(
                 virtualRouter.networkPrefixLength, virtualRouter.address
             ) == true
         ) {
-            try {
-                val nextHop = virtualRouter.lookupNextHopForChainSocket(
-                    endpointInetAddr.address, endpoint.port
-                )
+            val nextHop = virtualRouter.lookupNextHopForChainSocket(
+                endpointInetAddr.address, endpoint.port
+            )
 
+            val network = nextHop.network
+            if(network != null) {
+                logger(Log.DEBUG, "$logPrefix binding socket to network $network to connect to $endpoint")
+                network.bindSocket(this)
+            }
+
+            try {
                 super.connect(InetSocketAddress(nextHop.address, nextHop.port))
 
                 initializeChainIfNotFinalDest(
@@ -53,7 +59,9 @@ class ChainSocket(
                     Log.INFO, "$logPrefix created socket to $address:$port " +
                         "nexthop = ${nextHop.address}:${nextHop.port}")
             }catch(e: Exception) {
-                logger(Log.ERROR, "$logPrefix Exception connecting to $endpoint")
+                logger(Log.ERROR, "$logPrefix Exception connecting to $endpoint " +
+                        "nexthop=${nextHop.address}:${nextHop.port} (finalDest=${nextHop.isFinalDest})", e)
+                throw e
             }
         }else {
             super.connect(endpoint, timeout)

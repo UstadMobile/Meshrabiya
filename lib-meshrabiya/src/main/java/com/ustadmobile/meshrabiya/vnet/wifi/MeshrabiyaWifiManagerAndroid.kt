@@ -585,7 +585,8 @@ class MeshrabiyaWifiManagerAndroid(
                 ioExecutorService = ioExecutor,
                 router = router,
                 logger = logger,
-                name = "network bound to ${config.ssid}"
+                name = "network bound to ${config.ssid}",
+                boundNetwork = network,
             )
 
             val chainSocketServer = ChainSocketServer(
