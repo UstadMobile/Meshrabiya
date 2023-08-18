@@ -6,7 +6,7 @@ import kotlin.random.Random
 
 
 fun findFreePort(preferred: Int = 0): Int {
-    var portToTry = if(preferred == 0) Random.nextInt(1, 65_536) else preferred
+    var portToTry = if(preferred == 0) Random.nextInt(1025, 65_536) else preferred
     while(true){
         try {
             ServerSocket(portToTry).close()
@@ -15,6 +15,6 @@ fun findFreePort(preferred: Int = 0): Int {
         }catch(e: Exception) {
             //Do nothing - try another port
         }
-        portToTry = Random.nextInt(1, 65_536)
+        portToTry = Random.nextInt(1025, 65_536)
     }
 }
