@@ -1,9 +1,10 @@
 # Meshrabiya
 
 Meshrabiya is a virtual mesh network for Android that operates over WiFi. It allows applications
-to seamlessly communicate over multiple hops and multiple WiFi direct group networks using a 
-"virtual" IP address (typically a random auto-generated address e.g. 169.254.x.y). It uses normal
-runtime permissions that can be granted by the user and does not require root permissions.
+to seamlessly communicate over multiple hops and multiple WiFi direct group networks and/or 
+Local Only Hotspots using a "virtual" IP address (typically a random auto-generated address 
+e.g. 169.254.x.y). It uses normal runtime permissions that can be granted by the user and does not 
+require root permissions.
 
 It is intended for use in situations where multiple Android devices need to communicate with each 
 other and a WiFi access point is not available e.g. schools and health clinics without WiFi 
@@ -12,7 +13,9 @@ Using multiple hops over multiple WiFi direct groups enables more devices to con
 using a single device hotspot.
 
 Meshrabiya provides socket factories (for both TCP and UDP) that can create sockets to route data 
-between nodes over multiple hops as if they were directly connected.
+between nodes over multiple hops as if they were directly connected. The socket factory can also
+be used with other networking libraries (e.g. OkHttp) to make it easy to send/receive data over the
+virtual mesh.
 
 How it works:
 
@@ -51,11 +54,11 @@ How it works:
   device.
  * __Local Only Hotspot__ This is supported on all Android 8 devices, however it can only operate
  concurrently with being connected to another hotspot if [WiFi station - Access Point concurrency](https://developer.android.com/reference/android/net/wifi/WifiManager#isStaApConcurrencySupported())
- is supported. Android generates a random subnet range so there is no IP address conflict when one
- device is both operating as a Local Only Hotspot provider and connected to another Local Only 
- Hotspot at the same time.
- It is only possible to specify the hotspot SSID, passphrase, and band on Android 13+ using a hidden
- API.
+ is supported. This is only available on Android 11+ devices and requires hardware support. Generally
+ lower-end devices are less likely to have this feature. Android generates a random subnet range so 
+ there is no IP address conflict when one device is both operating as a Local Only Hotspot provider 
+ and connected to another Local Only Hotspot at the same time. It is only possible to specify the 
+ hotspot SSID, passphrase, and band on Android 13+ using a hidden API.
 
 Want to try it yourself? Download the test app APK from [releases](https://github.com/UstadMobile/Meshrabiya/releases).
 
@@ -148,6 +151,12 @@ is not on the virtual network (e.g where the ip address does not match the netma
 node). It is therefor possible to use the socket factory anywhere, even when connections to non-virtual
 destinations are required - e.g. it can be used with an OKHttp Client and the client will be able to
 connect to both virtual and non-virtual addresses.
+e.g.
+```
+val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+            .socketFactory(myNode.socketFactory)
+            .build()
+```
 
 ### Exchange data using UDP
 
