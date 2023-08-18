@@ -13,7 +13,7 @@ if(project.file("buildconfig.local.properties").exists()) {
 }
 
 group 'com.github.UstadMobile.Meshrabiya'
-version '0.1d6-snapshot'
+version '0.1d7-snapshot'
 
 ext {
 
