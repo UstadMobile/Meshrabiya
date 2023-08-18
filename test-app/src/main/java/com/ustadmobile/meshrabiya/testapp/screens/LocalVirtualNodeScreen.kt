@@ -378,7 +378,8 @@ fun LocalVirtualNodeScreen(
                                 "this device as a WiFi station (client). It will not share mobile Internet. " +
                                 "Any device can operate as a WiFi hotspot and station (client) " +
                                 "simultaneously. Once the hotspot is created a QR code will be " +
-                                "displayed that can be used to connect devices.")
+                                "displayed that can be used to connect devices. This cannot start " +
+                                "if you are using the system mobile hotspot and/or tethering.")
                     }
                 }
             )

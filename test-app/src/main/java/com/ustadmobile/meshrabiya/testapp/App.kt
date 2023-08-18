@@ -27,6 +27,7 @@ import org.kodein.di.instance
 import org.kodein.di.singleton
 import java.io.File
 import java.net.InetAddress
+import java.time.Duration
 
 class App: Application(), DIAware {
 
@@ -84,8 +85,12 @@ class App: Application(), DIAware {
 
         bind<OkHttpClient>() with singleton {
             val node: AndroidVirtualNode = instance()
+            //Local connections, even when fast and with high throughput, can have high latency
             OkHttpClient.Builder()
                 .socketFactory(node.socketFactory)
+                .connectTimeout(Duration.ofSeconds(30))
+                .readTimeout(Duration.ofSeconds(30))
+                .writeTimeout(Duration.ofSeconds(30))
                 .build()
         }
 

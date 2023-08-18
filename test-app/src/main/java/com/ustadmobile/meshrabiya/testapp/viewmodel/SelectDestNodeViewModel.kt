@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
+import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.appstate.FabState
@@ -24,6 +25,7 @@ import java.net.InetAddress
 
 data class SelectDestNodeUiState(
     val nodes: Map<Int, VirtualNode.LastOriginatorMessage> = emptyMap(),
+    val contactingInProgressDevice: String? = null,
     val error: String? = null,
     val sendingUri: String = "",
     val appUiState: AppUiState = AppUiState(),
@@ -71,6 +73,11 @@ class SelectDestNodeViewModel(
         destNodeAddr: Int,
     ) {
         val destInetAddr = InetAddress.getByAddress(destNodeAddr.addressToByteArray())
+        _uiState.update { prev ->
+            prev.copy(
+                contactingInProgressDevice = destNodeAddr.addressToDotNotation()
+            )
+        }
 
         viewModelScope.launch {
             val transfer = withContext(Dispatchers.IO) {

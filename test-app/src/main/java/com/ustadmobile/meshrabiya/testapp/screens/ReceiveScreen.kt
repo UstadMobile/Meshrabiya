@@ -100,7 +100,7 @@ fun ReceiveScreen(
     ) {
         items(
             items = uiState.incomingTransfers,
-            key = { Pair(it.fromHost, it.id) }
+            key = { Triple(it.fromHost, it.id, it.requestReceivedTime) }
         ) { transfer ->
             ListItem(
                 modifier = Modifier
