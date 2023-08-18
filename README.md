@@ -35,7 +35,7 @@ How it works:
 * Each node can simultaneously operate both a hotspot for incoming connections and make one outgoing
   connection via its WiFi station (client). There are two possible ways to do this, each of which has
   some advantages and disadvantages:
-** *WiFi Direct Group* Almost all Android devices (except it seems Android 11+ devices that support 
+ * __WiFi Direct Group__ Almost all Android devices (except it seems Android 11+ devices that support 
   [WiFi station - Access Point concurrency](https://developer.android.com/reference/android/net/wifi/WifiManager#isStaApConcurrencySupported())) 
   can create a WiFi direct group and
   simultaneously remain connected to a WiFi access point (as a station). Creating a WiFi direct 
@@ -49,7 +49,7 @@ How it works:
   Android 10).
   It is possible to specify the hotspot SSID, passphrase and band (2.4Ghz or 5Ghz) on any Android 10+
   device.
-** *Local Only Hotspot* This is supported on all Android 8 devices, however it can only operate
+ * __Local Only Hotspot__ This is supported on all Android 8 devices, however it can only operate
  concurrently with being connected to another hotspot if [WiFi station - Access Point concurrency](https://developer.android.com/reference/android/net/wifi/WifiManager#isStaApConcurrencySupported())
  is supported. Android generates a random subnet range so there is no IP address conflict when one
  device is both operating as a Local Only Hotspot provider and connected to another Local Only 
