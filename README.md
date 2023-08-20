@@ -1,10 +1,11 @@
 # Meshrabiya
 
-Meshrabiya is a virtual mesh network for Android that operates over WiFi. It allows applications
-to seamlessly communicate over multiple hops and multiple WiFi direct group networks and/or 
-Local Only Hotspots using a "virtual" IP address (typically a random auto-generated address 
-e.g. 169.254.x.y). It uses normal runtime permissions that can be granted by the user and does not 
-require root permissions.
+Meshrabiya is a mesh network for Android that operates over WiFi. It allows applications
+to seamlessly communicate over multiple hops and multiple WiFi direct and/or Local Only Hotspots.
+Each device is given a "virtual" IP address (typically a random auto-generated address
+e.g. 169.254.x.y). Applications can then use the provided SocketFactory and/or DatagramSocket class
+to communicate with other nodes over multiple hops as if they were directly connected. This works
+with various higher level networking libraries such as OkHttp.
 
 It is intended for use in situations where multiple Android devices need to communicate with each 
 other and a WiFi access point is not available e.g. schools and health clinics without WiFi 
@@ -19,17 +20,21 @@ virtual mesh.
 
 How it works:
 
-* Node A creates a hotspot [Wifi Direct Group](https://developer.android.com/reference/android/net/wifi/p2p/WifiP2pManager#createGroup(android.net.wifi.p2p.WifiP2pManager.Channel,%20android.net.wifi.p2p.WifiP2pManager.ActionListener)). 
+* Node A creates a hotspot using a [Wifi Direct Group](https://developer.android.com/reference/android/net/wifi/p2p/WifiP2pManager#createGroup(android.net.wifi.p2p.WifiP2pManager.Channel,%20android.net.wifi.p2p.WifiP2pManager.ActionListener)). 
   or [Local Only Hotspot](https://developer.android.com/guide/topics/connectivity/localonlyhotspot).
   It generates a "connect link" that includes the hotspot SSID, passphrase, ipv6 link local address
-  (if a WiFi direct group), and the service port number.
-* Node B obtains the connect link by scanning a QR code (this could also potentially be sent over
-  Bluetooth Low Energy and/or Wifi Direct Service Discovery). Node B connects to the hotspot of 
+  (if a WiFi direct group), BSSID (where possible), and the service port number.
+* Node B obtains the connect link by scanning a QR code (this could also potentially be discovered via
+  Bluetooth Low Energy Advertising). Node B connects to the hotspot of 
   Node A using the [Wifi Bootstrap API](https://developer.android.com/guide/topics/connectivity/wifi-bootstrap). 
   If Node A created a WiFi direct group, then Node B will use the ipv6 link local address to reach Node 
   A. If Node A created a Local Only Hotspot, then Node B will use the DHCP server address to reach 
   Node A. Node B sends a UDP packet to the known address / service port of Node A to enable Node A 
-  to discover Node B. Node A and Node B can now communicate.
+  to discover Node B. Node A and Node B can now communicate. The connection is done using 
+  [WifiNetworkSpecifier](https://developer.android.com/guide/topics/connectivity/wifi-bootstrap) on 
+  Android 10+ and using WifiManager on prior versions. On Android 10+ the user will normally only see  
+  a confirmation dialog the first time a connection is established between two nodes (except when 
+  it is not possible for a single node to maintain the same SSID and/or when the BSSID is unknown).
 * Node B creates its own hotspot. Node C (and so forth) can connect. All nodes periodically broadcast
   originator messages that include their virtual IP address and connect link. The propogation of
   originator messages is subject to limits on the maximum number of hops. When a node receives an
