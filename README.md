@@ -67,7 +67,7 @@ How it works:
 
 Want to try it yourself? Download the test app APK from [releases](https://github.com/UstadMobile/Meshrabiya/releases).
 
-Want to collaborate on development? Join us on discord: [https://discord.gg/WHe35Sbsg4](https://discord.gg/WHe35Sbsg4).
+Want to collaborate on development? Join us on [#meshrabiya:matrix.org](https://matrix.to/#/#meshrabiya:matrix.org).
 
 ![Diagram](doc/android-wifi-networking.svg)
 
