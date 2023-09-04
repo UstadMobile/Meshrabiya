@@ -5,13 +5,18 @@ to seamlessly communicate over multiple hops and multiple WiFi direct and/or Loc
 Each device is given a "virtual" IP address (typically a random auto-generated address
 e.g. 169.254.x.y). Applications can then use the provided SocketFactory and/or DatagramSocket class
 to communicate with other nodes over multiple hops as if they were directly connected. This works
-with various higher level networking libraries such as OkHttp.
+with various higher level networking libraries such as OkHttp. 
 
 It is intended for use in situations where multiple Android devices need to communicate with each 
 other and a WiFi access point is not available e.g. schools and health clinics without WiFi 
 infrastructure, when hiking, etc. WiFi enables high-speed connections with tests obtaining 300Mbps+.
 Using multiple hops over multiple WiFi direct groups enables more devices to connect than is possible
 using a single device hotspot.
+
+Meshrabiya is entirely open-source and does not have any proprietary dependencies (e.g. it works 
+with Android Open Source Project devices and does not use/require Google Play Services, Nearby 
+Connections API, etc).
+
 
 Meshrabiya provides socket factories (for both TCP and UDP) that can create sockets to route data 
 between nodes over multiple hops as if they were directly connected. The socket factory can also
