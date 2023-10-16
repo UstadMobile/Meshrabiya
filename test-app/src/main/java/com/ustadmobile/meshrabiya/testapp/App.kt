@@ -1,7 +1,9 @@
 package com.ustadmobile.meshrabiya.testapp
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -27,12 +29,15 @@ import org.kodein.di.instance
 import org.kodein.di.singleton
 import java.io.File
 import java.net.InetAddress
+import java.text.SimpleDateFormat
 import java.time.Duration
+import java.util.Date
 
 class App: Application(), DIAware {
 
     val ADDRESS_PREF_KEY = intPreferencesKey("virtualaddr")
 
+    @SuppressLint("SimpleDateFormat")
     private val diModule = DI.Module("meshrabiya-module") {
 
         bind<InetAddress>(tag = TAG_VIRTUAL_ADDRESS) with singleton() {
@@ -54,12 +59,23 @@ class App: Application(), DIAware {
         }
 
         bind<MNetLogger>() with singleton {
-            MNetLoggerAndroid(minLogLevel = Log.DEBUG)
+            val logFileNameDateComp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+            val logDir: File = instance(tag = TAG_LOG_DIR)
+            MNetLoggerAndroid(
+                deviceInfoStr = meshrabiyaDeviceInfoStr(),
+                minLogLevel = Log.DEBUG,
+                logFile = File(logDir, "${logFileNameDateComp}_${Build.MANUFACTURER}_${Build.MODEL}.log")
+            )
         }
+
         bind<Json>() with singleton {
             Json {
                 encodeDefaults = true
             }
+        }
+
+        bind<File>(tag = TAG_LOG_DIR) with singleton {
+            File(filesDir, "log")
         }
 
         bind<File>(tag = TAG_WWW_DIR) with singleton {
@@ -143,6 +159,8 @@ class App: Application(), DIAware {
         const val TAG_WWW_DIR = "www_dir"
 
         const val TAG_RECEIVE_DIR = "receive_dir"
+
+        const val TAG_LOG_DIR = "log_dir"
 
     }
 }

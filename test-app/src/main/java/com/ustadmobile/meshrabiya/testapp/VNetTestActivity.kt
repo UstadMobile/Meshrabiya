@@ -37,6 +37,7 @@ import androidx.navigation.compose.rememberNavController
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
 import com.ustadmobile.meshrabiya.testapp.screens.InfoScreen
 import com.ustadmobile.meshrabiya.testapp.screens.LocalVirtualNodeScreen
+import com.ustadmobile.meshrabiya.testapp.screens.LogListScreen
 import com.ustadmobile.meshrabiya.testapp.screens.NeighborNodeListScreen
 import com.ustadmobile.meshrabiya.testapp.screens.OpenSourceLicensesScreen
 import com.ustadmobile.meshrabiya.testapp.screens.ReceiveScreen
@@ -71,12 +72,6 @@ class VNetTestActivity : ComponentActivity(), DIAware {
     }
 
 
-
-    companion object {
-
-        val UUID_MASK = UUID.fromString("db803871-2136-4a7a-8859-6fdc28b567b6")
-
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -270,12 +265,21 @@ fun AppNavHost(
                 onSetAppUiState = onSetAppUiState,
                 onClickLicenses = {
                     navController.navigate("licenses")
+                },
+                onClickLogs = {
+                    navController.navigate("logs")
                 }
             )
         }
 
         composable("licenses") {
             OpenSourceLicensesScreen()
+        }
+
+        composable("logs") {
+            LogListScreen(
+                onSetAppUiState = onSetAppUiState,
+            )
         }
     }
 }

@@ -341,7 +341,9 @@ fun LocalVirtualNodeScreen(
 
             item("hotspot_on_button") {
                 OutlinedButton(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     onClick = {
                         onSetIncomingConnectionsEnabled(true)
                     }
@@ -352,7 +354,9 @@ fun LocalVirtualNodeScreen(
         }else {
             item("hotspot_off_button") {
                 OutlinedButton(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     onClick = {
                         onSetIncomingConnectionsEnabled(false)
                     }
@@ -443,6 +447,8 @@ fun LocalVirtualNodeScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                             .fillMaxWidth(),
                         onClick = {
+                            logger(Log.DEBUG, "Click: Connect via QR Code Scan")
+
                             qrCodeScannerLauncher.launch(ScanOptions().apply {
                                 setOrientationLocked(false)
                                 setPrompt("Enable the hotspot in the Meshrabiya app on the device " +

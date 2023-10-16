@@ -90,6 +90,7 @@ class LocalVirtualNodeViewModel(
     }
 
     fun onConnectBandChanged(band: ConnectBand) {
+        logger(Log.DEBUG, "Click: Set band to $band")
         _uiState.update { prev ->
             prev.copy(
                 band = band,
@@ -98,6 +99,7 @@ class LocalVirtualNodeViewModel(
     }
 
     fun onSetHotspotTypeToCreate(hotspotType: HotspotType) {
+        logger(Log.DEBUG, "Click: HotspotType to $hotspotType")
         _uiState.update { prev ->
             prev.copy(
                 hotspotTypeToCreate = hotspotType
@@ -106,6 +108,8 @@ class LocalVirtualNodeViewModel(
     }
 
     fun onSetIncomingConnectionsEnabled(enabled: Boolean) {
+        val startStopStr = if(enabled) "Start" else "Stop"
+        logger(Log.DEBUG, "Click: $startStopStr Hotspot")
         viewModelScope.launch {
             val response = node.setWifiHotspotEnabled(
                 enabled = enabled,
@@ -135,6 +139,7 @@ class LocalVirtualNodeViewModel(
     }
 
     fun onClickDisconnectStation() {
+        logger(Log.DEBUG, "Click: Disconnect station")
         viewModelScope.launch {
             node.disconnectWifiStation()
         }

@@ -1,17 +1,9 @@
 package com.ustadmobile.meshrabiya.testapp.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.net.wifi.WifiManager
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CopyAll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,19 +41,21 @@ fun InfoScreen(
     ),
     onSetAppUiState: (AppUiState) -> Unit,
     onClickLicenses: () -> Unit = { },
+    onClickLogs: () -> Unit = { },
 ) {
     val uiState by viewModel.uiState.collectAsState(initial = InfoUiState())
     LaunchedEffect(uiState.appUiState) {
         onSetAppUiState(uiState.appUiState)
     }
 
-    InfoScreen(uiState, onClickLicenses)
+    InfoScreen(uiState, onClickLicenses, onClickLogs)
 }
 
 @Composable
 fun InfoScreen(
     uiState: InfoUiState,
     onClickLicenses: () -> Unit,
+    onClickLogs: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -114,25 +108,11 @@ fun InfoScreen(
         item("logheader") {
             ListItem(
                 modifier = Modifier.clickable {
-                    val clipboard =
-                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-
-                    val clip: ClipData = ClipData.newPlainText("Logs",
-                        androidLogger.exportAsString(context)
-                    )
-
-                    clipboard.setPrimaryClip(clip)
-                    Toast
-                        .makeText(context, "Copied logs!", Toast.LENGTH_LONG)
-                        .show()
-
+                      onClickLogs()
                 },
                 headlineContent = {
                     Text("Logs")
                 },
-                trailingContent = {
-                    Icon(imageVector = Icons.Default.CopyAll, contentDescription = "Copy")
-                }
             )
         }
 
