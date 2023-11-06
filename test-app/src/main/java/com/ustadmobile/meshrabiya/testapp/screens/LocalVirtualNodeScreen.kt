@@ -276,7 +276,7 @@ fun LocalVirtualNodeScreen(
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp)
                     ) {
-                        uiState.bandOptions.forEach {band ->
+                        uiState.bandOptions.forEach { band ->
                             FilterChip(
                                 selected = uiState.band == band,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
@@ -305,6 +305,9 @@ fun LocalVirtualNodeScreen(
 
             }
 
+        }
+
+        if(!uiState.incomingConnectionsEnabled) {
             item(key = "preferredhotspottype") {
                 Column {
                     Text(
@@ -338,7 +341,9 @@ fun LocalVirtualNodeScreen(
                     }
                 }
             }
+        }
 
+        if(!uiState.incomingConnectionsEnabled) {
             item("hotspot_on_button") {
                 OutlinedButton(
                     modifier = Modifier
@@ -350,6 +355,29 @@ fun LocalVirtualNodeScreen(
                 ) {
                     Text("Start Hotspot")
                 }
+            }
+
+            item("hotspot_info") {
+                ListItem(
+                    headlineContent = {
+
+                    },
+                    supportingContent = {
+                        Row {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info",
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text("This creates a hotspot that other devices can use to connect to " +
+                                    "this device as a WiFi station (client). It will not share mobile Internet. " +
+                                    "Any device can operate as a WiFi hotspot and station (client) " +
+                                    "simultaneously. Once the hotspot is created a QR code will be " +
+                                    "displayed that can be used to connect devices. This cannot start " +
+                                    "if you are using the system mobile hotspot and/or tethering.")
+                        }
+                    }
+                )
             }
         }else {
             item("hotspot_off_button") {
@@ -364,29 +392,6 @@ fun LocalVirtualNodeScreen(
                     Text("Stop Hotspot")
                 }
             }
-        }
-
-        item("hotspot_info") {
-            ListItem(
-                headlineContent = {
-
-                },
-                supportingContent = {
-                    Row {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("This creates a hotspot that other devices can use to connect to " +
-                                "this device as a WiFi station (client). It will not share mobile Internet. " +
-                                "Any device can operate as a WiFi hotspot and station (client) " +
-                                "simultaneously. Once the hotspot is created a QR code will be " +
-                                "displayed that can be used to connect devices. This cannot start " +
-                                "if you are using the system mobile hotspot and/or tethering.")
-                    }
-                }
-            )
         }
 
 
