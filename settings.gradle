@@ -19,3 +19,4 @@ rootProject.name = "Meshrabiya"
 include ':lib-meshrabiya'
 include ':test-app'
 include ':test-shared'
+include ':nearby-test'

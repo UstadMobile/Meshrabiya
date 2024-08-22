@@ -10,6 +10,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/lib-meshrabiya" />
+            <option value="$PROJECT_DIR$/nearby-test" />
             <option value="$PROJECT_DIR$/test-app" />
             <option value="$PROJECT_DIR$/test-shared" />
           </set>

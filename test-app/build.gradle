@@ -58,8 +58,9 @@ android {
 }
 
 dependencies {
+    implementation(project(":lib-meshrabiya"))
+    implementation(project(":nearby-test"))
 
-    implementation project(':lib-meshrabiya')
     implementation "ch.acra:acra-http:$version_acra"
     implementation "ch.acra:acra-dialog:$version_acra"
 

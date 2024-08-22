@@ -25,6 +25,7 @@ class VirtualPacket private constructor(
     assertHeaderAlreadyInData: Boolean = false,
 ) {
 
+
     val header: VirtualPacketHeader
 
     init {
