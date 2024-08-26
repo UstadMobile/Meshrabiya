@@ -97,7 +97,7 @@ class VNetTestActivity : ComponentActivity(), DIAware {
         if (missingPermissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missingPermissions, PERMISSION_REQUEST_CODE)
         } else {
-            viewModel.startNearbyNetwork()
+            viewModel.startNetwork()
         }
     }
 
@@ -109,7 +109,7 @@ class VNetTestActivity : ComponentActivity(), DIAware {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                viewModel.startNearbyNetwork()
+                viewModel.startNetwork()
             } else {
                 Toast.makeText(
                     this,

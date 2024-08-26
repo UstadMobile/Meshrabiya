@@ -1,5 +1,6 @@
 package com.meshrabiya.lib_nearby.nearby
 
+
 import android.content.Context
 import android.util.Log
 import com.google.android.gms.nearby.Nearby
@@ -17,6 +18,7 @@ import com.google.android.gms.nearby.connection.Strategy
 import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
+import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
 import com.ustadmobile.meshrabiya.vnet.netinterface.VSocket
 import com.ustadmobile.meshrabiya.vnet.netinterface.VirtualNetworkInterface
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +32,7 @@ import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.net.InetAddress
+import java.nio.BufferUnderflowException
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -45,168 +48,92 @@ class GoogleNearbyVirtualNetwork(
     private val serviceId: String = "com.ustadmobile.meshrabiya",
     private val strategy: Strategy = Strategy.P2P_STAR,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-    private val executorService: ExecutorService = Executors.newCachedThreadPool(),
-    private val onConnectionStatusChanged: (String, Boolean) -> Unit
+    private val executorService: ExecutorService = Executors.newCachedThreadPool()
 ) : VirtualNetworkInterface {
 
     private val connectionsClient = Nearby.getConnectionsClient(context)
-    private val endpointMap = ConcurrentHashMap<String, InetAddress>()
-    private val discoveredEndpoints = ConcurrentHashMap<String, DiscoveredEndpointInfo>()
+    val endpointMap = ConcurrentHashMap<String, InetAddress>()
     private val streamMap = ConcurrentHashMap<String, Pair<PipedInputStream, PipedOutputStream>>()
     private val isRunning = AtomicBoolean(false)
     private val ipAddressPool = IPAddressPool("192.168.0.0", 24)
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
-            Log.d("NearbyNetwork", "Connection initiated with: $endpointId (${connectionInfo.endpointName})")
             coroutineScope.launch {
                 if (endpointMap.size < maxConnections) {
                     connectionsClient.acceptConnection(endpointId, payloadCallback)
-                    Log.d("NearbyNetwork", "Accepted connection with: $endpointId")
+                        .addOnFailureListener { e -> handleError("Failed to accept connection", e) }
                 } else {
                     connectionsClient.rejectConnection(endpointId)
-                    Log.d("NearbyNetwork", "Rejected connection with: $endpointId (max connections reached)")
+                        .addOnFailureListener { e -> handleError("Failed to reject connection", e) }
                 }
             }
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             if (result.status.isSuccess) {
-                val dynamicIp = ipAddressPool.getNextAvailableIp()
+                val dynamicIp = ipAddressPool.getNextAvailableIp(endpointId)
                 endpointMap[endpointId] = dynamicIp
-                Log.d("NearbyNetwork", "Successfully connected to: $endpointId. Assigned IP: $dynamicIp")
-                onConnectionStatusChanged(endpointId, true)
+                Log.d("NearbyNetwork", "Connected to $endpointId with IP: $dynamicIp")
+                if (endpointMap.size < maxConnections) {
+                    startDiscovery() // Continue discovery if not at max connections
+                }
             } else {
-                Log.e("NearbyNetwork", "Failed to connect to: $endpointId. Reason: ${result.status}")
-                val ipToRelease = endpointMap.remove(endpointId)
-                ipAddressPool.releaseIp(ipToRelease)
-                onConnectionStatusChanged(endpointId, false)
+                handleError("Connection failed", Exception(result.status.statusMessage))
             }
         }
 
         override fun onDisconnected(endpointId: String) {
-            Log.d("NearbyNetwork", "Disconnected from: $endpointId")
-            val ipToRelease = endpointMap.remove(endpointId)
-            ipAddressPool.releaseIp(ipToRelease)
+            endpointMap.remove(endpointId)
+            ipAddressPool.releaseIp(endpointId)
             streamMap.remove(endpointId)?.let { (input, output) ->
                 input.close()
                 output.close()
             }
-            onConnectionStatusChanged(endpointId, false)
+            if (isRunning.get() && endpointMap.size < maxConnections) {
+                startDiscovery() // Restart discovery if below max connections
+            }
         }
-    }
-
-    private fun onConnectionStatusChanged(endpointId: String, b: Boolean) {
-
     }
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             when (payload.type) {
-                Payload.Type.BYTES -> {
-                    val receivedMessage = String(payload.asBytes()!!)
-                    Log.d("NearbyNetwork", "Received message from $endpointId: $receivedMessage")
-                    handleBytesPayload(endpointId, payload)
-                }
-                Payload.Type.STREAM -> {
-                    Log.d("NearbyNetwork", "Received STREAM payload from: $endpointId")
-                    handleStreamPayload(endpointId, payload)
-                }
-                else -> {
-                    Log.d("NearbyNetwork", "Received unsupported payload type from: $endpointId")
-                }
+                Payload.Type.BYTES -> handleBytesPayload(endpointId, payload)
+                Payload.Type.STREAM -> handleStreamPayload(endpointId, payload)
+                else -> handleError(
+                    "Unsupported payload type",
+                    Exception("Received unsupported payload type")
+                )
             }
         }
 
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
-            Log.d("NearbyNetwork", "Payload transfer update from $endpointId: ${update.status}")
-        }
-    }
-    fun start() {
-        if (isRunning.compareAndSet(false, true)) {
-            startAdvertising()
-            startDiscovery()
-        }
-    }
-    private fun startAdvertising() {
-        Log.d("NearbyNetwork", "Starting advertising")
-        val advertisingOptions = AdvertisingOptions.Builder().setStrategy(strategy).build()
-        connectionsClient.startAdvertising(
-            virtualAddress.hostAddress,
-            serviceId,
-            connectionLifecycleCallback,
-            advertisingOptions
-        ).addOnSuccessListener {
-            Log.d("NearbyNetwork", "Advertising started successfully")
-        }.addOnFailureListener { e ->
-            Log.e("NearbyNetwork", "Failed to start advertising: ${e.message}")
-            isRunning.set(false)
-        }
-    }
-
-    private fun startDiscovery() {
-        Log.d("NearbyNetwork", "Starting discovery")
-        val discoveryOptions = DiscoveryOptions.Builder().setStrategy(strategy).build()
-        connectionsClient.startDiscovery(
-            serviceId,
-            object : EndpointDiscoveryCallback() {
-                override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
-                    Log.d("NearbyNetwork", "Endpoint found: $endpointId")
-                    discoveredEndpoints[endpointId] = info
-                    if (endpointMap.size < maxConnections) {
-                        requestConnection(endpointId)
-                    }
-                }
-
-                override fun onEndpointLost(endpointId: String) {
-                    Log.d("NearbyNetwork", "Endpoint lost: $endpointId")
-                    discoveredEndpoints.remove(endpointId)
-                }
-            },
-            discoveryOptions
-        ).addOnSuccessListener {
-            Log.d("NearbyNetwork", "Discovery started successfully")
-        }.addOnFailureListener { e ->
-            Log.e("NearbyNetwork", "Failed to start discovery: ${e.message}")
-            isRunning.set(false)
-        }
-    }
-
-    fun getDiscoveredEndpoints(): List<String> {
-        return discoveredEndpoints.keys.toList()
-    }
-
-    fun requestConnection(endpointId: String) {
-        if (endpointMap.size >= maxConnections) {
-            Log.d("NearbyNetwork", "Max connections reached, not requesting new connection")
-            return
-        }
-
-        Log.d("NearbyNetwork", "Requesting connection to endpoint: $endpointId")
-        connectionsClient.requestConnection(
-            virtualAddress.hostAddress,
-            endpointId,
-            connectionLifecycleCallback
-        ).addOnSuccessListener {
-            Log.d("NearbyNetwork", "Connection request sent successfully to: $endpointId")
-        }.addOnFailureListener { e ->
-            Log.e("NearbyNetwork", "Failed to request connection to: $endpointId. Error: ${e.message}")
+            // Handle transfer updates if needed
         }
     }
 
     private fun handleBytesPayload(endpointId: String, payload: Payload) {
         payload.asBytes()?.let { bytes ->
             try {
+                if (bytes.size < VirtualPacketHeader.HEADER_SIZE) {
+                    handleError("Received payload is too small to contain a valid VirtualPacket", Exception("Payload size: ${bytes.size}"))
+                    return
+                }
+
+                // Create VirtualPacket from the received bytes
                 val virtualPacket = VirtualPacket.fromData(bytes, 0)
-                val lastHopAddress = InetAddress.getByAddress(virtualPacket.header.lastHopAddr.toByteArray())
-                endpointMap[endpointId] = lastHopAddress
+
+                // Process the packet
                 routePacket(virtualPacket)
+            } catch (e: BufferUnderflowException) {
+                handleError("Buffer underflow while handling byte payload from endpoint $endpointId", e)
             } catch (e: Exception) {
-                Log.e("NearbyNetwork", "Error handling bytes payload: ${e.message}")
-                // Consider notifying the ViewModel about this error
+                handleError("Error processing byte payload from endpoint $endpointId", e)
             }
         }
     }
+
 
     private fun handleStreamPayload(endpointId: String, payload: Payload) {
         payload.asStream()?.asInputStream()?.let { inputStream ->
@@ -217,14 +144,13 @@ class GoogleNearbyVirtualNetwork(
                 try {
                     inputStream.copyTo(existingPipedOutput)
                 } catch (e: IOException) {
-                    Log.e("NearbyNetwork", "Error copying stream: ${e.message}")
+                    handleError("Error handling stream payload", e)
                 } finally {
                     inputStream.close()
                 }
             }
         }
     }
-
     private fun routePacket(packet: VirtualPacket) {
         val destAddress = InetAddress.getByAddress(packet.header.toAddr.toByteArray())
 
@@ -236,14 +162,130 @@ class GoogleNearbyVirtualNetwork(
             }
             endpointMap.containsValue(destAddress) -> forwardPacket(packet, destAddress)
             else -> {
-                val nextHop = findNextHop(destAddress)
+                val nextHop = findNextHop(destAddress, packet.header.fromAddr.toByteArray())
                 if (nextHop != null) {
                     forwardPacket(packet, nextHop)
                 } else {
-                    Log.d("NearbyNetwork", "No route to destination: $destAddress")
+                    handleError("No route to destination", Exception("Unable to route packet to $destAddress"))
                 }
             }
         }
+    }
+
+
+
+    private fun findNextHop(destAddress: InetAddress, sourceAddress: ByteArray): InetAddress? {
+        // Improved routing logic
+        val sourceIp = InetAddress.getByAddress(sourceAddress)
+        return endpointMap.values
+            .filter { it != sourceIp }
+            .minByOrNull { it.address.fold(0) { acc, byte -> acc + (byte.toInt() and 0xFF) xor (destAddress.address[acc % 4].toInt() and 0xFF) } }
+    }
+
+    fun startAdvertising() {
+        val advertisingOptions = AdvertisingOptions.Builder().setStrategy(strategy).build()
+        connectionsClient.startAdvertising(
+            virtualAddress.hostAddress,
+            serviceId,
+            connectionLifecycleCallback,
+            advertisingOptions
+        ).addOnFailureListener { e -> handleError("Failed to start advertising", e) }
+    }
+
+    fun startDiscovery() {
+        if (endpointMap.size >= maxConnections) return
+
+        val discoveryOptions = DiscoveryOptions.Builder().setStrategy(strategy).build()
+        connectionsClient.startDiscovery(
+            serviceId,
+            object : EndpointDiscoveryCallback() {
+                override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
+                    if (endpointMap.size < maxConnections) {
+                        connectionsClient.requestConnection(
+                            virtualAddress.hostAddress,
+                            endpointId,
+                            connectionLifecycleCallback
+                        ).addOnFailureListener { e ->
+                            handleError(
+                                "Failed to request connection",
+                                e
+                            )
+                        }
+                    }
+                }
+
+                override fun onEndpointLost(endpointId: String) {
+                    // Handle lost endpoint
+                }
+            },
+            discoveryOptions
+        ).addOnFailureListener { e -> handleError("Failed to start discovery", e) }
+    }
+
+    override fun connectSocket(
+        nextHopAddress: InetAddress,
+        destAddress: InetAddress,
+        destPort: Int
+    ): VSocket {
+        // Stream setup code
+        val endpointId = endpointMap.entries.find { it.value == nextHopAddress }?.key
+            ?: throw IOException("No route to host")
+        val streamId = Random.nextLong().toString()
+
+        val outputStream = PipedOutputStream()
+        val inputForPayload = PipedInputStream(outputStream)
+
+        val inputStream = PipedInputStream()
+        val outputForPayload = PipedOutputStream(inputStream)
+
+        streamMap[streamId] = inputStream to outputStream
+
+        val initMessage = byteArrayOf(1) + "STREAM_INIT:$streamId:${destAddress.hostAddress}:$destPort".toByteArray()
+        connectionsClient.sendPayload(endpointId, Payload.fromBytes(initMessage))
+            .addOnSuccessListener {
+                connectionsClient.sendPayload(endpointId, Payload.fromStream(inputForPayload))
+            }
+            .addOnFailureListener { e ->
+                streamMap.remove(streamId)
+                throw IOException("Failed to initialize stream: ${e.message}")
+            }
+
+        return object : VSocket {
+            override fun inputStream(): InputStream = inputStream
+            override fun outputStream(): OutputStream = outputStream
+            override fun close() {
+                try {
+                    inputStream.close()
+                    outputStream.close()
+                } finally {
+                    streamMap.remove(streamId)
+                    connectionsClient.sendPayload(
+                        endpointId,
+                        Payload.fromBytes("STREAM_CLOSE:$streamId".toByteArray())
+                    )
+                }
+            }
+        }
+    }
+
+
+    private fun handleError(message: String, error: Exception) {
+        Log.e("NearbyNetwork", "$message: ${error.message}")
+        // Implement additional error handling logic here
+    }
+
+    override fun send(virtualPacket: VirtualPacket, nextHopAddress: InetAddress) {
+        val endpointId = endpointMap.entries.find { it.value == nextHopAddress }?.key ?: run {
+            handleError("No route to host", IOException("No endpoint found for address $nextHopAddress"))
+            return
+        }
+
+        val payload = Payload.fromBytes(
+            virtualPacket.data.copyOfRange(virtualPacket.dataOffset, virtualPacket.dataOffset + virtualPacket.datagramPacketSize)
+        )
+
+        connectionsClient.sendPayload(endpointId, payload)
+            .addOnFailureListener { e -> handleError("Failed to send payload", e) }
     }
 
     private fun processLocalPacket(packet: VirtualPacket) {
@@ -260,59 +302,11 @@ class GoogleNearbyVirtualNetwork(
         packet.updateLastHopAddrAndIncrementHopCountInData(virtualAddress.address.ip4AddressToInt())
         send(packet, nextHopAddress)
     }
-    fun sendTestMessage(endpointId: String) {
-        val message = "Test message from ${virtualAddress.hostAddress}"
-        val payload = Payload.fromBytes(message.toByteArray())
-        connectionsClient.sendPayload(endpointId, payload)
-            .addOnSuccessListener {
-                Log.d("NearbyNetwork", "Test message sent successfully to: $endpointId")
-            }
-            .addOnFailureListener { e ->
-                Log.e("NearbyNetwork", "Failed to send test message to $endpointId: ${e.message}")
-            }
-    }
-    private fun findNextHop(destAddress: InetAddress): InetAddress? {
-        return endpointMap.values.randomOrNull()
-    }
 
-    override fun send(virtualPacket: VirtualPacket, nextHopAddress: InetAddress) {
-        val endpointId = endpointMap.entries.find { it.value == nextHopAddress }?.key ?: return
-        val payload = Payload.fromBytes(virtualPacket.data.copyOfRange(virtualPacket.dataOffset, virtualPacket.dataOffset + virtualPacket.datagramPacketSize))
-        connectionsClient.sendPayload(endpointId, payload)
-            .addOnFailureListener { e -> Log.e("NearbyNetwork", "Failed to send payload: ${e.message}") }
-    }
-
-    override fun connectSocket(nextHopAddress: InetAddress, destAddress: InetAddress, destPort: Int): VSocket {
-        val endpointId = endpointMap.entries.find { it.value == nextHopAddress }?.key
-            ?: throw IOException("No route to host")
-        val streamId = Random.nextLong().toString()
-
-        val outputStream = PipedOutputStream()
-        val inputForPayload = PipedInputStream(outputStream)
-
-        val (inputStream, outputForPayload) = streamMap.getOrPut(endpointId) {
-            PipedInputStream().let { it to PipedOutputStream(it) }
-        }
-
-        connectionsClient.sendPayload(endpointId, Payload.fromStream(inputForPayload))
-            .addOnFailureListener { e -> Log.e("NearbyNetwork", "Failed to send stream payload: ${e.message}") }
-
-        return object : VSocket {
-            override fun inputStream(): InputStream = inputStream
-            override fun outputStream(): OutputStream = outputStream
-            override fun close() {
-                inputStream.close()
-                outputStream.close()
-                streamMap.remove(endpointId)
-            }
-        }
-    }
     override fun close() {
         if (isRunning.compareAndSet(true, false)) {
             coroutineScope.cancel()
             executorService.shutdown()
-            connectionsClient.stopAdvertising()
-            connectionsClient.stopDiscovery()
             connectionsClient.stopAllEndpoints()
             streamMap.values.forEach { (input, output) ->
                 input.close()
@@ -320,12 +314,40 @@ class GoogleNearbyVirtualNetwork(
             }
             streamMap.clear()
             endpointMap.clear()
-            discoveredEndpoints.clear()
         }
     }
 
-    fun getConnectedEndpoints(): List<InetAddress> {
-        return endpointMap.values.toList()
+    fun sendMessage(message: String) {
+        val maxPayloadSize = VirtualPacket.MAX_PAYLOAD_SIZE // Use the constant defined in VirtualPacket
+        val messageBytes = message.toByteArray()
+        val numChunks = (messageBytes.size + maxPayloadSize - 1) / maxPayloadSize
+
+        // Loop to send each chunk
+        for (i in 0 until numChunks) {
+            val start = i * maxPayloadSize
+            val end = minOf(start + maxPayloadSize, messageBytes.size)
+            val chunk = messageBytes.copyOfRange(start, end)
+
+            val packet = VirtualPacket.fromData(chunk, 0)
+            sendPacketToAllEndpoints(packet)
+        }
+    }
+
+    private fun sendPacketToAllEndpoints(packet: VirtualPacket) {
+        endpointMap.entries.forEach { (endpointId, address) ->
+            try {
+                send(packet, address)
+                Log.d("GoogleNearbyVirtualNetwork", "Message chunk sent to $endpointId with IP: $address")
+            } catch (e: Exception) {
+                Log.e("GoogleNearbyVirtualNetwork", "Error sending message chunk to $endpointId: ${e.message}", e)
+            }
+        }
+    }
+
+    fun isRunning(): Boolean = isRunning.get()
+
+    fun getConnectedEndpoints(): List<Pair<String, InetAddress>> {
+        return endpointMap.entries.map { (endpointId, address) -> endpointId to address }
     }
 
     private fun Int.toByteArray(): ByteArray {
@@ -338,27 +360,27 @@ class GoogleNearbyVirtualNetwork(
     }
 }
 
+
 class IPAddressPool(baseIp: String, maskBits: Int) {
     private val network: InetAddress
-    private val availableIps: MutableSet<InetAddress>
+    private val usedIps = ConcurrentHashMap<String, InetAddress>()
+    private var lastAssignedIp: Int
 
     init {
         network = InetAddress.getByName(baseIp)
-        val numAddresses = 1 shl (32 - maskBits)
-        availableIps = (1 until numAddresses).map {
-            InetAddress.getByAddress(network.address.let { addr ->
-                ByteBuffer.wrap(addr).putInt(ByteBuffer.wrap(addr).int + it).array()
-            })
-        }.toMutableSet()
+        lastAssignedIp = ByteBuffer.wrap(network.address).int
     }
 
     @Synchronized
-    fun getNextAvailableIp(): InetAddress {
-        return availableIps.first().also { availableIps.remove(it) }
+    fun getNextAvailableIp(deviceId: String): InetAddress {
+        return usedIps.getOrPut(deviceId) {
+            lastAssignedIp++
+            InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(lastAssignedIp).array())
+        }
     }
 
     @Synchronized
-    fun releaseIp(ip: InetAddress?) {
-        ip?.let { availableIps.add(it) }
+    fun releaseIp(deviceId: String) {
+        usedIps.remove(deviceId)
     }
 }
