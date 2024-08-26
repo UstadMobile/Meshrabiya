@@ -2,41 +2,41 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-feature android:name="android.software.companion_device_setup"/>
-
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- Required to create local only hotspot, use wifimanager, etc  -->
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
-
-    <!--
-    Location permissions for use of local hotspot
-    https://developer.android.com/guide/topics/connectivity/localonlyhotspot
-    -->
-
-
-    <!-- required for wifi performance lock -->
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-
-    <!-- For QR code scanning -->
-    <uses-permission android:name="android.permission.CAMERA"/>
-
-    <uses-feature
-        android:name="android.hardware.camera"
-        android:required="false"/>
-
-    <!-- If your app targets Android 13 (API level 33)
-          or higher, you must declare the NEARBY_WIFI_DEVICES permission. -->
+    <!-- Nearby Devices permissions -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Internet and Network permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+
+    <!-- WiFi permissions -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
+    <!-- Location permissions (for Android 12 and below) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
         android:maxSdkVersion="32" />
+
+    <!-- Bluetooth permissions -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+
+    <!-- Other permissions -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <!-- Features -->
+    <uses-feature android:name="android.software.companion_device_setup"/>
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false"/>
 
     <queries>
         <intent>

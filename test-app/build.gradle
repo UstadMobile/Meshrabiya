@@ -3,6 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id "com.jaredsburrows.license" version "0.9.3"
+
 }
 
 android {
@@ -59,7 +60,8 @@ android {
 
 dependencies {
     implementation(project(":lib-meshrabiya"))
-    implementation(project(":nearby-test"))
+    implementation(project(":lib-nearby"))
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
 
     implementation "ch.acra:acra-http:$version_acra"
     implementation "ch.acra:acra-dialog:$version_acra"

@@ -74,7 +74,7 @@ class VirtualPacket private constructor(
      *
      * @param lastHopAddr the value to set for the last hop address
      */
-    internal fun updateLastHopAddrAndIncrementHopCountInData(
+    fun updateLastHopAddrAndIncrementHopCountInData(
         lastHopAddr: Int
     ) {
         val byteBuffer = ByteBuffer.wrap(data, dataOffset + LAST_HOP_ADDR_OFFSET, 5)
