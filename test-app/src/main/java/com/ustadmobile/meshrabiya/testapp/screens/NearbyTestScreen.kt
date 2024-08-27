@@ -17,13 +17,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
+
 
 @Composable
 fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
     val isNetworkRunning by viewModel.isNetworkRunning.collectAsState()
-    val connectedEndpoints by viewModel.connectedEndpoints.collectAsState()
+    val endpoints by viewModel.endpoints.collectAsState()
     val logs by viewModel.logs.collectAsState()
 
     Column(
@@ -42,19 +44,20 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Text("Endpoints:", style = MaterialTheme.typography.titleMedium)
         LazyColumn(
             modifier = Modifier
-                .height(120.dp)
+                .height(150.dp)
                 .fillMaxWidth()
         ) {
-            items(connectedEndpoints) { (endpointId, address) ->
+            items(endpoints) { endpoint ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("$endpointId (${address.hostAddress})")
-                    Button(onClick = { viewModel.sendTestPacket(endpointId) }) {
-                        Text("Send Test")
+                    Text("${endpoint.endpointId}: ${endpoint.status}")
+                    if (endpoint.isOutgoing) {
+                        Text("Outgoing", color = Color.Blue)
                     }
                 }
             }
