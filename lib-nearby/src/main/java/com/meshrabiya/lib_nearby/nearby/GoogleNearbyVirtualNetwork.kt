@@ -16,6 +16,7 @@ import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
 import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.VirtualNode
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
@@ -48,7 +49,8 @@ class GoogleNearbyVirtualNetwork(
     private val serviceId: String = "com.ustadmobile.meshrabiya",
     private val strategy: Strategy = Strategy.P2P_STAR,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-    private val executorService: ExecutorService = Executors.newCachedThreadPool()
+    private val executorService: ExecutorService = Executors.newCachedThreadPool(),
+    override val logger: MNetLogger
 ) : VirtualNetworkInterface {
 
     private val connectionsClient = Nearby.getConnectionsClient(context)

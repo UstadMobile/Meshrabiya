@@ -1,19 +1,21 @@
 package com.ustadmobile.meshrabiya.testapp.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
@@ -22,51 +24,53 @@ import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
 fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
     val isNetworkRunning by viewModel.isNetworkRunning.collectAsState()
     val connectedEndpoints by viewModel.connectedEndpoints.collectAsState()
-    val messages by viewModel.messages.collectAsState()
-    var messageText by remember { mutableStateOf("") }
+    val logs by viewModel.logs.collectAsState()
 
-
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Nearby Connections", style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(8.dp))
-
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         Button(
-            onClick = { viewModel.startNetwork() },
-            enabled = !isNetworkRunning
+            onClick = {
+                if (isNetworkRunning) viewModel.stopNetwork() else viewModel.startNetwork()
+            },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Start Network")
+            Text(if (isNetworkRunning) "Stop Network" else "Start Network")
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = { viewModel.stopNetwork() },
-            enabled = isNetworkRunning
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(
+            modifier = Modifier
+                .height(120.dp)
+                .fillMaxWidth()
         ) {
-            Text("Stop Network")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("Connected Endpoints:")
-        connectedEndpoints.forEach { (id, address) ->
-            Text("$id: $address")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextField(
-            value = messageText,
-            onValueChange = { messageText = it },
-            label = { Text("Enter message") }
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = { viewModel.sendMessage(messageText) }) {
-            Text("Send Message")
+            items(connectedEndpoints) { (endpointId, address) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("$endpointId (${address.hostAddress})")
+                    Button(onClick = { viewModel.sendTestPacket(endpointId) }) {
+                        Text("Send Test")
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("Messages:")
-        messages.forEach { (sender, message) ->
-            Text("$sender: $message")
+        Text("Logs:", style = MaterialTheme.typography.titleMedium)
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            items(logs) { log ->
+                Text(log)
+            }
         }
     }
 }

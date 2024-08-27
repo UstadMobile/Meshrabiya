@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet.netinterface
 
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
 import java.io.Closeable
 import java.net.InetAddress
@@ -33,7 +34,7 @@ import java.net.InetAddress
 interface VirtualNetworkInterface : Closeable {
 
     val virtualAddress: InetAddress
-
+    val logger: MNetLogger
     /**
      * Send the given VirtualPacket over this VirtualNetworkInterface to the NextHopAddress
      *
