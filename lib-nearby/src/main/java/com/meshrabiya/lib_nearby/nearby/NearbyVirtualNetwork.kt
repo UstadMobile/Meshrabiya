@@ -16,17 +16,22 @@ import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
 import com.ustadmobile.meshrabiya.log.MNetLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlin.random.Random
+
 
 class NearbyVirtualNetwork(
     private val context: Context,
     private val name: String,
     private val serviceId: String,
     private val strategy: Strategy = Strategy.P2P_CLUSTER,
-    private val logger: MNetLogger
+    private val logger: MNetLogger,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
     private val connectionsClient = Nearby.getConnectionsClient(context)
 
@@ -45,6 +50,19 @@ class NearbyVirtualNetwork(
     val endpointStatusFlow = _endpointStatusFlow.asStateFlow()
 
     private val desiredOutgoingConnections = 3
+
+    init {
+        scope.launch {
+            endpointStatusFlow.collect { endpointMap ->
+                val connectedEndpoints = endpointMap.values.count { it.status == EndpointStatus.CONNECTED && it.isOutgoing }
+                if (connectedEndpoints < desiredOutgoingConnections) {
+                    endpointMap.values
+                        .filter { it.status == EndpointStatus.DISCONNECTED }
+                        .forEach { checkAndInitiateConnection(it.endpointId) }
+                }
+            }
+        }
+    }
 
     fun start() {
         startAdvertising()
@@ -77,7 +95,7 @@ class NearbyVirtualNetwork(
             log("Failed to start discovery", e)
         }
     }
-
+    
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
             log("Connection initiated with endpoint: $endpointId")
@@ -191,8 +209,8 @@ class NearbyVirtualNetwork(
     }
 
     private fun checkAndInitiateConnection(endpointId: String) {
-        val connectedEndpoints = _endpointStatusFlow.value.values.count { it.status == EndpointStatus.CONNECTED && it.isOutgoing }
-        if (connectedEndpoints < desiredOutgoingConnections) {
+        val endpointInfo = _endpointStatusFlow.value[endpointId]
+        if (endpointInfo != null && endpointInfo.status == EndpointStatus.DISCONNECTED) {
             requestConnection(endpointId)
         }
     }
@@ -232,6 +250,7 @@ class NearbyVirtualNetwork(
 }
 
 private const val IP_EXCHANGE_PACKET_TYPE = 1
+
 data class IpExchangePacket(val ipAddress: String) {
     fun toByteArray(): ByteArray {
         return byteArrayOf(IP_EXCHANGE_PACKET_TYPE.toByte()) + ipAddress.toByteArray()
