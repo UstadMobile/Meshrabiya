@@ -39,11 +39,16 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun initializeNearbyNetwork() {
+        val virtualIpAddress = "169.254.${Random.nextInt(1, 255)}.${Random.nextInt(1, 255)}"
+        val broadcastAddress = "169.254.255.255"
+
         nearbyNetwork = NearbyVirtualNetwork(
             context = getApplication(),
             name = "Device-${Random.nextInt(1000)}",
             serviceId = "com.ustadmobile.meshrabiya.test",
-            logger = logger,
+            virtualIpAddress = virtualIpAddress,
+            broadcastAddress = broadcastAddress,
+            logger = logger
         )
     }
 
