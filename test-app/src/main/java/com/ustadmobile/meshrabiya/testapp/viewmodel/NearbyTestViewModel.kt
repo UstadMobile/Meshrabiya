@@ -8,6 +8,8 @@ import com.ustadmobile.meshrabiya.log.MNetLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.net.InetAddress
+import java.nio.ByteBuffer
 import kotlin.random.Random
 
 
@@ -46,12 +48,16 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
             context = getApplication(),
             name = "Device-${Random.nextInt(1000)}",
             serviceId = "com.ustadmobile.meshrabiya.test",
-            virtualIpAddress = virtualIpAddress,
-            broadcastAddress = broadcastAddress,
+            virtualIpAddress = ipToInt(virtualIpAddress),
+            broadcastAddress =ipToInt(broadcastAddress),
             logger = logger
         )
     }
-
+    fun ipToInt(ipAddress: String): Int {
+        val inetAddress = InetAddress.getByName(ipAddress)
+        val byteArray = inetAddress.address
+        return ByteBuffer.wrap(byteArray).int
+    }
     fun startNetwork() {
         nearbyNetwork.start()
         _isNetworkRunning.value = true

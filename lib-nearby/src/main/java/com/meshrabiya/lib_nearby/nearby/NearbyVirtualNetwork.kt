@@ -15,50 +15,52 @@ import com.google.android.gms.nearby.connection.Payload
 import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
-import com.ustadmobile.meshrabiya.ext.ip4AddressToInt
+import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
-import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.InetAddress
-import java.nio.ByteBuffer
 import kotlin.random.Random
-
 
 class NearbyVirtualNetwork(
     context: Context,
     private val name: String,
     private val serviceId: String,
-    private val virtualIpAddress: String,
-    private val broadcastAddress: String,
+    private val virtualIpAddress: Int,
+    private val broadcastAddress: Int,
     private val strategy: Strategy = Strategy.P2P_CLUSTER,
     private val logger: MNetLogger
 ) {
+    private val connectionsClient = Nearby.getConnectionsClient(context)
+    private val desiredOutgoingConnections = 3
+    private val scope = CoroutineScope(Dispatchers.Default)
 
     data class EndpointInfo(
         val endpointId: String,
-        var status: EndpointStatus = EndpointStatus.DISCONNECTED,
-        var ipAddress: String? = null,
-        var isOutgoing: Boolean = false
+        val status: EndpointStatus,
+        val ipAddress: String?,
+        val isOutgoing: Boolean
     )
 
     enum class EndpointStatus {
         DISCONNECTED, CONNECTING, CONNECTED, DISCONNECTING
     }
-    private val connectionsClient = Nearby.getConnectionsClient(context)
-    private val desiredOutgoingConnections = 3
+
+    enum class LogLevel {
+        VERBOSE, DEBUG, INFO, WARNING, ERROR
+    }
 
     private val _endpointStatusFlow = MutableStateFlow<Map<String, EndpointInfo>>(emptyMap())
     val endpointStatusFlow = _endpointStatusFlow.asStateFlow()
-
 
     init {
         observeEndpointStatusFlow()
@@ -74,18 +76,18 @@ class NearbyVirtualNetwork(
         connectionsClient.stopDiscovery()
         connectionsClient.stopAllEndpoints()
         _endpointStatusFlow.value = emptyMap()
-        log("Stopped advertising, discovery, all connections, and cleared endpoints")
+        scope.cancel()
+        log(LogLevel.INFO, "Stopped advertising, discovery, all connections, and cleared endpoints")
     }
-
 
     private fun startAdvertising() {
         val advertisingOptions = AdvertisingOptions.Builder().setStrategy(strategy).build()
         connectionsClient.startAdvertising(
             name, serviceId, connectionLifecycleCallback, advertisingOptions
         ).addOnSuccessListener {
-            log("Started advertising successfully")
+            log(LogLevel.INFO, "Started advertising successfully")
         }.addOnFailureListener { e ->
-            log("Failed to start advertising", e)
+            log(LogLevel.ERROR, "Failed to start advertising", e)
         }
     }
 
@@ -94,46 +96,49 @@ class NearbyVirtualNetwork(
         connectionsClient.startDiscovery(
             serviceId, endpointDiscoveryCallback, discoveryOptions
         ).addOnSuccessListener {
-            log("Started discovery successfully")
+            log(LogLevel.INFO, "Started discovery successfully")
         }.addOnFailureListener { e ->
-            log("Failed to start discovery", e)
+            log(LogLevel.ERROR, "Failed to start discovery", e)
         }
     }
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
-            log("Connection initiated with endpoint: $endpointId")
+            log(LogLevel.INFO, "Connection initiated with endpoint: $endpointId")
             connectionsClient.acceptConnection(endpointId, payloadCallback)
             updateEndpointStatus(endpointId, EndpointStatus.CONNECTING)
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             if (result.status.isSuccess) {
-                log("Successfully connected to endpoint: $endpointId")
+                log(LogLevel.INFO, "Successfully connected to endpoint: $endpointId")
                 updateEndpointStatus(endpointId, EndpointStatus.CONNECTED)
                 sendMmcpPingPacket(endpointId)
             } else {
-                log("Failed to connect to endpoint: $endpointId. Reason: ${result.status}")
+                log(LogLevel.ERROR, "Failed to connect to endpoint: $endpointId. Reason: ${result.status}")
                 updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
             }
         }
 
         override fun onDisconnected(endpointId: String) {
-            log("Disconnected from endpoint: $endpointId")
+            log(LogLevel.INFO, "Disconnected from endpoint: $endpointId")
             updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
         }
     }
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
-            log("Endpoint found: $endpointId")
-            addEndpoint(endpointId)
-            checkAndInitiateConnection(endpointId)
+            log(LogLevel.DEBUG, "Endpoint found: $endpointId")
+            _endpointStatusFlow.update { currentMap ->
+                currentMap + (endpointId to EndpointInfo(endpointId, EndpointStatus.DISCONNECTED, null, false))
+            }
         }
 
         override fun onEndpointLost(endpointId: String) {
-            log("Endpoint lost: $endpointId")
-            removeEndpoint(endpointId)
+            log(LogLevel.DEBUG, "Endpoint lost: $endpointId")
+            _endpointStatusFlow.update { currentMap ->
+                currentMap - endpointId
+            }
         }
     }
 
@@ -141,176 +146,63 @@ class NearbyVirtualNetwork(
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             when (payload.type) {
                 Payload.Type.BYTES -> handleBytesPayload(endpointId, payload)
-                else -> log("Received unsupported payload type from: $endpointId")
+                Payload.Type.STREAM -> handleStreamPayload(endpointId, payload)
+                else -> log(LogLevel.WARNING, "Received unsupported payload type from: $endpointId")
             }
         }
 
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
+            log(LogLevel.DEBUG, "Payload transfer update for $endpointId: ${update.status}")
         }
     }
 
-    private fun updateEndpointIpAddress(endpointId: String, ipAddress: String) {
-        _endpointStatusFlow.update { currentMap ->
-            currentMap.toMutableMap().apply {
-                this[endpointId]?.ipAddress = ipAddress
+    private fun observeEndpointStatusFlow() {
+        scope.launch {
+            endpointStatusFlow.collect { endpointMap ->
+                val connectedOutgoing = endpointMap.values.count { it.status == EndpointStatus.CONNECTED && it.isOutgoing }
+                val disconnectedEndpoints = endpointMap.values.filter { it.status == EndpointStatus.DISCONNECTED }
+
+                log(LogLevel.DEBUG, "Connected outgoing: $connectedOutgoing, Disconnected endpoints: ${disconnectedEndpoints.size}")
+
+                if (connectedOutgoing < desiredOutgoingConnections && disconnectedEndpoints.isNotEmpty()) {
+                    val endpointsToConnect = disconnectedEndpoints.take(desiredOutgoingConnections - connectedOutgoing)
+                    log(LogLevel.INFO, "Initiating connection to ${endpointsToConnect.size} endpoints")
+                    endpointsToConnect.forEach { requestConnection(it.endpointId) }
+                }
             }
-        }
-    }
-
-    private fun updateEndpointStatus(endpointId: String, status: EndpointStatus) {
-        _endpointStatusFlow.update { currentMap ->
-            currentMap.toMutableMap().apply {
-                this[endpointId]?.status = status
-            }
-        }
-    }
-
-    private fun addEndpoint(endpointId: String) {
-        _endpointStatusFlow.update { currentMap ->
-            currentMap.toMutableMap().apply {
-                this[endpointId] = EndpointInfo(endpointId)
-            }
-        }
-    }
-
-    private fun removeEndpoint(endpointId: String) {
-        _endpointStatusFlow.update { currentMap ->
-            currentMap.toMutableMap().apply {
-                remove(endpointId)
-            }
-        }
-    }
-
-    private fun checkAndInitiateConnection(endpointId: String) {
-        val endpointInfo = _endpointStatusFlow.value[endpointId]
-        if (endpointInfo != null && endpointInfo.status == EndpointStatus.DISCONNECTED) {
-            requestConnection(endpointId)
         }
     }
 
     private fun requestConnection(endpointId: String) {
         connectionsClient.requestConnection(name, endpointId, connectionLifecycleCallback)
             .addOnSuccessListener {
-                log("Connection request sent to endpoint: $endpointId")
-                updateEndpointStatus(endpointId, EndpointStatus.CONNECTING)
+                log(LogLevel.INFO, "Connection request sent to endpoint: $endpointId")
                 _endpointStatusFlow.update { currentMap ->
-                    currentMap.toMutableMap().apply {
-                        this[endpointId]?.isOutgoing = true
-                    }
+                    currentMap[endpointId]?.let { info ->
+                        currentMap + (endpointId to info.copy(status = EndpointStatus.CONNECTING, isOutgoing = true))
+                    } ?: currentMap
                 }
             }
             .addOnFailureListener { e ->
-                log("Failed to request connection to endpoint: $endpointId", e)
+                log(LogLevel.ERROR, "Failed to request connection to endpoint: $endpointId", e)
                 updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
             }
     }
 
-    private fun log(message: String, exception: Exception? = null) {
-        val prefix = "[NearbyVirtualNetwork:$name] "
-        if (exception != null) {
-            logger(Log.ERROR, "$prefix$message", exception)
-        } else {
-            logger(Log.DEBUG, "$prefix$message")
-        }
-    }
-
-    private fun observeEndpointStatusFlow() {
-        CoroutineScope(Dispatchers.Default).launch {
-            endpointStatusFlow.collect { endpointMap ->
-                checkAndInitiateConnections(endpointMap)
-            }
-        }
-    }
-
-    private fun checkAndInitiateConnections(endpointMap: Map<String, EndpointInfo>) {
-        val connectedOutgoing = endpointMap.values.count { it.status == EndpointStatus.CONNECTED && it.isOutgoing }
-        val disconnectedEndpoints = endpointMap.values.filter { it.status == EndpointStatus.DISCONNECTED }
-
-        log( "Connected outgoing: $connectedOutgoing, Disconnected endpoints: ${disconnectedEndpoints.size}")
-
-        if (connectedOutgoing < desiredOutgoingConnections && disconnectedEndpoints.isNotEmpty()) {
-            val endpointsToConnect = disconnectedEndpoints.take(desiredOutgoingConnections - connectedOutgoing)
-            log( "Initiating connection to ${endpointsToConnect.size} endpoints")
-            updateMultipleEndpointsStatus(endpointsToConnect.map { it.endpointId }, EndpointStatus.CONNECTING)
-            endpointsToConnect.forEach { requestConnection(it.endpointId) }
-        }
-    }
-
-    private fun updateMultipleEndpointsStatus(endpointIds: List<String>, status: EndpointStatus) {
-        _endpointStatusFlow.update { currentMap ->
-            currentMap.toMutableMap().apply {
-                endpointIds.forEach { endpointId ->
-                    this[endpointId]?.status = status
-                    this[endpointId]?.isOutgoing = true
-                }
-            }
-        }
-    }
-
     private fun sendMmcpPingPacket(endpointId: String) {
         val mmcpPing = MmcpPing(Random.nextInt())
-        val pingBytes = mmcpPing.toBytes()
-
-        val header = VirtualPacketHeader(
-            fromAddr = InetAddress.getByName(virtualIpAddress).address.ip4AddressToInt(),
-            toAddr = InetAddress.getByName(broadcastAddress).address.ip4AddressToInt(),
-            fromPort = 0,
-            toPort = 0,
-            lastHopAddr = InetAddress.getByName(virtualIpAddress).address.ip4AddressToInt(),
-            payloadSize = pingBytes.size,
-            hopCount = 0,
-            maxHops = 1
-        )
-
-        val totalSize = VirtualPacketHeader.HEADER_SIZE + pingBytes.size
-        val data = ByteArray(totalSize)
-        header.toBytes(data, 0)
-        System.arraycopy(pingBytes, 0, data, VirtualPacketHeader.HEADER_SIZE, pingBytes.size)
-
-        val virtualPacket = VirtualPacket.fromData(data, 0)
+        val virtualPacket = mmcpPing.toVirtualPacket(virtualIpAddress, broadcastAddress)
         val payload = Payload.fromBytes(virtualPacket.data)
 
         connectionsClient.sendPayload(endpointId, payload)
-            .addOnSuccessListener { log("Sent MMCP Ping to $endpointId") }
-            .addOnFailureListener { e -> log("Failed to send MMCP Ping to $endpointId", e) }
-    }
-
-    private fun sendMmcpPongPacket(endpointId: String, replyToMessageId: Int) {
-        val mmcpPong = MmcpPong(Random.nextInt(), replyToMessageId)
-        val pongBytes = mmcpPong.toBytes()
-
-        val header = VirtualPacketHeader(
-            fromAddr = InetAddress.getByName(virtualIpAddress).address.ip4AddressToInt(),
-            toAddr = InetAddress.getByName(broadcastAddress).address.ip4AddressToInt(),
-            fromPort = 0,
-            toPort = 0,
-            lastHopAddr = InetAddress.getByName(virtualIpAddress).address.ip4AddressToInt(),
-            payloadSize = pongBytes.size,
-            hopCount = 0,
-            maxHops = 1
-        )
-
-        val totalSize = VirtualPacketHeader.HEADER_SIZE + pongBytes.size
-        val data = ByteArray(totalSize)
-        header.toBytes(data, 0)
-        System.arraycopy(pongBytes, 0, data, VirtualPacketHeader.HEADER_SIZE, pongBytes.size)
-
-        val virtualPacket = VirtualPacket.fromData(data, 0)
-        val payload = Payload.fromBytes(virtualPacket.data)
-
-        connectionsClient.sendPayload(endpointId, payload)
-            .addOnSuccessListener { log("Sent MMCP Pong to $endpointId") }
-            .addOnFailureListener { e -> log("Failed to send MMCP Pong to $endpointId", e) }
-    }
-
-    private fun Int.toByteArray(): ByteArray {
-        return ByteBuffer.allocate(4).putInt(this).array()
+            .addOnSuccessListener { log(LogLevel.DEBUG, "Sent MMCP Ping to $endpointId") }
+            .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send MMCP Ping to $endpointId", e) }
     }
 
     private fun handleBytesPayload(endpointId: String, payload: Payload) {
         val bytes = payload.asBytes()
-        if (bytes == null || bytes.isEmpty()) {
-            log("Received invalid payload from endpoint: $endpointId")
+        if (bytes == null) {
+            log(LogLevel.WARNING, "Received null payload from endpoint: $endpointId")
             return
         }
 
@@ -322,30 +214,73 @@ class NearbyVirtualNetwork(
                     virtualPacket.payloadOffset + virtualPacket.header.payloadSize
                 )
             )
-            val fromAddress = InetAddress.getByAddress(virtualPacket.header.fromAddr.toByteArray()).hostAddress
+            val fromAddress = InetAddress.getByAddress(virtualPacket.header.fromAddr.addressToByteArray()).hostAddress
 
             when (mmcpMessage) {
-                is MmcpPing -> handleMmcpPing(endpointId, mmcpMessage, fromAddress)
-                is MmcpPong -> handleMmcpPong(endpointId, mmcpMessage, fromAddress)
-                else -> log("Received unknown MMCP message from $endpointId")
+                is MmcpPing -> handleMmcpPing(endpointId, mmcpMessage, fromAddress ?: "Unknown")
+                is MmcpPong -> handleMmcpPong(endpointId, mmcpMessage, fromAddress ?: "Unknown")
+                else -> log(LogLevel.WARNING, "Received unknown MMCP message from $endpointId")
             }
         } catch (e: Exception) {
-            log("Error parsing payload from $endpointId", e)
+            log(LogLevel.ERROR, "Error parsing payload from $endpointId", e)
+        }
+    }
+
+    private fun handleStreamPayload(endpointId: String, payload: Payload) {
+        val inputStream = payload.asStream()?.asInputStream()
+        if (inputStream != null) {
+            log(LogLevel.DEBUG, "Received stream payload from $endpointId")
+            // Process the stream here
+        } else {
+            log(LogLevel.WARNING, "Received invalid stream payload from $endpointId")
         }
     }
 
     private fun handleMmcpPing(endpointId: String, mmcpPing: MmcpPing, fromAddress: String) {
-        log( "Received MMCP Ping from $endpointId with IP $fromAddress")
+        log(LogLevel.DEBUG, "Received MMCP Ping from $endpointId with IP $fromAddress")
         updateEndpointIpAddress(endpointId, fromAddress)
         sendMmcpPongPacket(endpointId, mmcpPing.messageId)
     }
 
     private fun handleMmcpPong(endpointId: String, mmcpPong: MmcpPong, fromAddress: String) {
-        log( "Received MMCP Pong from $endpointId with IP $fromAddress")
+        log(LogLevel.DEBUG, "Received MMCP Pong from $endpointId with IP $fromAddress")
         updateEndpointIpAddress(endpointId, fromAddress)
     }
 
+    private fun sendMmcpPongPacket(endpointId: String, replyToMessageId: Int) {
+        val mmcpPong = MmcpPong(Random.nextInt(), replyToMessageId)
+        val virtualPacket = mmcpPong.toVirtualPacket(virtualIpAddress, broadcastAddress)
+        val payload = Payload.fromBytes(virtualPacket.data)
 
+        connectionsClient.sendPayload(endpointId, payload)
+            .addOnSuccessListener { log(LogLevel.DEBUG, "Sent MMCP Pong to $endpointId") }
+            .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send MMCP Pong to $endpointId", e) }
+    }
+
+    private fun updateEndpointStatus(endpointId: String, status: EndpointStatus) {
+        _endpointStatusFlow.update { currentMap ->
+            currentMap[endpointId]?.let { info ->
+                currentMap + (endpointId to info.copy(status = status))
+            } ?: currentMap
+        }
+    }
+
+    private fun updateEndpointIpAddress(endpointId: String, ipAddress: String) {
+        _endpointStatusFlow.update { currentMap ->
+            currentMap[endpointId]?.let { info ->
+                currentMap + (endpointId to info.copy(ipAddress = ipAddress))
+            } ?: currentMap
+        }
+    }
+
+    private fun log(level: LogLevel, message: String, exception: Exception? = null) {
+        val prefix = "[NearbyVirtualNetwork:$name] "
+        when (level) {
+            LogLevel.VERBOSE -> logger(Log.VERBOSE, "$prefix$message", exception)
+            LogLevel.DEBUG -> logger(Log.DEBUG, "$prefix$message", exception)
+            LogLevel.INFO -> logger(Log.INFO, "$prefix$message", exception)
+            LogLevel.WARNING -> logger(Log.WARN, "$prefix$message", exception)
+            LogLevel.ERROR -> logger(Log.ERROR, "$prefix$message", exception)
+        }
+    }
 }
-
-
