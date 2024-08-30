@@ -64,6 +64,8 @@ class NearbyVirtualNetwork(
 
     init {
         observeEndpointStatusFlow()
+        startAdvertising()
+        startDiscovery()
     }
 
     fun start() {
@@ -71,7 +73,7 @@ class NearbyVirtualNetwork(
         startDiscovery()
     }
 
-    fun stop() {
+    fun close() {
         connectionsClient.stopAdvertising()
         connectionsClient.stopDiscovery()
         connectionsClient.stopAllEndpoints()

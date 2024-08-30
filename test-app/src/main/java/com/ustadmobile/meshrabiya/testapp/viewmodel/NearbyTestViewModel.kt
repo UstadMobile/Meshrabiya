@@ -65,7 +65,7 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun stopNetwork() {
-        nearbyNetwork.stop()
+        nearbyNetwork.close()
         _isNetworkRunning.value = false
     }
 
