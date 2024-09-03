@@ -13,6 +13,7 @@ import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import com.ustadmobile.meshrabiya.testapp.server.TestAppServer
+import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
@@ -39,6 +40,10 @@ class App: Application(), DIAware {
 
     @SuppressLint("SimpleDateFormat")
     private val diModule = DI.Module("meshrabiya-module") {
+
+        bind<NearbyTestViewModel>() with singleton {
+            NearbyTestViewModel(application = this@App)
+        }
 
         bind<InetAddress>(tag = TAG_VIRTUAL_ADDRESS) with singleton() {
             runBlocking {

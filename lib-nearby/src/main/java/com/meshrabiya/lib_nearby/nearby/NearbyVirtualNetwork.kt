@@ -21,6 +21,7 @@ import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
+import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -30,6 +31,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.InetAddress
 import kotlin.random.Random
+
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 class NearbyVirtualNetwork(
     context: Context,
@@ -43,11 +47,12 @@ class NearbyVirtualNetwork(
     private val connectionsClient = Nearby.getConnectionsClient(context)
     private val desiredOutgoingConnections = 3
     private val scope = CoroutineScope(Dispatchers.Default)
+    private val isClosed = AtomicBoolean(false)
 
     data class EndpointInfo(
         val endpointId: String,
         val status: EndpointStatus,
-        val ipAddress: String?,
+        val ipAddress: InetAddress?,
         val isOutgoing: Boolean
     )
 
@@ -59,30 +64,32 @@ class NearbyVirtualNetwork(
         VERBOSE, DEBUG, INFO, WARNING, ERROR
     }
 
-    private val _endpointStatusFlow = MutableStateFlow<Map<String, EndpointInfo>>(emptyMap())
+    private val _endpointStatusFlow = MutableStateFlow(ConcurrentHashMap<String, EndpointInfo>())
     val endpointStatusFlow = _endpointStatusFlow.asStateFlow()
 
     init {
         observeEndpointStatusFlow()
-        startAdvertising()
-        startDiscovery()
     }
 
     fun start() {
+        checkClosed()
         startAdvertising()
         startDiscovery()
     }
 
     fun close() {
-        connectionsClient.stopAdvertising()
-        connectionsClient.stopDiscovery()
-        connectionsClient.stopAllEndpoints()
-        _endpointStatusFlow.value = emptyMap()
-        scope.cancel()
-        log(LogLevel.INFO, "Stopped advertising, discovery, all connections, and cleared endpoints")
+        if (isClosed.compareAndSet(false, true)) {
+            connectionsClient.stopAdvertising()
+            connectionsClient.stopDiscovery()
+            connectionsClient.stopAllEndpoints()
+            _endpointStatusFlow.value.clear()
+            scope.cancel()
+            log(LogLevel.INFO, "Stopped advertising, discovery, all connections, and cleared endpoints")
+        }
     }
 
     private fun startAdvertising() {
+        checkClosed()
         val advertisingOptions = AdvertisingOptions.Builder().setStrategy(strategy).build()
         connectionsClient.startAdvertising(
             name, serviceId, connectionLifecycleCallback, advertisingOptions
@@ -94,6 +101,7 @@ class NearbyVirtualNetwork(
     }
 
     private fun startDiscovery() {
+        checkClosed()
         val discoveryOptions = DiscoveryOptions.Builder().setStrategy(strategy).build()
         connectionsClient.startDiscovery(
             serviceId, endpointDiscoveryCallback, discoveryOptions
@@ -106,12 +114,14 @@ class NearbyVirtualNetwork(
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
+            checkClosed()
             log(LogLevel.INFO, "Connection initiated with endpoint: $endpointId")
             connectionsClient.acceptConnection(endpointId, payloadCallback)
             updateEndpointStatus(endpointId, EndpointStatus.CONNECTING)
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
+            checkClosed()
             if (result.status.isSuccess) {
                 log(LogLevel.INFO, "Successfully connected to endpoint: $endpointId")
                 updateEndpointStatus(endpointId, EndpointStatus.CONNECTED)
@@ -123,6 +133,7 @@ class NearbyVirtualNetwork(
         }
 
         override fun onDisconnected(endpointId: String) {
+            checkClosed()
             log(LogLevel.INFO, "Disconnected from endpoint: $endpointId")
             updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
         }
@@ -130,22 +141,25 @@ class NearbyVirtualNetwork(
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
+            checkClosed()
             log(LogLevel.DEBUG, "Endpoint found: $endpointId")
-            _endpointStatusFlow.update { currentMap ->
-                currentMap + (endpointId to EndpointInfo(endpointId, EndpointStatus.DISCONNECTED, null, false))
-            }
+            val updatedMap = ConcurrentHashMap<String, EndpointInfo>(_endpointStatusFlow.value)
+            updatedMap[endpointId] = EndpointInfo(endpointId, EndpointStatus.DISCONNECTED, null, false)
+            _endpointStatusFlow.value = updatedMap
         }
 
         override fun onEndpointLost(endpointId: String) {
+            checkClosed()
             log(LogLevel.DEBUG, "Endpoint lost: $endpointId")
-            _endpointStatusFlow.update { currentMap ->
-                currentMap - endpointId
-            }
+            val updatedMap = ConcurrentHashMap<String, EndpointInfo>(_endpointStatusFlow.value)
+            updatedMap.remove(endpointId)
+            _endpointStatusFlow.value = updatedMap
         }
     }
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
+            checkClosed()
             when (payload.type) {
                 Payload.Type.BYTES -> handleBytesPayload(endpointId, payload)
                 Payload.Type.STREAM -> handleStreamPayload(endpointId, payload)
@@ -154,6 +168,7 @@ class NearbyVirtualNetwork(
         }
 
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
+            checkClosed()
             log(LogLevel.DEBUG, "Payload transfer update for $endpointId: ${update.status}")
         }
     }
@@ -164,26 +179,30 @@ class NearbyVirtualNetwork(
                 val connectedOutgoing = endpointMap.values.count { it.status == EndpointStatus.CONNECTED && it.isOutgoing }
                 val disconnectedEndpoints = endpointMap.values.filter { it.status == EndpointStatus.DISCONNECTED }
 
-                log(LogLevel.DEBUG, "Connected outgoing: $connectedOutgoing, Disconnected endpoints: ${disconnectedEndpoints.size}")
-
                 if (connectedOutgoing < desiredOutgoingConnections && disconnectedEndpoints.isNotEmpty()) {
-                    val endpointsToConnect = disconnectedEndpoints.take(desiredOutgoingConnections - connectedOutgoing)
+                    val endpointsToConnect = disconnectedEndpoints
+                        .take(desiredOutgoingConnections - connectedOutgoing)
+
                     log(LogLevel.INFO, "Initiating connection to ${endpointsToConnect.size} endpoints")
-                    endpointsToConnect.forEach { requestConnection(it.endpointId) }
+
+                    val updatedMap = ConcurrentHashMap(endpointMap)
+
+                    endpointsToConnect.forEach { endpoint ->
+                        updatedMap[endpoint.endpointId] = endpoint.copy(status = EndpointStatus.CONNECTING, isOutgoing = true)
+                        requestConnection(endpoint.endpointId)
+                    }
+
+                    _endpointStatusFlow.value = updatedMap
                 }
             }
         }
     }
 
     private fun requestConnection(endpointId: String) {
+        checkClosed()
         connectionsClient.requestConnection(name, endpointId, connectionLifecycleCallback)
             .addOnSuccessListener {
                 log(LogLevel.INFO, "Connection request sent to endpoint: $endpointId")
-                _endpointStatusFlow.update { currentMap ->
-                    currentMap[endpointId]?.let { info ->
-                        currentMap + (endpointId to info.copy(status = EndpointStatus.CONNECTING, isOutgoing = true))
-                    } ?: currentMap
-                }
             }
             .addOnFailureListener { e ->
                 log(LogLevel.ERROR, "Failed to request connection to endpoint: $endpointId", e)
@@ -192,6 +211,7 @@ class NearbyVirtualNetwork(
     }
 
     private fun sendMmcpPingPacket(endpointId: String) {
+        checkClosed()
         val mmcpPing = MmcpPing(Random.nextInt())
         val virtualPacket = mmcpPing.toVirtualPacket(virtualIpAddress, broadcastAddress)
         val payload = Payload.fromBytes(virtualPacket.data)
@@ -202,6 +222,7 @@ class NearbyVirtualNetwork(
     }
 
     private fun handleBytesPayload(endpointId: String, payload: Payload) {
+        checkClosed()
         val bytes = payload.asBytes()
         if (bytes == null) {
             log(LogLevel.WARNING, "Received null payload from endpoint: $endpointId")
@@ -216,11 +237,11 @@ class NearbyVirtualNetwork(
                     virtualPacket.payloadOffset + virtualPacket.header.payloadSize
                 )
             )
-            val fromAddress = InetAddress.getByAddress(virtualPacket.header.fromAddr.addressToByteArray()).hostAddress
+            val fromAddress = InetAddress.getByAddress(virtualPacket.header.fromAddr.addressToByteArray())
 
             when (mmcpMessage) {
-                is MmcpPing -> handleMmcpPing(endpointId, mmcpMessage, fromAddress ?: "Unknown")
-                is MmcpPong -> handleMmcpPong(endpointId, mmcpMessage, fromAddress ?: "Unknown")
+                is MmcpPing -> handleMmcpPing(endpointId, mmcpMessage, fromAddress)
+                is MmcpPong -> handleMmcpPong(endpointId, mmcpMessage, fromAddress)
                 else -> log(LogLevel.WARNING, "Received unknown MMCP message from $endpointId")
             }
         } catch (e: Exception) {
@@ -229,6 +250,7 @@ class NearbyVirtualNetwork(
     }
 
     private fun handleStreamPayload(endpointId: String, payload: Payload) {
+        checkClosed()
         val inputStream = payload.asStream()?.asInputStream()
         if (inputStream != null) {
             log(LogLevel.DEBUG, "Received stream payload from $endpointId")
@@ -238,18 +260,14 @@ class NearbyVirtualNetwork(
         }
     }
 
-    private fun handleMmcpPing(endpointId: String, mmcpPing: MmcpPing, fromAddress: String) {
+    private fun handleMmcpPing(endpointId: String, mmcpPing: MmcpPing, fromAddress: InetAddress) {
+        checkClosed()
         log(LogLevel.DEBUG, "Received MMCP Ping from $endpointId with IP $fromAddress")
         updateEndpointIpAddress(endpointId, fromAddress)
         sendMmcpPongPacket(endpointId, mmcpPing.messageId)
     }
-
-    private fun handleMmcpPong(endpointId: String, mmcpPong: MmcpPong, fromAddress: String) {
-        log(LogLevel.DEBUG, "Received MMCP Pong from $endpointId with IP $fromAddress")
-        updateEndpointIpAddress(endpointId, fromAddress)
-    }
-
     private fun sendMmcpPongPacket(endpointId: String, replyToMessageId: Int) {
+        checkClosed()
         val mmcpPong = MmcpPong(Random.nextInt(), replyToMessageId)
         val virtualPacket = mmcpPong.toVirtualPacket(virtualIpAddress, broadcastAddress)
         val payload = Payload.fromBytes(virtualPacket.data)
@@ -259,20 +277,39 @@ class NearbyVirtualNetwork(
             .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send MMCP Pong to $endpointId", e) }
     }
 
-    private fun updateEndpointStatus(endpointId: String, status: EndpointStatus) {
-        _endpointStatusFlow.update { currentMap ->
-            currentMap[endpointId]?.let { info ->
-                currentMap + (endpointId to info.copy(status = status))
-            } ?: currentMap
-        }
+    private fun handleMmcpPong(endpointId: String, mmcpPong: MmcpPong, fromAddress: InetAddress) {
+        checkClosed()
+        log(LogLevel.DEBUG, "Received MMCP Pong from $endpointId with message ID ${mmcpPong.messageId}")
+        updateEndpointIpAddress(endpointId, fromAddress)
     }
 
-    private fun updateEndpointIpAddress(endpointId: String, ipAddress: String) {
-        _endpointStatusFlow.update { currentMap ->
-            currentMap[endpointId]?.let { info ->
-                currentMap + (endpointId to info.copy(ipAddress = ipAddress))
-            } ?: currentMap
+    private fun updateEndpointIpAddress(endpointId: String, ipAddress: InetAddress) {
+        val updatedMap = ConcurrentHashMap(_endpointStatusFlow.value)
+        updatedMap[endpointId] = updatedMap[endpointId]?.copy(ipAddress = ipAddress)
+        _endpointStatusFlow.value = updatedMap
+    }
+
+    private fun updateEndpointStatus(endpointId: String, status: EndpointStatus) {
+        // Create a new map to safely update the status
+        val updatedMap = ConcurrentHashMap<String, EndpointInfo>(_endpointStatusFlow.value)
+
+        // Get the current endpoint info
+        val info = updatedMap[endpointId]
+
+        // Update or add the endpoint status safely
+        if (info != null) {
+            updatedMap[endpointId] = info.copy(status = status)
+        } else {
+            log(LogLevel.WARNING, "Endpoint $endpointId not found in status map. Adding new entry.")
+            updatedMap[endpointId] = EndpointInfo(endpointId, status, null, false)
         }
+
+        _endpointStatusFlow.value = updatedMap
+    }
+
+
+    private fun checkClosed() {
+        if (isClosed.get()) throw IllegalStateException("Network is closed")
     }
 
     private fun log(level: LogLevel, message: String, exception: Exception? = null) {

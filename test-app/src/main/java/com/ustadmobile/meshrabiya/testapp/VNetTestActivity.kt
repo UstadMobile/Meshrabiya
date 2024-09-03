@@ -55,12 +55,14 @@ import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
 import org.kodein.di.compose.withDI
+import org.kodein.di.instance
 import java.net.URLEncoder
 
 class VNetTestActivity : ComponentActivity(), DIAware {
     override val di by closestDI()
 
-    private val viewModel: NearbyTestViewModel by viewModels()
+    private val viewModel: NearbyTestViewModel by instance()
+
     private val PERMISSION_REQUEST_CODE = 123
 
     private val requiredPermissions = arrayOf(

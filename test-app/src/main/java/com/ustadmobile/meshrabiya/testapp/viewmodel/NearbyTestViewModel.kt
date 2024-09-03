@@ -1,6 +1,7 @@
 package com.ustadmobile.meshrabiya.testapp.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meshrabiya.lib_nearby.nearby.NearbyVirtualNetwork
@@ -49,19 +50,25 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
             name = "Device-${Random.nextInt(1000)}",
             serviceId = "com.ustadmobile.meshrabiya.test",
             virtualIpAddress = ipToInt(virtualIpAddress),
-            broadcastAddress =ipToInt(broadcastAddress),
+            broadcastAddress = ipToInt(broadcastAddress),
             logger = logger
         )
     }
+
     fun ipToInt(ipAddress: String): Int {
         val inetAddress = InetAddress.getByName(ipAddress)
         val byteArray = inetAddress.address
         return ByteBuffer.wrap(byteArray).int
     }
+
     fun startNetwork() {
-        nearbyNetwork.start()
-        _isNetworkRunning.value = true
-        observeEndpoints()
+        try {
+            nearbyNetwork.start()
+            _isNetworkRunning.value = true
+            observeEndpoints()
+        } catch (e: IllegalStateException) {
+            logger.invoke(Log.ERROR, "Failed to start network: ${e.message}")
+        }
     }
 
     fun stopNetwork() {
@@ -75,5 +82,20 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
                 _endpoints.value = endpointMap.values.toList()
             }
         }
+    }
+
+    fun sendBroadcast(message: String) {
+        viewModelScope.launch {
+            try {
+                logger.invoke(Log.INFO, "Broadcast sent: $message")
+            } catch (e: IllegalStateException) {
+                logger.invoke(Log.ERROR, "Failed to send broadcast: ${e.message}")
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopNetwork()
     }
 }
