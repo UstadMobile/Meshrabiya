@@ -249,7 +249,6 @@ class NearbyVirtualNetwork(
         val inputStream = payload.asStream()?.asInputStream()
         if (inputStream != null) {
             log(LogLevel.DEBUG, "Received stream payload from $endpointId")
-            // Process the stream here
         } else {
             log(LogLevel.WARNING, "Received invalid stream payload from $endpointId")
         }

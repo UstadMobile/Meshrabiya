@@ -14,7 +14,6 @@ class ChatServer(
     val chatMessages: StateFlow<List<ChatMessage>> get() = _chatMessages
 
     init {
-        // Register the listener to handle incoming messages
         nearbyVirtualNetwork.setOnMessageReceivedListener { endpointId, payload ->
             handleIncomingPayload(endpointId, payload)
         }
@@ -26,8 +25,6 @@ class ChatServer(
             val message = String(bytes, Charsets.UTF_8)
             val chatMessage = ChatMessage(timestamp = System.currentTimeMillis(), message = message)
             _chatMessages.value = _chatMessages.value + chatMessage
-        } else {
-            // Handle other payload types if needed
         }
     }
 

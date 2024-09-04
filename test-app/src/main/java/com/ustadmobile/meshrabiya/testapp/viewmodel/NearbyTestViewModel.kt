@@ -67,7 +67,6 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     private fun initializeChatServer() {
         chatServer = ChatServer(nearbyNetwork)
 
-        // Observe chat messages from ChatServer
         viewModelScope.launch {
             chatServer.chatMessages.collect { messages ->
                 _messages.value = messages.map { it.message }
@@ -84,7 +83,7 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     fun startNetwork() {
         try {
             nearbyNetwork.start()
-            chatServer // Ensure ChatServer is running
+            chatServer
             _isNetworkRunning.value = true
             observeEndpoints()
         } catch (e: IllegalStateException) {
