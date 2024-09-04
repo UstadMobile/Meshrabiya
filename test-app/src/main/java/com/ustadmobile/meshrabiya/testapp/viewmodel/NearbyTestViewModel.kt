@@ -4,15 +4,15 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.nearby.connection.Payload
 import com.meshrabiya.lib_nearby.nearby.NearbyVirtualNetwork
 import com.ustadmobile.meshrabiya.log.MNetLogger
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.ustadmobile.meshrabiya.testapp.server.ChatServer
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import kotlin.random.Random
-
 
 class NearbyTestViewModel(application: Application) : AndroidViewModel(application) {
     private val _isNetworkRunning = MutableStateFlow(false)
@@ -24,7 +24,11 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs
 
+    private val _messages = MutableStateFlow<List<String>>(emptyList())
+    val messages: StateFlow<List<String>> = _messages
+
     private lateinit var nearbyNetwork: NearbyVirtualNetwork
+    private lateinit var chatServer: ChatServer
 
     private val logger = object : MNetLogger() {
         override fun invoke(priority: Int, message: String, exception: Exception?) {
@@ -39,6 +43,7 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         initializeNearbyNetwork()
+        initializeChatServer()
     }
 
     private fun initializeNearbyNetwork() {
@@ -53,6 +58,21 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
             broadcastAddress = ipToInt(broadcastAddress),
             logger = logger
         )
+
+        nearbyNetwork.setOnMessageReceivedListener { endpointId, payload ->
+            handleIncomingPayload(endpointId, payload)
+        }
+    }
+
+    private fun initializeChatServer() {
+        chatServer = ChatServer(nearbyNetwork)
+
+        // Observe chat messages from ChatServer
+        viewModelScope.launch {
+            chatServer.chatMessages.collect { messages ->
+                _messages.value = messages.map { it.message }
+            }
+        }
     }
 
     fun ipToInt(ipAddress: String): Int {
@@ -64,6 +84,7 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     fun startNetwork() {
         try {
             nearbyNetwork.start()
+            chatServer // Ensure ChatServer is running
             _isNetworkRunning.value = true
             observeEndpoints()
         } catch (e: IllegalStateException) {
@@ -73,6 +94,7 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
 
     fun stopNetwork() {
         nearbyNetwork.close()
+        chatServer.close()
         _isNetworkRunning.value = false
     }
 
@@ -84,13 +106,26 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun sendBroadcast(message: String) {
+    fun sendMessage(message: String, endpointId: String? = null) {
         viewModelScope.launch {
             try {
-                logger.invoke(Log.INFO, "Broadcast sent: $message")
+                chatServer.sendMessage(message, endpointId) // Assuming endpointId might be needed
+                logger.invoke(Log.INFO, "Message sent: $message")
             } catch (e: IllegalStateException) {
-                logger.invoke(Log.ERROR, "Failed to send broadcast: ${e.message}")
+                logger.invoke(Log.ERROR, "Failed to send message: ${e.message}")
             }
+        }
+    }
+
+
+    private fun handleIncomingPayload(endpointId: String, payload: Payload) {
+        if (payload.type == Payload.Type.BYTES) {
+            val bytes = payload.asBytes() ?: return
+            val message = String(bytes, Charsets.UTF_8)
+            _messages.value = _messages.value + message
+            logger.invoke(Log.INFO, "Received message from $endpointId: $message")
+        } else {
+            logger.invoke(Log.INFO, "Received unsupported payload type from $endpointId")
         }
     }
 

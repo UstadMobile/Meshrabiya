@@ -33,7 +33,8 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
     val isNetworkRunning by viewModel.isNetworkRunning.collectAsState()
     val endpoints by viewModel.endpoints.collectAsState()
     val logs by viewModel.logs.collectAsState()
-    var broadcastMessage by remember { mutableStateOf("") }
+    val messages by viewModel.messages.collectAsState()
+    var messageToSend by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -72,23 +73,36 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Text("Messages:", style = MaterialTheme.typography.titleMedium)
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            items(messages) { message ->
+                Text(message)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
-                value = broadcastMessage,
-                onValueChange = { broadcastMessage = it },
-                label = { Text("Broadcast Message") },
+                value = messageToSend,
+                onValueChange = { messageToSend = it },
+                label = { Text("Message") },
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Button(
                 onClick = {
-                    viewModel.sendBroadcast(broadcastMessage)
-                    broadcastMessage = ""
+                    viewModel.sendMessage(messageToSend)
+                    messageToSend = ""
                 },
-                enabled = isNetworkRunning && broadcastMessage.isNotBlank()
+                enabled = isNetworkRunning && messageToSend.isNotBlank()
             ) {
                 Text("Send")
             }
@@ -108,3 +122,4 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
         }
     }
 }
+
