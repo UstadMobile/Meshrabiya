@@ -106,10 +106,10 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun sendMessage(message: String, endpointId: String? = null) {
+    fun sendMessage(message: String) {
         viewModelScope.launch {
             try {
-                chatServer.sendMessage(message, endpointId) // Assuming endpointId might be needed
+                chatServer.sendMessage(message)
                 logger.invoke(Log.INFO, "Message sent: $message")
             } catch (e: IllegalStateException) {
                 logger.invoke(Log.ERROR, "Failed to send message: ${e.message}")

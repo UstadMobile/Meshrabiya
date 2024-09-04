@@ -32,10 +32,17 @@ class ChatServer(
     }
 
     fun sendMessage(message: String, endpointId: String? = null) {
-        // Implementation to send a message
+        val chatMessage = ChatMessage(timestamp = System.currentTimeMillis(), message = message)
+        _chatMessages.value = _chatMessages.value + chatMessage
+
         if (endpointId != null) {
-            nearbyVirtualNetwork.sendMessage(message, endpointId) // or however the message sending is handled
+            nearbyVirtualNetwork.sendMessage(endpointId, message)
         } else {
+            nearbyVirtualNetwork.endpointStatusFlow.value.values
+                .filter { it.status == NearbyVirtualNetwork.EndpointStatus.CONNECTED }
+                .forEach { endpoint ->
+                    nearbyVirtualNetwork.sendMessage(endpoint.endpointId, message)
+                }
         }
     }
 

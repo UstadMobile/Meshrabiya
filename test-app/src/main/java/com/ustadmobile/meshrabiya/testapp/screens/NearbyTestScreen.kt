@@ -34,7 +34,7 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
     val endpoints by viewModel.endpoints.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val messages by viewModel.messages.collectAsState()
-    var messageToSend by remember { mutableStateOf("") }
+    var messageText by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -91,18 +91,20 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
-                value = messageToSend,
-                onValueChange = { messageToSend = it },
+                value = messageText,
+                onValueChange = { messageText = it },
                 label = { Text("Message") },
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Button(
                 onClick = {
-                    viewModel.sendMessage(messageToSend)
-                    messageToSend = ""
+                    if (messageText.isNotBlank()) {
+                        viewModel.sendMessage(messageText)
+                        messageText = ""
+                    }
                 },
-                enabled = isNetworkRunning && messageToSend.isNotBlank()
+                enabled = isNetworkRunning && messageText.isNotBlank()
             ) {
                 Text("Send")
             }
