@@ -24,8 +24,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.InputStream
 import java.net.InetAddress
+import java.time.Duration
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 
@@ -41,6 +45,10 @@ class NearbyVirtualNetwork(
 ) {
 
     private var messageReceivedListener: ((String, Payload) -> Unit)? = null
+
+    private val streamReplies = ConcurrentHashMap<Int, CompletableFuture<InputStream>>()
+
+    data class ConnectOptions(val timeout: Duration = Duration.ofSeconds(10))
 
     fun setOnMessageReceivedListener(listener: (String, Payload) -> Unit) {
         messageReceivedListener = listener
@@ -115,6 +123,21 @@ class NearbyVirtualNetwork(
         }
     }
 
+    fun connectSocket(endpointId: String, options: ConnectOptions = ConnectOptions()): InputStream {
+        val streamId = Random.nextInt()
+        val header = NearbyStreamHeader(streamId, isReply = false, payloadSize = 0)
+        val future = CompletableFuture<InputStream>()
+        streamReplies[streamId] = future
+
+        try {
+            val payload = Payload.fromBytes(header.toBytes())
+            connectionsClient.sendPayload(endpointId, payload)
+            return future.get(options.timeout.toMillis(), TimeUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            streamReplies.remove(streamId)
+            throw e
+        }
+    }
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
             checkClosed()
@@ -160,7 +183,7 @@ class NearbyVirtualNetwork(
         }
     }
 
-    private val payloadCallback = object : PayloadCallback() {
+     val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             checkClosed()
             when (payload.type) {
@@ -238,7 +261,6 @@ class NearbyVirtualNetwork(
         try {
             val message = String(bytes, Charsets.UTF_8)
             log(LogLevel.INFO, "Received message from $endpointId: $message")
-            // Handle the message as needed
         } catch (e: Exception) {
             log(LogLevel.ERROR, "Error parsing payload from $endpointId", e)
         }
@@ -246,14 +268,22 @@ class NearbyVirtualNetwork(
 
     private fun handleStreamPayload(endpointId: String, payload: Payload) {
         checkClosed()
-        val inputStream = payload.asStream()?.asInputStream()
-        if (inputStream != null) {
-            log(LogLevel.DEBUG, "Received stream payload from $endpointId")
-        } else {
-            log(LogLevel.WARNING, "Received invalid stream payload from $endpointId")
+        payload.asStream()?.asInputStream()?.use { inputStream ->
+            val headerBytes = ByteArray(12)
+            inputStream.read(headerBytes)
+            val header = NearbyStreamHeader.fromBytes(headerBytes)
+
+            if (header.isReply) {
+                streamReplies[header.streamId]?.complete(inputStream)
+            } else {
+                handleIncomingStream(endpointId, header, inputStream)
+            }
         }
     }
 
+    private fun handleIncomingStream(endpointId: String, header: NearbyStreamHeader, inputStream: InputStream) {
+        log(LogLevel.INFO, "Received new stream from $endpointId with streamId: ${header.streamId}")
+    }
     private fun sendMmcpPingPacket(endpointId: String) {
         checkClosed()
         val mmcpPing = MmcpPing(Random.nextInt())
