@@ -18,6 +18,8 @@ import com.google.android.gms.nearby.connection.Strategy
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.vnet.VirtualPacket
+import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.InputStream
 import java.net.InetAddress
+import java.nio.ByteBuffer
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -125,7 +128,13 @@ class NearbyVirtualNetwork(
 
     fun connectSocket(endpointId: String, options: ConnectOptions = ConnectOptions()): InputStream {
         val streamId = Random.nextInt()
-        val header = NearbyStreamHeader(streamId, isReply = false, payloadSize = 0)
+        val header = NearbyStreamHeader(
+            streamId = streamId,
+            isReply = false,
+            payloadSize = 0,
+            fromAddress = virtualIpAddress,
+            toAddress = broadcastAddress
+        )
         val future = CompletableFuture<InputStream>()
         streamReplies[streamId] = future
 
@@ -269,9 +278,7 @@ class NearbyVirtualNetwork(
     private fun handleStreamPayload(endpointId: String, payload: Payload) {
         checkClosed()
         payload.asStream()?.asInputStream()?.use { inputStream ->
-            val headerBytes = ByteArray(12)
-            inputStream.read(headerBytes)
-            val header = NearbyStreamHeader.fromBytes(headerBytes)
+            val header = inputStream.readNearbyStreamHeader()
 
             if (header.isReply) {
                 streamReplies[header.streamId]?.complete(inputStream)
@@ -282,7 +289,8 @@ class NearbyVirtualNetwork(
     }
 
     private fun handleIncomingStream(endpointId: String, header: NearbyStreamHeader, inputStream: InputStream) {
-        log(LogLevel.INFO, "Received new stream from $endpointId with streamId: ${header.streamId}")
+        log(LogLevel.INFO, "Received new stream from $endpointId with streamId: ${header.streamId}, fromAddress: ${header.fromAddress}, toAddress: ${header.toAddress}")
+
     }
     private fun sendMmcpPingPacket(endpointId: String) {
         checkClosed()
@@ -311,6 +319,45 @@ class NearbyVirtualNetwork(
         updatedMap[endpointId] = updatedMap[endpointId]?.copy(status = status) ?: EndpointInfo(endpointId, status, null, false)
         _endpointStatusFlow.value = updatedMap
     }
+
+    fun sendUdpPacket(endpointId: String, sourcePort: Int, destinationPort: Int, data: ByteArray) {
+        checkClosed()
+
+        val udpHeader = ByteBuffer.allocate(8)
+        udpHeader.putShort(sourcePort.toShort())
+        udpHeader.putShort(destinationPort.toShort())
+        udpHeader.putShort((8 + data.size).toShort())
+        udpHeader.putShort(0)
+
+        val udpPacket = ByteArray(udpHeader.capacity() + data.size)
+        System.arraycopy(udpHeader.array(), 0, udpPacket, 0, udpHeader.capacity())
+        System.arraycopy(data, 0, udpPacket, udpHeader.capacity(), data.size)
+
+        val header = VirtualPacketHeader(
+            fromAddr = virtualIpAddress,
+            toAddr = broadcastAddress,
+            fromPort = sourcePort,
+            toPort = destinationPort,
+            payloadSize = udpPacket.size,
+            hopCount = 0,
+            maxHops = 10, // Adjust as needed
+            lastHopAddr = virtualIpAddress
+        )
+
+        val virtualPacket = VirtualPacket.fromHeaderAndPayloadData(
+            header = header,
+            data = ByteArray(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE),
+            payloadOffset = VirtualPacketHeader.HEADER_SIZE
+        )
+
+        System.arraycopy(udpPacket, 0, virtualPacket.data, virtualPacket.payloadOffset, udpPacket.size)
+
+        val payload = Payload.fromBytes(virtualPacket.data)
+        connectionsClient.sendPayload(endpointId, payload)
+            .addOnSuccessListener { log(LogLevel.INFO, "UDP packet sent to $endpointId") }
+            .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send UDP packet to $endpointId", e) }
+    }
+
 
     private fun log(level: LogLevel, message: String, exception: Exception? = null) {
         val prefix = "[NearbyVirtualNetwork:$name] "
