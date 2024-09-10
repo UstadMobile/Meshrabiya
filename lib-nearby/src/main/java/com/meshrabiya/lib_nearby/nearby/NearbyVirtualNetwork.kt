@@ -320,44 +320,6 @@ class NearbyVirtualNetwork(
         _endpointStatusFlow.value = updatedMap
     }
 
-    fun sendUdpPacket(endpointId: String, sourcePort: Int, destinationPort: Int, data: ByteArray) {
-        checkClosed()
-
-        val udpHeader = ByteBuffer.allocate(8)
-        udpHeader.putShort(sourcePort.toShort())
-        udpHeader.putShort(destinationPort.toShort())
-        udpHeader.putShort((8 + data.size).toShort())
-        udpHeader.putShort(0)
-
-        val udpPacket = ByteArray(udpHeader.capacity() + data.size)
-        System.arraycopy(udpHeader.array(), 0, udpPacket, 0, udpHeader.capacity())
-        System.arraycopy(data, 0, udpPacket, udpHeader.capacity(), data.size)
-
-        val header = VirtualPacketHeader(
-            fromAddr = virtualIpAddress,
-            toAddr = broadcastAddress,
-            fromPort = sourcePort,
-            toPort = destinationPort,
-            payloadSize = udpPacket.size,
-            hopCount = 0,
-            maxHops = 10, // Adjust as needed
-            lastHopAddr = virtualIpAddress
-        )
-
-        val virtualPacket = VirtualPacket.fromHeaderAndPayloadData(
-            header = header,
-            data = ByteArray(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE),
-            payloadOffset = VirtualPacketHeader.HEADER_SIZE
-        )
-
-        System.arraycopy(udpPacket, 0, virtualPacket.data, virtualPacket.payloadOffset, udpPacket.size)
-
-        val payload = Payload.fromBytes(virtualPacket.data)
-        connectionsClient.sendPayload(endpointId, payload)
-            .addOnSuccessListener { log(LogLevel.INFO, "UDP packet sent to $endpointId") }
-            .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send UDP packet to $endpointId", e) }
-    }
-
 
     private fun log(level: LogLevel, message: String, exception: Exception? = null) {
         val prefix = "[NearbyVirtualNetwork:$name] "
