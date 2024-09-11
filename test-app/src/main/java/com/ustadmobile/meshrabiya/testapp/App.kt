@@ -14,6 +14,7 @@ import com.ustadmobile.meshrabiya.vnet.AndroidVirtualNode
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
 import com.ustadmobile.meshrabiya.testapp.server.TestAppServer
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
+import com.ustadmobile.meshrabiya.testapp.viewmodel.VpnTestViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
@@ -44,6 +45,11 @@ class App: Application(), DIAware {
         bind<NearbyTestViewModel>() with singleton {
             NearbyTestViewModel(application = this@App)
         }
+
+        bind<VpnTestViewModel>() with singleton {
+            VpnTestViewModel(application = this@App)
+        }
+
 
         bind<InetAddress>(tag = TAG_VIRTUAL_ADDRESS) with singleton() {
             runBlocking {

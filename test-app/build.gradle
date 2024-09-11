@@ -61,6 +61,8 @@ android {
 dependencies {
     implementation(project(":lib-meshrabiya"))
     implementation(project(":lib-nearby"))
+    implementation(project(":lib-meshrabiya-vpn"))
+
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
 
     implementation "ch.acra:acra-http:$version_acra"

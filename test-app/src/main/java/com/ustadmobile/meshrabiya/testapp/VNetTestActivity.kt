@@ -1,7 +1,10 @@
 package com.ustadmobile.meshrabiya.testapp
 
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.VpnService
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -49,8 +52,11 @@ import com.ustadmobile.meshrabiya.testapp.screens.OpenSourceLicensesScreen
 import com.ustadmobile.meshrabiya.testapp.screens.ReceiveScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SelectDestNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
+import com.ustadmobile.meshrabiya.testapp.screens.VpnTestScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
+import com.ustadmobile.meshrabiya.testapp.viewmodel.VpnStatus
+import com.ustadmobile.meshrabiya.testapp.viewmodel.VpnTestViewModel
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
@@ -60,21 +66,8 @@ import java.net.URLEncoder
 
 class VNetTestActivity : ComponentActivity(), DIAware {
     override val di by closestDI()
-
-    private val viewModel: NearbyTestViewModel by instance()
-
-    private val PERMISSION_REQUEST_CODE = 123
-
-    private val requiredPermissions = arrayOf(
-        android.Manifest.permission.BLUETOOTH,
-        android.Manifest.permission.BLUETOOTH_ADMIN,
-        android.Manifest.permission.ACCESS_FINE_LOCATION,
-        android.Manifest.permission.ACCESS_COARSE_LOCATION,
-        android.Manifest.permission.BLUETOOTH_ADVERTISE,
-        android.Manifest.permission.BLUETOOTH_CONNECT,
-        android.Manifest.permission.BLUETOOTH_SCAN,
-        android.Manifest.permission.NEARBY_WIFI_DEVICES
-    )
+    private val viewModel: VpnTestViewModel by instance()
+    private val VPN_REQUEST_CODE = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,45 +77,33 @@ class VNetTestActivity : ComponentActivity(), DIAware {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    NearbyTestScreen(viewModel = viewModel)
+                    VpnTestScreen(viewModel = viewModel, onStartVpn = { startVpn() })
                 }
             }
         }
-        checkAndRequestPermissions()
     }
 
-    private fun checkAndRequestPermissions() {
-        val missingPermissions = requiredPermissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }.toTypedArray()
-
-        if (missingPermissions.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missingPermissions, PERMISSION_REQUEST_CODE)
+    private fun startVpn() {
+        val intent = viewModel.prepareVpn()
+        if (intent != null) {
+            startActivityForResult(intent, VPN_REQUEST_CODE)
         } else {
-            viewModel.startNetwork()
+            onActivityResult(VPN_REQUEST_CODE, RESULT_OK, null)
         }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                viewModel.startNetwork()
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == VPN_REQUEST_CODE) {
+            if (resultCode == RESULT_OK) {
+                viewModel.startVpn()
+                Toast.makeText(this, "VPN permission granted", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(
-                    this,
-                    "Permissions are required to use Nearby features",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
             }
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeshrabiyaTestApp(
