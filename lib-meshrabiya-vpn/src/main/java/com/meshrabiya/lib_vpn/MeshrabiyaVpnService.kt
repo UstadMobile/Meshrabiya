@@ -4,6 +4,7 @@ package com.meshrabiya.lib_vpn
 import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import android.system.OsConstants
 import android.util.Log
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -26,10 +27,14 @@ class MeshrabiyaVpnService : VpnService() {
     private fun establishVpn() {
         try {
             builder.apply {
-                addAddress("10.0.0.2", 32)
-                addRoute("0.0.0.0", 0)
+                addAddress("10.0.0.2", 24)
+                addRoute("192.168.0.0", 24)
+                addDnsServer("1.1.1.1")
                 addDnsServer("8.8.8.8")
                 setSession("MeshrabiyaVPN")
+                setMtu(1500)
+                allowFamily(OsConstants.AF_INET)
+                allowFamily(OsConstants.AF_INET6)
             }
 
             vpnInterface = builder.establish()
