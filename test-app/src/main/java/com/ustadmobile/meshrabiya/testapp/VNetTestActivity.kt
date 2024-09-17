@@ -1,18 +1,15 @@
 package com.ustadmobile.meshrabiya.testapp
 
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.VpnService
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ConnectWithoutContact
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
@@ -36,8 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -55,7 +51,6 @@ import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
 import com.ustadmobile.meshrabiya.testapp.screens.VpnTestScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
-import com.ustadmobile.meshrabiya.testapp.viewmodel.VpnStatus
 import com.ustadmobile.meshrabiya.testapp.viewmodel.VpnTestViewModel
 import org.kodein.di.DI
 import org.kodein.di.DIAware
@@ -177,6 +172,23 @@ fun MeshrabiyaTestApp(
                     }
                 )
 
+
+                NavigationBarItem(
+                    selected = navController.currentDestination?.route == "chat",
+                    label = { Text("Chat") },
+                    onClick = {
+                        navController.navigate("chat")
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Chat,
+                            contentDescription = null,
+                        )
+                    }
+                )
+
+
+
                 NavigationBarItem(
                     selected = selectedItem == "send",
                     label = { Text("Send") },
@@ -262,6 +274,14 @@ fun AppNavHost(
                 onSetAppUiState = onSetAppUiState,
             )
         }
+
+        composable("chat") {
+            val viewModel: NearbyTestViewModel = viewModel()
+            NearbyTestScreen(
+                viewModel = viewModel,
+            )
+        }
+
 
         composable("send") {
             SendFileScreen(
