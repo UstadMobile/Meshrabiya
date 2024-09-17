@@ -40,14 +40,17 @@ class MeshrabiyaVpnService : VpnService() {
 
             // Establish the VPN interface
             vpnInterface = builder.establish()
-            vpnInterface?.let {
-                fileInputStream = FileInputStream(it.fileDescriptor)
-                fileOutputStream = FileOutputStream(it.fileDescriptor)
+            if (vpnInterface == null) {
+                throw IllegalStateException("Failed to establish VPN interface.")
+            } else {
+                fileInputStream = FileInputStream(vpnInterface!!.fileDescriptor)
+                fileOutputStream = FileOutputStream(vpnInterface!!.fileDescriptor)
                 logMessage("VPN interface established successfully")
                 startHandlingTraffic()
-            } ?: logMessage("Failed to establish VPN interface")
+            }
+
         } catch (e: Exception) {
-            logMessage("Error setting up VPN: ${e.message}")
+            logMessage("Error setting up VPN: ${e.message ?: "Unknown error"}")
         }
     }
 
