@@ -37,12 +37,12 @@ android {
 dependencies {
     implementation project(':lib-meshrabiya')
 
-    implementation 'androidx.core:core-ktx:1.8.0'
-    implementation 'junit:junit:4.13.2'
+    implementation libs.androidx.core
+    implementation libs.junit
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$version_coroutines"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
-    implementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+    implementation libs.mockito.kotlin
     implementation "app.cash.turbine:turbine:$version_turbine"
-    implementation "com.squareup.okhttp3:mockwebserver:$version_mockwebserver"
-    implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
+    implementation libs.mockwebserver
+    implementation libs.okhttp
 }

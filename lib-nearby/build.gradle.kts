@@ -36,15 +36,15 @@ android {
 
 dependencies {
     implementation(project(":lib-meshrabiya"))
-    implementation("com.google.android.gms:play-services-nearby:19.3.0")
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("com.google.android.material:material:1.12.0")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.mockito:mockito-core:5.1.1")
-    testImplementation ("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    implementation(libs.google.play.services.nearby)
+    implementation(libs.androidx.core)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.google.material)
+    testImplementation(libs.junit)
+    testImplementation(libs.mockito.core)
+    testImplementation (libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.espresso.core)
 
 
 
