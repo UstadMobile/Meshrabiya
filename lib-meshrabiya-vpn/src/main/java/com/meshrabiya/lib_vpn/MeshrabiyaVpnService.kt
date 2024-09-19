@@ -11,12 +11,15 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.net.InetAddress
 import java.nio.ByteBuffer
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class MeshrabiyaVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private lateinit var fileInputStream: FileInputStream
     private lateinit var fileOutputStream: FileOutputStream
     private val builder = Builder()
+    private val executorService: ExecutorService = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         logMessage("VPN Service started")
@@ -55,7 +58,6 @@ class MeshrabiyaVpnService : VpnService() {
 
         } catch (e: Exception) {
             logMessage("Error setting up VPN: ${e.message ?: "Unknown error"}")
-            // Optionally rethrow or handle specific exceptions
         }
     }
 
@@ -63,7 +65,7 @@ class MeshrabiyaVpnService : VpnService() {
      * Starts a new thread to handle traffic.
      */
     private fun startHandlingTraffic() {
-        Thread { handleTraffic() }.start()
+        executorService.submit { handleTraffic() }
     }
 
     /**
@@ -137,8 +139,7 @@ class MeshrabiyaVpnService : VpnService() {
      * @return the constructed IPv4 address.
      */
     private fun buildIPv4Address(buffer: ByteBuffer): InetAddress {
-        val addressBytes = buffer.array().copyOfRange(16, 20)
-        return InetAddress.getByAddress(addressBytes)
+        return InetAddress.getByAddress(ByteArray(4).also { buffer.get(it, 0, 4) })
     }
 
     /**
@@ -147,25 +148,30 @@ class MeshrabiyaVpnService : VpnService() {
      * @return a pair of the destination port and the protocol name.
      */
     private fun parseIPv4Header(buffer: ByteBuffer): Pair<Int, String> {
-        val protocol = buffer.get(9).toInt()
-        val isTcp = protocol == IPPROTO_TCP
-        val isUdp = protocol == IPPROTO_UDP
+        try {
+            val protocol = buffer.get(IPV4_PROTOCOL_OFFSET).toInt()
+            val isTcp = protocol == IPPROTO_TCP
+            val isUdp = protocol == IPPROTO_UDP
 
-        val ipHeaderLength = (buffer.get(0).toInt() and 0x0F) * 4
-        val destinationPort = if (isTcp || isUdp) {
-            ((buffer.get(ipHeaderLength + 2).toInt() and 0xFF) shl 8) or
-                    (buffer.get(ipHeaderLength + 3).toInt() and 0xFF)
-        } else {
-            -1
+            val ipHeaderLength = (buffer.get(IPV4_HEADER_LENGTH_OFFSET).toInt() and 0x0F) * 4
+            val destinationPort = if (isTcp || isUdp) {
+                ((buffer.get(ipHeaderLength + 2).toInt() and 0xFF) shl 8) or
+                        (buffer.get(ipHeaderLength + 3).toInt() and 0xFF)
+            } else {
+                -1
+            }
+
+            val protocolName = when {
+                isTcp -> "TCP"
+                isUdp -> "UDP"
+                else -> "Unknown"
+            }
+
+            return Pair(destinationPort, protocolName)
+        } catch (e: Exception) {
+            logMessage("Error parsing IPv4 header: ${e.message}")
+            return Pair(-1, "Error")
         }
-
-        val protocolName = when {
-            isTcp -> "TCP"
-            isUdp -> "UDP"
-            else -> "Unknown"
-        }
-
-        return Pair(destinationPort, protocolName)
     }
 
     /**
@@ -192,8 +198,7 @@ class MeshrabiyaVpnService : VpnService() {
      * @return the constructed IPv6 address.
      */
     private fun buildIPv6Address(buffer: ByteBuffer): InetAddress {
-        val addressBytes = buffer.array().copyOfRange(24, 40)
-        return InetAddress.getByAddress(addressBytes)
+        return InetAddress.getByAddress(ByteArray(16).also { buffer.get(it, 0, 16) })
     }
 
     /**
@@ -202,28 +207,32 @@ class MeshrabiyaVpnService : VpnService() {
      * @return a pair of the destination port and the protocol name.
      */
     private fun parseIPv6Header(buffer: ByteBuffer): Pair<Int, String> {
-        val protocol = buffer.get(6).toInt()
-        val isTcp = protocol == IPPROTO_TCP
-        val isUdp = protocol == IPPROTO_UDP
-        val isIcmpv6 = protocol == IPPROTO_ICMPV6
+        try {
+            val protocol = buffer.get(IPV6_PROTOCOL_OFFSET).toInt()
+            val isTcp = protocol == IPPROTO_TCP
+            val isUdp = protocol == IPPROTO_UDP
+            val isIcmpv6 = protocol == IPPROTO_ICMPV6
 
-        val destinationPort = if (isTcp || isUdp) {
-            ((buffer.get(40).toInt() and 0xFF) shl 8) or
-                    (buffer.get(41).toInt() and 0xFF)
-        } else {
-            -1
+            val destinationPort = if (isTcp || isUdp) {
+                ((buffer.get(IPV6_PORT_OFFSET).toInt() and 0xFF) shl 8) or
+                        (buffer.get(IPV6_PORT_OFFSET + 1).toInt() and 0xFF)
+            } else {
+                -1
+            }
+
+            val protocolName = when {
+                isTcp -> "TCP"
+                isUdp -> "UDP"
+                isIcmpv6 -> "ICMPv6"
+                else -> "Unknown"
+            }
+
+            return Pair(destinationPort, protocolName)
+        } catch (e: Exception) {
+            logMessage("Error parsing IPv6 header: ${e.message}")
+            return Pair(-1, "Error")
         }
-
-        val protocolName = when {
-            isTcp -> "TCP"
-            isUdp -> "UDP"
-            isIcmpv6 -> "ICMPv6"
-            else -> "Unknown"
-        }
-
-        return Pair(destinationPort, protocolName)
     }
-
     /**
      * Checks if the destination IP is part of the virtual network.
      * @param destinationIp the destination IP address.
@@ -254,9 +263,6 @@ class MeshrabiyaVpnService : VpnService() {
         }
     }
 
-    /**
-     * Called when the VPN service is revoked. Closes resources and performs cleanup.
-     */
     override fun onRevoke() {
         logMessage("VPN Service revoked")
         try {
@@ -269,29 +275,32 @@ class MeshrabiyaVpnService : VpnService() {
         super.onRevoke()
     }
 
-    /**
-     * Logs messages for debugging and informational purposes.
-     * @param message the message to log.
-     */
     private fun logMessage(message: String) {
         Log.d(TAG, message)
     }
 
     companion object {
         private const val TAG = "MeshrabiyaVpnService"
-        private val VPN_ADDRESS = InetAddress.getByName("10.0.0.2")
-        private const val VPN_ADDRESS_PREFIX_LENGTH = 24
-        private val ROUTE_ADDRESS = InetAddress.getByName("192.168.0.0")
-        private const val ROUTE_PREFIX_LENGTH = 24
-        private val PRIMARY_DNS = InetAddress.getByName("1.1.1.1")
-        private val SECONDARY_DNS = InetAddress.getByName("8.8.8.8")
+        private val VPN_ADDRESS = InetAddress.getByName("10.0.0.2") // VPN address for internal routing
+        private const val VPN_ADDRESS_PREFIX_LENGTH = 24 // Subnet mask for VPN
+        private val ROUTE_ADDRESS = InetAddress.getByName("192.168.0.0") // Route for local network traffic
+        private const val ROUTE_PREFIX_LENGTH = 24 // Subnet mask for local network
+        private val PRIMARY_DNS = InetAddress.getByName("1.1.1.1") // Primary DNS server
+        private val SECONDARY_DNS = InetAddress.getByName("8.8.8.8") // Secondary DNS server
         private const val VPN_SESSION_NAME = "MeshrabiyaVPN"
-        private const val MTU_VALUE = 1500
-        private const val BUFFER_SIZE = 32767
-        private const val IPV4_VERSION: Byte = 4
-        private const val IPV6_VERSION: Byte = 6
-        private const val IPPROTO_TCP = 6
-        private const val IPPROTO_UDP = 17
-        private const val IPPROTO_ICMPV6 = 58
+        private const val MTU_VALUE = 1500 // Maximum Transmission Unit for the VPN
+        private const val BUFFER_SIZE = 32767 // Buffer size for reading packets
+        private const val IPV4_VERSION: Byte = 4  // IPv4 version identifier
+        private const val IPV6_VERSION: Byte = 6 // IPv6 version identifier
+        private const val IPPROTO_TCP = 6 // TCP protocol number
+        private const val IPPROTO_UDP = 17 // UDP protocol number
+        private const val IPPROTO_ICMPV6 = 58 // ICMPv6 protocol number
+
+        // Constants for byte offsets and field lengths
+        private const val IPV4_PROTOCOL_OFFSET = 9
+        private const val IPV4_HEADER_LENGTH_OFFSET = 0
+        private const val IPV6_PROTOCOL_OFFSET = 6
+        private const val IPV6_PORT_OFFSET = 40
+
     }
 }
