@@ -106,8 +106,15 @@ class MeshrabiyaVpnService : VpnService() {
      * @param length the length of the packet data.
      */
     private fun processPacket(buffer: ByteBuffer, length: Int) {
+        // The `flip()` method gets the buffer ready to read data.
+        // When we write to the buffer, it moves a pointer forward.
+        // `flip()` changes the buffer from writing mode to reading mode.
+        // It sets the end (limit) to where we stopped writing and resets the start (position) to zero,
+        // so we can read the data from the beginning.
         buffer.flip()
 
+        // Check the first byte of the packet to figure out if it's an IPv4 or IPv6 packet.
+        // The first few bits of the first byte tell us the IP version (4 or 6).
         when (val ipVersion = (buffer.get(0).toInt() ushr 4).toByte()) {
             IPV4_VERSION -> handleIPv4Packet(buffer, length)
             IPV6_VERSION -> handleIPv6Packet(buffer, length)
@@ -122,9 +129,9 @@ class MeshrabiyaVpnService : VpnService() {
      */
     private fun handleIPv4Packet(buffer: ByteBuffer, length: Int) {
         val destinationIp = buildIPv4Address(buffer)
-        val (destinationPort, protocolName) = parseIPv4Header(buffer)
+        val header = parseIPv4Header(buffer)
 
-        logMessage("IPv4 Packet - Destination: ${destinationIp.hostAddress}:$destinationPort, Protocol: $protocolName")
+        logMessage("IPv4 Packet - Destination: ${header.destinationIp.hostAddress}:${header.destinationPort}, Protocol: ${header.protocolName}")
 
         if (isVirtualNetwork(destinationIp)) {
             handleVirtualNetworkPacket(buffer, length)
@@ -143,11 +150,10 @@ class MeshrabiyaVpnService : VpnService() {
     }
 
     /**
-     * Parses the IPv4 header to extract the destination port and protocol name.
-     * @param buffer the buffer containing the IPv4 packet data.
-     * @return a pair of the destination port and the protocol name.
+     * Parses the IPv4 header to extract important information such as destination port, origin port, and protocol.
+     * Returns an IpHeader data class containing all relevant information.
      */
-    private fun parseIPv4Header(buffer: ByteBuffer): Pair<Int, String> {
+    private fun parseIPv4Header(buffer: ByteBuffer): IpHeader {
         try {
             val protocol = buffer.get(IPV4_PROTOCOL_OFFSET).toInt()
             val isTcp = protocol == IPPROTO_TCP
@@ -162,15 +168,25 @@ class MeshrabiyaVpnService : VpnService() {
             }
 
             val protocolName = when {
-                isTcp -> "TCP"
-                isUdp -> "UDP"
-                else -> "Unknown"
+                isTcp -> Protocol.TCP
+                isUdp -> Protocol.UDP
+                else -> Protocol.UNKNOWN
             }
 
-            return Pair(destinationPort, protocolName)
+            return IpHeader(
+                destinationIp = buildIPv4Address(buffer),
+                destinationPort = destinationPort,
+
+                // NOTE : ---->  Placeholder, real origin logic needed
+                originIp = InetAddress.getByName("0.0.0.0"),
+                // Placeholder
+                originPort = -1,
+
+                protocolName = protocolName
+            )
         } catch (e: Exception) {
             logMessage("Error parsing IPv4 header: ${e.message}")
-            return Pair(-1, "Error")
+            return IpHeader(InetAddress.getByName("0.0.0.0"), -1, InetAddress.getByName("0.0.0.0"), -1, Protocol.ERROR)
         }
     }
 
@@ -181,9 +197,9 @@ class MeshrabiyaVpnService : VpnService() {
      */
     private fun handleIPv6Packet(buffer: ByteBuffer, length: Int) {
         val destinationIp = buildIPv6Address(buffer)
-        val (destinationPort, protocolName) = parseIPv6Header(buffer)
+        val header = parseIPv6Header(buffer)
 
-        logMessage("IPv6 Packet - Destination: [${destinationIp.hostAddress}]:$destinationPort, Protocol: $protocolName")
+        logMessage("IPv6 Packet - Destination: [${header.destinationIp.hostAddress}]:${header.destinationPort}, Protocol: ${header.protocolName}")
 
         if (isVirtualNetwork(destinationIp)) {
             handleVirtualNetworkPacket(buffer, length)
@@ -202,16 +218,14 @@ class MeshrabiyaVpnService : VpnService() {
     }
 
     /**
-     * Parses the IPv6 header to extract the destination port and protocol name.
-     * @param buffer the buffer containing the IPv6 packet data.
-     * @return a pair of the destination port and the protocol name.
+     * Parses the IPv6 header to extract important information such as destination port, origin port, and protocol.
+     * Returns an IpHeader data class containing all relevant information.
      */
-    private fun parseIPv6Header(buffer: ByteBuffer): Pair<Int, String> {
+    private fun parseIPv6Header(buffer: ByteBuffer): IpHeader {
         try {
             val protocol = buffer.get(IPV6_PROTOCOL_OFFSET).toInt()
             val isTcp = protocol == IPPROTO_TCP
             val isUdp = protocol == IPPROTO_UDP
-            val isIcmpv6 = protocol == IPPROTO_ICMPV6
 
             val destinationPort = if (isTcp || isUdp) {
                 ((buffer.get(IPV6_PORT_OFFSET).toInt() and 0xFF) shl 8) or
@@ -221,18 +235,27 @@ class MeshrabiyaVpnService : VpnService() {
             }
 
             val protocolName = when {
-                isTcp -> "TCP"
-                isUdp -> "UDP"
-                isIcmpv6 -> "ICMPv6"
-                else -> "Unknown"
+                isTcp -> Protocol.TCP
+                isUdp -> Protocol.UDP
+                else -> Protocol.UNKNOWN
             }
 
-            return Pair(destinationPort, protocolName)
+            return IpHeader(
+                destinationIp = buildIPv6Address(buffer),
+                destinationPort = destinationPort,
+
+                // NOTE : ---->  Placeholder, real origin logic needed
+                originIp = InetAddress.getByName("::"),
+                // Placeholder
+                originPort = -1,
+                protocolName = protocolName
+            )
         } catch (e: Exception) {
             logMessage("Error parsing IPv6 header: ${e.message}")
-            return Pair(-1, "Error")
+            return IpHeader(InetAddress.getByName("::"), -1, InetAddress.getByName("::"), -1, Protocol.ERROR)
         }
     }
+
     /**
      * Checks if the destination IP is part of the virtual network.
      * @param destinationIp the destination IP address.
@@ -281,26 +304,61 @@ class MeshrabiyaVpnService : VpnService() {
 
     companion object {
         private const val TAG = "MeshrabiyaVpnService"
-        private val VPN_ADDRESS = InetAddress.getByName("10.0.0.2") // VPN address for internal routing
-        private const val VPN_ADDRESS_PREFIX_LENGTH = 24 // Subnet mask for VPN
-        private val ROUTE_ADDRESS = InetAddress.getByName("192.168.0.0") // Route for local network traffic
-        private const val ROUTE_PREFIX_LENGTH = 24 // Subnet mask for local network
-        private val PRIMARY_DNS = InetAddress.getByName("1.1.1.1") // Primary DNS server
-        private val SECONDARY_DNS = InetAddress.getByName("8.8.8.8") // Secondary DNS server
         private const val VPN_SESSION_NAME = "MeshrabiyaVPN"
-        private const val MTU_VALUE = 1500 // Maximum Transmission Unit for the VPN
-        private const val BUFFER_SIZE = 32767 // Buffer size for reading packets
-        private const val IPV4_VERSION: Byte = 4  // IPv4 version identifier
-        private const val IPV6_VERSION: Byte = 6 // IPv6 version identifier
-        private const val IPPROTO_TCP = 6 // TCP protocol number
-        private const val IPPROTO_UDP = 17 // UDP protocol number
-        private const val IPPROTO_ICMPV6 = 58 // ICMPv6 protocol number
 
-        // Constants for byte offsets and field lengths
-        private const val IPV4_PROTOCOL_OFFSET = 9
-        private const val IPV4_HEADER_LENGTH_OFFSET = 0
-        private const val IPV6_PROTOCOL_OFFSET = 6
-        private const val IPV6_PORT_OFFSET = 40
+        // VPN_ADDRESS is the internal IP address used by the VPN for routing data within the VPN network.
+        private val VPN_ADDRESS = InetAddress.getByName("10.0.0.2")
 
+        // VPN_ADDRESS_PREFIX_LENGTH specifies the subnet mask for the VPN network. A value of 24 means the VPN uses a 255.255.255.0 subnet mask, allowing for up to 256 IP addresses.
+        private const val VPN_ADDRESS_PREFIX_LENGTH = 24
+
+        // ROUTE_ADDRESS is the IP address range for routing local network traffic. It’s used to determine which traffic should go through the local network.
+        private val ROUTE_ADDRESS = InetAddress.getByName("192.168.0.0")
+
+        // ROUTE_PREFIX_LENGTH specifies the subnet mask for local network routing. Similar to VPN_ADDRESS_PREFIX_LENGTH, this mask defines how many addresses are in the local network.
+        private const val ROUTE_PREFIX_LENGTH = 24
+
+        // PRIMARY_DNS is the IP address of the main DNS server used by the VPN for resolving domain names to IP addresses.
+        private val PRIMARY_DNS = InetAddress.getByName("1.1.1.1")
+
+        // SECONDARY_DNS is the IP address of a backup DNS server. If the primary DNS server is unavailable, the VPN will use this server instead.
+        private val SECONDARY_DNS = InetAddress.getByName("8.8.8.8")
+
+        // MTU_VALUE stands for Maximum Transmission Unit. It defines the largest size of a packet that can be sent through the VPN without needing to be fragmented. 1500 bytes is a common default size.
+        private const val MTU_VALUE = 1500
+
+        // BUFFER_SIZE determines the amount of data that can be read or written at once. 32767 bytes is a size chosen to handle large packets efficiently.
+        private const val BUFFER_SIZE = 32767
+
+        private const val IPV4_VERSION: Byte = 4
+        private const val IPV6_VERSION: Byte = 6
+
+        // Protocol numbers for different types of network traffic, based on the official IP protocol specifications.
+        // These numbers identify whether a packet is using TCP, UDP, or ICMPv6 protocol.
+        private const val IPPROTO_TCP = 6 // TCP is protocol number 6 (used for web traffic, file transfer, etc.)
+        private const val IPPROTO_UDP = 17 // UDP is protocol number 17 (used for streaming, video games, etc.)
+
+        private const val IPV4_PROTOCOL_OFFSET = 9 // For IPv4 packets, the type of protocol (e.g., TCP, UDP) is found at the 10th byte of the header. This is why the offset is 9.
+        private const val IPV4_HEADER_LENGTH_OFFSET = 0 // The length of the IPv4 header itself is encoded in the first byte, but only in the first 4 bits. This is why we use offset 0.
+        private const val IPV6_PROTOCOL_OFFSET = 6 // For IPv6 packets, the protocol type is found in the 7th byte of the header, which is why the offset is 6.
+        private const val IPV6_PORT_OFFSET = 40 // In IPv6 packets, information about source and destination ports starts after the first 40 bytes of the header, hence the offset is 40.
     }
 }
+
+/**
+ * Enum class representing the valid protocols (TCP, UDP, ICMPv6, and Unknown).
+ */
+enum class Protocol {
+    TCP, UDP, UNKNOWN, ERROR
+}
+
+/**
+ * Data class to represent the parsed IP header with necessary information.
+ */
+data class IpHeader(
+    val destinationIp: InetAddress,
+    val destinationPort: Int,
+    val originIp: InetAddress,
+    val originPort: Int,
+    val protocolName: Protocol
+)
