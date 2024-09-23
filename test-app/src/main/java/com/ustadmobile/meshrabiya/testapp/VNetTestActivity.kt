@@ -48,7 +48,6 @@ import com.ustadmobile.meshrabiya.testapp.screens.OpenSourceLicensesScreen
 import com.ustadmobile.meshrabiya.testapp.screens.ReceiveScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SelectDestNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
-import com.ustadmobile.meshrabiya.testapp.screens.VpnTestScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
 import com.ustadmobile.meshrabiya.testapp.viewmodel.VpnTestViewModel
@@ -72,7 +71,8 @@ class VNetTestActivity : ComponentActivity(), DIAware {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    VpnTestScreen(viewModel = viewModel, onStartVpn = { startVpn() })
+//                    VpnTestScreen(viewModel = viewModel, onStartVpn = { startVpn() })
+                    MeshrabiyaTestApp(di = di)
                 }
             }
         }
@@ -278,7 +278,7 @@ fun AppNavHost(
         composable("chat") {
             val viewModel: NearbyTestViewModel = viewModel()
             NearbyTestScreen(
-                viewModel = viewModel,
+                viewModel = viewModel, context = navController.context
             )
         }
 

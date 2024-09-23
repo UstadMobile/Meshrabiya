@@ -7,8 +7,11 @@ import androidx.lifecycle.viewModelScope
 import com.google.android.gms.nearby.connection.Payload
 import com.meshrabiya.lib_nearby.nearby.NearbyVirtualNetwork
 import com.ustadmobile.meshrabiya.log.MNetLogger
+import com.ustadmobile.meshrabiya.testapp.server.ChatMessage
 import com.ustadmobile.meshrabiya.testapp.server.ChatServer
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.net.InetAddress
 import java.nio.ByteBuffer
