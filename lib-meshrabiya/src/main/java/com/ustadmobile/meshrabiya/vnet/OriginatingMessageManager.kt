@@ -2,6 +2,7 @@ package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.asInetAddress
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpOriginatorMessage
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit
 
 
 class OriginatingMessageManager(
+    //TODO: change this to a function that provides a list of inetaddresses
     localNodeInetAddr: InetAddress,
     private val logger: MNetLogger,
     private val scheduledExecutorService: ScheduledExecutorService,
@@ -43,6 +45,11 @@ class OriginatingMessageManager(
     private val originatingMessageNodeLostThreshold: Int = 10000,
     lostNodeCheckInterval: Int = 1_000,
 ) {
+
+    //  A - B - C - E
+    //   \ D
+
+
 
     private val logPrefix ="[OriginatingMessageManager for ${localNodeInetAddr}] "
 
@@ -89,6 +96,11 @@ class OriginatingMessageManager(
             }
         )
 
+
+        //TODO: This should be a loop - it should go over all known addresses and broadcast for each one
+        //It should then go over each INTERFACE and send the broadcast - the interface is responsible
+        //to know who the neighbors are
+
         val packet = originatingMessage.toVirtualPacket(
             toAddr = ADDR_BROADCAST,
             fromAddr = localNodeAddress,
@@ -100,50 +112,23 @@ class OriginatingMessageManager(
             it.value.hopCount == 1.toByte()
         }
 
-        neighbors.forEach {
-            val lastOriginatorMessage = it.value
+        neighbors.forEach { neighbor ->
+            val lastOriginatorMessage = neighbor.value
             try {
-                lastOriginatorMessage.receivedFromSocket.send(
-                    nextHopAddress = lastOriginatorMessage.lastHopRealInetAddr,
-                    nextHopPort = lastOriginatorMessage.lastHopRealPort,
+                //TODO: receivedFromInterface to be made non-nullable
+                lastOriginatorMessage.receivedFromInterface?.send(
                     virtualPacket = packet,
+                    nextHopAddress = neighbor.value.lastHopAddr.asInetAddress()
                 )
             }catch(e: Exception) {
                 logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable: exception sending to " +
-                        "${it.key.addressToDotNotation()} through ${it.value.lastHopRealInetAddr}:${it.value.lastHopRealPort}",
+                        "${neighbor.key.addressToDotNotation()} through ${neighbor.value.lastHopRealInetAddr}:${neighbor.value.lastHopRealPort}",
                     e)
             }
         }
 
-        //check if we have an active station connection but have lost the originating message from
-        // the hotspot node e.g. node slowed down for a while, app restart, etc.
-        //Send it an originating message even if we haven't receive one from it lately
-        //This could help restore a connection that died temporarily.
-        val stationState = getWifiState().wifiStationState
-        val stationNeighborInetAddr = stationState.config?.linkLocalAddr
-        val stationDatagramPort = stationState.config?.port
-        if(stationNeighborInetAddr != null &&
-            !neighbors.any { it.value.lastHopRealInetAddr == stationNeighborInetAddr }
-            && stationDatagramPort != null
-            && stationState.stationBoundDatagramSocket != null
-        ) {
-            logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable: have not received " +
-                    " originating message from hotspot we are connected to as station. Retrying")
-            try {
-                stationState.stationBoundDatagramSocket.send(
-                    nextHopAddress = stationNeighborInetAddr,
-                    nextHopPort = stationDatagramPort,
-                    virtualPacket = packet,
-                )
-            }catch(e: Exception) {
-                logger(Log.ERROR, "$logPrefix : sendOriginatingMessagesRunnable: could not " +
-                        "send originating message to group owner", e)
-            }
-        }else if(stationNeighborInetAddr != null && stationState.stationBoundDatagramSocket == null) {
-            logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable : could not send " +
-                    "originating message to group owner socket not set on state")
-        }
-
+        //TODO: check on each interface if there are any known neighbors for which we do not have
+        //current originator messages
     }
 
     private val pingNeighborsRunnable = Runnable {

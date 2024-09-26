@@ -21,6 +21,7 @@ import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocket2
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
+import com.ustadmobile.meshrabiya.vnet.netinterface.VirtualNetworkInterface
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactory
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactoryImpl
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
@@ -114,10 +115,14 @@ abstract class VirtualNode(
 
     private val forwardingRules: MutableMap<ForwardBindPoint, UdpForwardRule> = ConcurrentHashMap()
 
+    private val _virtualNetworkInterfaces: Flow<List<VirtualNetworkInterface>> = MutableStateFlow(
+        emptyList()
+    )
+
     /**
      * @param originatorMessage the Originator message itself
      * @param timeReceived the time this message was received
-     * @param lastHopAddr the recorded last hop address
+     * @param lastHopAddr the recorded last hop address (Virtual address)
      */
     data class LastOriginatorMessage(
         val originatorMessage: MmcpOriginatorMessage,
@@ -127,6 +132,8 @@ abstract class VirtualNode(
         val lastHopRealInetAddr: InetAddress,
         val receivedFromSocket: VirtualNodeDatagramSocket,
         val lastHopRealPort: Int,
+        val receivedFromInterface: VirtualNetworkInterface? = null,
+
     )
 
     @Suppress("unused") //Part of the API

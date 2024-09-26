@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.InputStream
 import java.net.InetAddress
@@ -36,7 +37,11 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 
+//TODO: ********MUST IMPLEMENT THE VIRTUALNETWORKINTERFACE********
 
+//When Implementing the send function of virtualnetworkinterface
+// If the nextHopAddress is BROADCAST - then send the packet to all known endpoints.
+// Else lookup the endpoint id for the given nextHopAddress
 class NearbyVirtualNetwork(
     context: Context,
     private val name: String,
@@ -245,6 +250,7 @@ class NearbyVirtualNetwork(
             }
     }
 
+    //TODO: This should NOT exist like this - ALL PAYLOADS MUST BE VIRTUAL PACKETS
     fun sendMessage(endpointId: String, message: String) {
         checkClosed()
         val payload = Payload.fromBytes(message.toByteArray(Charsets.UTF_8))
@@ -315,6 +321,7 @@ class NearbyVirtualNetwork(
     }
 
     private fun updateEndpointStatus(endpointId: String, status: EndpointStatus) {
+        //TODO For the flow this MUST copy the map
         val updatedMap = ConcurrentHashMap(_endpointStatusFlow.value)
         updatedMap[endpointId] = updatedMap[endpointId]?.copy(status = status) ?: EndpointInfo(endpointId, status, null, false)
         _endpointStatusFlow.value = updatedMap
