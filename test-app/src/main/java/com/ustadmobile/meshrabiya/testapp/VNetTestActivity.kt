@@ -278,7 +278,7 @@ fun AppNavHost(
         composable("chat") {
             val viewModel: NearbyTestViewModel = viewModel()
             NearbyTestScreen(
-                viewModel = viewModel, context = navController.context
+                viewModel = viewModel
             )
         }
 

@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.net.DatagramPacket
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.net.NoRouteToHostException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -96,11 +97,7 @@ class OriginatingMessageManager(
             }
         )
 
-
-        //TODO: This should be a loop - it should go over all known addresses and broadcast for each one
-        //It should then go over each INTERFACE and send the broadcast - the interface is responsible
-        //to know who the neighbors are
-
+        // Create the packet to be sent
         val packet = originatingMessage.toVirtualPacket(
             toAddr = ADDR_BROADCAST,
             fromAddr = localNodeAddress,
@@ -108,27 +105,30 @@ class OriginatingMessageManager(
             hopCount = 1,
         )
 
-        val neighbors = originatorMessages.filter {
-            it.value.hopCount == 1.toByte()
-        }
+        // Get known addresses
+        val knownAddresses = getKnownInetAddresses()
 
-        neighbors.forEach { neighbor ->
-            val lastOriginatorMessage = neighbor.value
+        // Loop through each address and send the packet
+        knownAddresses.forEach { inetAddress ->
+            val neighbor = originatorMessages[inetAddress.requireAddressAsInt()]
             try {
-                //TODO: receivedFromInterface to be made non-nullable
-                lastOriginatorMessage.receivedFromInterface?.send(
+                // Send the packet to each known neighbor
+                neighbor?.receivedFromInterface?.send(
                     virtualPacket = packet,
-                    nextHopAddress = neighbor.value.lastHopAddr.asInetAddress()
+                    nextHopAddress = inetAddress
                 )
-            }catch(e: Exception) {
+            } catch (e: Exception) {
                 logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable: exception sending to " +
-                        "${neighbor.key.addressToDotNotation()} through ${neighbor.value.lastHopRealInetAddr}:${neighbor.value.lastHopRealPort}",
-                    e)
+                        inetAddress.toString(), e)
             }
         }
+    }
 
-        //TODO: check on each interface if there are any known neighbors for which we do not have
-        //current originator messages
+    private fun getKnownInetAddresses(): List<InetAddress> {
+        // Obtain all network interfaces and filter for usable addresses
+        return NetworkInterface.getNetworkInterfaces().toList().flatMap { ni ->
+            ni.inetAddresses.toList().filter { !it.isLoopbackAddress && it.isSiteLocalAddress }
+        }
     }
 
     private val pingNeighborsRunnable = Runnable {

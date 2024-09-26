@@ -15,21 +15,21 @@ import com.google.android.gms.nearby.connection.Payload
 import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
+import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
-import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
+import com.ustadmobile.meshrabiya.vnet.netinterface.VSocket
+import com.ustadmobile.meshrabiya.vnet.netinterface.VirtualNetworkInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.InputStream
 import java.net.InetAddress
-import java.nio.ByteBuffer
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -49,14 +49,12 @@ class NearbyVirtualNetwork(
     private val virtualIpAddress: Int,
     private val broadcastAddress: Int,
     private val strategy: Strategy = Strategy.P2P_CLUSTER,
-    private val logger: MNetLogger
-) {
+    override val logger: MNetLogger
+) : VirtualNetworkInterface {
 
     private var messageReceivedListener: ((String, Payload) -> Unit)? = null
 
     private val streamReplies = ConcurrentHashMap<Int, CompletableFuture<InputStream>>()
-
-    data class ConnectOptions(val timeout: Duration = Duration.ofSeconds(10))
 
     fun setOnMessageReceivedListener(listener: (String, Payload) -> Unit) {
         messageReceivedListener = listener
@@ -96,7 +94,47 @@ class NearbyVirtualNetwork(
         startDiscovery()
     }
 
-    fun close() {
+    override val virtualAddress: InetAddress
+        get() = TODO("Not yet implemented")
+
+    override fun send(virtualPacket: VirtualPacket, nextHopAddress: InetAddress) {
+        if (nextHopAddress.address.contentEquals(broadcastAddress.addressToByteArray())) {
+            // Broadcast to all known endpoints
+            _endpointStatusFlow.value.forEach { (endpointId, _) ->
+                sendPacketToEndpoint(endpointId, virtualPacket)
+            }
+        } else {
+            // Lookup the endpoint ID for the given nextHopAddress
+            val endpointId = _endpointStatusFlow.value.entries
+                .find { it.value.ipAddress == nextHopAddress }
+                ?.key
+
+            if (endpointId != null) {
+                sendPacketToEndpoint(endpointId, virtualPacket)
+            } else {
+                log(LogLevel.ERROR, "No endpoint found for the address: $nextHopAddress")
+            }
+        }
+    }
+
+
+    private fun sendPacketToEndpoint(endpointId: String, virtualPacket: VirtualPacket) {
+        val payload = Payload.fromBytes(virtualPacket.data)
+        connectionsClient.sendPayload(endpointId, payload)
+            .addOnSuccessListener {
+                log(LogLevel.INFO, "Virtual packet sent to $endpointId")
+            }
+            .addOnFailureListener { e ->
+                log(LogLevel.ERROR, "Failed to send virtual packet to $endpointId", e)
+            }
+    }
+
+    override fun connectSocket(nextHopAddress: InetAddress, destAddress: InetAddress, destPort: Int): VSocket {
+        log(LogLevel.INFO, "Connecting to socket: $nextHopAddress -> $destAddress:$destPort")
+        return TODO("Provide the return value")
+    }
+
+    override fun close() {
         if (isClosed.compareAndSet(false, true)) {
             connectionsClient.stopAdvertising()
             connectionsClient.stopDiscovery()
@@ -131,27 +169,7 @@ class NearbyVirtualNetwork(
         }
     }
 
-    fun connectSocket(endpointId: String, options: ConnectOptions = ConnectOptions()): InputStream {
-        val streamId = Random.nextInt()
-        val header = NearbyStreamHeader(
-            streamId = streamId,
-            isReply = false,
-            payloadSize = 0,
-            fromAddress = virtualIpAddress,
-            toAddress = broadcastAddress
-        )
-        val future = CompletableFuture<InputStream>()
-        streamReplies[streamId] = future
 
-        try {
-            val payload = Payload.fromBytes(header.toBytes())
-            connectionsClient.sendPayload(endpointId, payload)
-            return future.get(options.timeout.toMillis(), TimeUnit.MILLISECONDS)
-        } catch (e: Exception) {
-            streamReplies.remove(streamId)
-            throw e
-        }
-    }
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
             checkClosed()
@@ -250,15 +268,6 @@ class NearbyVirtualNetwork(
             }
     }
 
-    //TODO: This should NOT exist like this - ALL PAYLOADS MUST BE VIRTUAL PACKETS
-    fun sendMessage(endpointId: String, message: String) {
-        checkClosed()
-        val payload = Payload.fromBytes(message.toByteArray(Charsets.UTF_8))
-        connectionsClient.sendPayload(endpointId, payload)
-            .addOnSuccessListener { log(LogLevel.INFO, "Message sent to $endpointId") }
-            .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send message to $endpointId", e) }
-    }
-
     private fun handleBytesPayload(endpointId: String, payload: Payload) {
         checkClosed()
         val bytes = payload.asBytes()
@@ -321,11 +330,13 @@ class NearbyVirtualNetwork(
     }
 
     private fun updateEndpointStatus(endpointId: String, status: EndpointStatus) {
-        //TODO For the flow this MUST copy the map
+        // Copy the map to ensure thread safety
         val updatedMap = ConcurrentHashMap(_endpointStatusFlow.value)
-        updatedMap[endpointId] = updatedMap[endpointId]?.copy(status = status) ?: EndpointInfo(endpointId, status, null, false)
+        updatedMap[endpointId] = updatedMap[endpointId]?.copy(status = status)
+            ?: EndpointInfo(endpointId, status, null, false)
         _endpointStatusFlow.value = updatedMap
     }
+
 
 
     private fun log(level: LogLevel, message: String, exception: Exception? = null) {
