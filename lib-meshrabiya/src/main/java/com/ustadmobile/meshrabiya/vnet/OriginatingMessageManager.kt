@@ -1,8 +1,8 @@
 package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
+import com.ustadmobile.meshrabiya.ext.addressToByteArray
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
-import com.ustadmobile.meshrabiya.ext.asInetAddress
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpOriginatorMessage
@@ -27,7 +27,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.net.DatagramPacket
 import java.net.InetAddress
-import java.net.NetworkInterface
 import java.net.NoRouteToHostException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -46,11 +45,6 @@ class OriginatingMessageManager(
     private val originatingMessageNodeLostThreshold: Int = 10000,
     lostNodeCheckInterval: Int = 1_000,
 ) {
-
-    //  A - B - C - E
-    //   \ D
-
-
 
     private val logPrefix ="[OriginatingMessageManager for ${localNodeInetAddr}] "
 
@@ -119,15 +113,14 @@ class OriginatingMessageManager(
                 )
             } catch (e: Exception) {
                 logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable: exception sending to " +
-                        inetAddress.toString(), e)
+                        "${inetAddress}", e)
             }
         }
     }
 
     private fun getKnownInetAddresses(): List<InetAddress> {
-        // Obtain all network interfaces and filter for usable addresses
-        return NetworkInterface.getNetworkInterfaces().toList().flatMap { ni ->
-            ni.inetAddresses.toList().filter { !it.isLoopbackAddress && it.isSiteLocalAddress }
+        return originatorMessages.keys.map { virtualAddr ->
+            InetAddress.getByAddress(virtualAddr.addressToByteArray())
         }
     }
 

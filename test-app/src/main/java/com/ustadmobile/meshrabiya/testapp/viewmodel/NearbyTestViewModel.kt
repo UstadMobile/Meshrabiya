@@ -12,6 +12,7 @@ import com.ustadmobile.meshrabiya.testapp.server.ChatServer
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.InetAddress
 import java.nio.ByteBuffer
@@ -36,7 +37,7 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     private val logger = object : MNetLogger() {
         override fun invoke(priority: Int, message: String, exception: Exception?) {
             val logMessage = "${MNetLogger.priorityLabel(priority)}: $message"
-            _logs.value = _logs.value + logMessage
+            _logs.update { it + logMessage } // Use update for thread-safe modification
         }
 
         override fun invoke(priority: Int, message: () -> String, exception: Exception?) {
@@ -72,23 +73,22 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
 
         viewModelScope.launch {
             chatServer.chatMessages.collect { messages ->
-                _messages.value = messages.map { it.message }
+                _messages.update { messages.map { it.message } } // Use update for thread-safe modification
             }
         }
     }
 
-    fun ipToInt(ipAddress: String): Int {
+    private fun ipToInt(ipAddress: String): Int {
         val inetAddress = InetAddress.getByName(ipAddress)
-        val byteArray = inetAddress.address
-        return ByteBuffer.wrap(byteArray).int
+        return ByteBuffer.wrap(inetAddress.address).int
     }
 
     fun startNetwork() {
         try {
             nearbyNetwork.start()
-            chatServer
             _isNetworkRunning.value = true
             observeEndpoints()
+            logger.invoke(Log.INFO, "Network started successfully")
         } catch (e: IllegalStateException) {
             logger.invoke(Log.ERROR, "Failed to start network: ${e.message}")
         }
@@ -98,12 +98,13 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
         nearbyNetwork.close()
         chatServer.close()
         _isNetworkRunning.value = false
+        logger.invoke(Log.INFO, "Network stopped successfully")
     }
 
     private fun observeEndpoints() {
         viewModelScope.launch {
             nearbyNetwork.endpointStatusFlow.collect { endpointMap ->
-                _endpoints.value = endpointMap.values.toList()
+                _endpoints.update { endpointMap.values.toList() } // Use update for thread-safe modification
             }
         }
     }
@@ -119,12 +120,11 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-
     private fun handleIncomingPayload(endpointId: String, payload: Payload) {
         if (payload.type == Payload.Type.BYTES) {
             val bytes = payload.asBytes() ?: return
             val message = String(bytes, Charsets.UTF_8)
-            _messages.value = _messages.value + message
+            _messages.update { it + message } // Use update for thread-safe modification
             logger.invoke(Log.INFO, "Received message from $endpointId: $message")
         } else {
             logger.invoke(Log.INFO, "Received unsupported payload type from $endpointId")

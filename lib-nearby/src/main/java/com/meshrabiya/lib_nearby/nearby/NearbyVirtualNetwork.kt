@@ -27,21 +27,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.InputStream
 import java.net.InetAddress
-import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 
-//TODO: ********MUST IMPLEMENT THE VIRTUALNETWORKINTERFACE********
 
-//When Implementing the send function of virtualnetworkinterface
-// If the nextHopAddress is BROADCAST - then send the packet to all known endpoints.
-// Else lookup the endpoint id for the given nextHopAddress
 class NearbyVirtualNetwork(
     context: Context,
     private val name: String,
@@ -55,6 +50,8 @@ class NearbyVirtualNetwork(
     private var messageReceivedListener: ((String, Payload) -> Unit)? = null
 
     private val streamReplies = ConcurrentHashMap<Int, CompletableFuture<InputStream>>()
+
+    fun getVirtualIpAddress(): Int = virtualIpAddress
 
     fun setOnMessageReceivedListener(listener: (String, Payload) -> Unit) {
         messageReceivedListener = listener
@@ -80,7 +77,9 @@ class NearbyVirtualNetwork(
         VERBOSE, DEBUG, INFO, WARNING, ERROR
     }
 
-    private val _endpointStatusFlow = MutableStateFlow(ConcurrentHashMap<String, EndpointInfo>())
+
+
+    private val _endpointStatusFlow = MutableStateFlow<MutableMap<String, EndpointInfo>>(mutableMapOf())
     val endpointStatusFlow = _endpointStatusFlow.asStateFlow()
 
 
@@ -99,34 +98,29 @@ class NearbyVirtualNetwork(
 
     override fun send(virtualPacket: VirtualPacket, nextHopAddress: InetAddress) {
         if (nextHopAddress.address.contentEquals(broadcastAddress.addressToByteArray())) {
-            // Broadcast to all known endpoints
-            _endpointStatusFlow.value.forEach { (endpointId, _) ->
+            //broadcastToAllConnected here
+            val connectedEndpoints = _endpointStatusFlow.value.filter { it.value.status == EndpointStatus.CONNECTED }
+            connectedEndpoints.forEach { (endpointId, _) ->
                 sendPacketToEndpoint(endpointId, virtualPacket)
             }
         } else {
-            // Lookup the endpoint ID for the given nextHopAddress
             val endpointId = _endpointStatusFlow.value.entries
                 .find { it.value.ipAddress == nextHopAddress }
                 ?.key
-
-            if (endpointId != null) {
-                sendPacketToEndpoint(endpointId, virtualPacket)
-            } else {
-                log(LogLevel.ERROR, "No endpoint found for the address: $nextHopAddress")
-            }
+            endpointId?.let { sendPacketToEndpoint(it, virtualPacket) }
+                ?: log(LogLevel.ERROR, "No endpoint found for address: $nextHopAddress")
         }
     }
+
+
+
 
 
     private fun sendPacketToEndpoint(endpointId: String, virtualPacket: VirtualPacket) {
         val payload = Payload.fromBytes(virtualPacket.data)
         connectionsClient.sendPayload(endpointId, payload)
-            .addOnSuccessListener {
-                log(LogLevel.INFO, "Virtual packet sent to $endpointId")
-            }
-            .addOnFailureListener { e ->
-                log(LogLevel.ERROR, "Failed to send virtual packet to $endpointId", e)
-            }
+            .addOnSuccessListener { log(LogLevel.INFO, "Virtual packet sent to $endpointId") }
+            .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send virtual packet to $endpointId", e) }
     }
 
     override fun connectSocket(nextHopAddress: InetAddress, destAddress: InetAddress, destPort: Int): VSocket {
@@ -330,14 +324,13 @@ class NearbyVirtualNetwork(
     }
 
     private fun updateEndpointStatus(endpointId: String, status: EndpointStatus) {
-        // Copy the map to ensure thread safety
-        val updatedMap = ConcurrentHashMap(_endpointStatusFlow.value)
-        updatedMap[endpointId] = updatedMap[endpointId]?.copy(status = status)
-            ?: EndpointInfo(endpointId, status, null, false)
-        _endpointStatusFlow.value = updatedMap
+        _endpointStatusFlow.update { currentMap ->
+            currentMap.toMutableMap().apply {
+                this[endpointId] = this[endpointId]?.copy(status = status)
+                    ?: EndpointInfo(endpointId, status, null, false)
+            }
+        }
     }
-
-
 
     private fun log(level: LogLevel, message: String, exception: Exception? = null) {
         val prefix = "[NearbyVirtualNetwork:$name] "
