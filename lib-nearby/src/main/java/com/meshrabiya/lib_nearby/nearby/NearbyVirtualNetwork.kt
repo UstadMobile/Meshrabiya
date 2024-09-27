@@ -97,24 +97,12 @@ class NearbyVirtualNetwork(
         get() = TODO("Not yet implemented")
 
     override fun send(virtualPacket: VirtualPacket, nextHopAddress: InetAddress) {
-        if (nextHopAddress.address.contentEquals(broadcastAddress.addressToByteArray())) {
-            //broadcastToAllConnected here
-            val connectedEndpoints = _endpointStatusFlow.value.filter { it.value.status == EndpointStatus.CONNECTED }
-            connectedEndpoints.forEach { (endpointId, _) ->
-                sendPacketToEndpoint(endpointId, virtualPacket)
-            }
-        } else {
-            val endpointId = _endpointStatusFlow.value.entries
-                .find { it.value.ipAddress == nextHopAddress }
-                ?.key
-            endpointId?.let { sendPacketToEndpoint(it, virtualPacket) }
-                ?: log(LogLevel.ERROR, "No endpoint found for address: $nextHopAddress")
+        //broadcastToAllConnected here
+        val connectedEndpoints = _endpointStatusFlow.value.filter { it.value.status == EndpointStatus.CONNECTED }
+        connectedEndpoints.forEach { (endpointId, _) ->
+            sendPacketToEndpoint(endpointId, virtualPacket)
         }
     }
-
-
-
-
 
     private fun sendPacketToEndpoint(endpointId: String, virtualPacket: VirtualPacket) {
         val payload = Payload.fromBytes(virtualPacket.data)
@@ -134,10 +122,14 @@ class NearbyVirtualNetwork(
             connectionsClient.stopDiscovery()
             connectionsClient.stopAllEndpoints()
             _endpointStatusFlow.value.clear()
-            scope.cancel()
-            log(LogLevel.INFO, "Stopped advertising, discovery, all connections, and cleared endpoints")
+            streamReplies.clear() // Clear any ongoing stream replies
+            scope.cancel() // Cancel any ongoing coroutines
+            log(LogLevel.INFO, "Network is closed and all connections have been stopped.")
         }
+
+        isClosed.set(false) // Reset the closed state if you're planning to reuse this instance
     }
+
 
     private fun startAdvertising() {
         checkClosed()
@@ -177,7 +169,7 @@ class NearbyVirtualNetwork(
             if (result.status.isSuccess) {
                 log(LogLevel.INFO, "Successfully connected to endpoint: $endpointId")
                 updateEndpointStatus(endpointId, EndpointStatus.CONNECTED)
-                sendMmcpPingPacket(endpointId)
+//                sendMmcpPingPacket(endpointId)
             } else {
                 log(LogLevel.ERROR, "Failed to connect to endpoint: $endpointId. Reason: ${result.status}")
                 updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
@@ -345,7 +337,7 @@ class NearbyVirtualNetwork(
 
     private fun checkClosed() {
         if (isClosed.get()) {
-            throw IllegalStateException("Network is closed")
+            log(LogLevel.INFO, "Network is closed")
         }
     }
 }

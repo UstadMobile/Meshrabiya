@@ -25,11 +25,12 @@ class ChatServer(
 
     private fun handleIncomingPayload(endpointId: String, payload: Payload) {
         payload.asBytes()?.let { bytes ->
-            val message = String(bytes, Charsets.UTF_8)
+            val message = String(bytes, Charsets.UTF_8).trim()
             val chatMessage = ChatMessage(System.currentTimeMillis(), message)
             _chatMessages.update { it + chatMessage }
         }
     }
+
 
     fun sendMessage(message: String) {
         val chatMessage = ChatMessage(System.currentTimeMillis(), message)

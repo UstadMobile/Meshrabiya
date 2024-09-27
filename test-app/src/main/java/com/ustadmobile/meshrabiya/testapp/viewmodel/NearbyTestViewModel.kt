@@ -10,34 +10,40 @@ import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.server.ChatMessage
 import com.ustadmobile.meshrabiya.testapp.server.ChatServer
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import kotlin.random.Random
 
 class NearbyTestViewModel(application: Application) : AndroidViewModel(application) {
     private val _isNetworkRunning = MutableStateFlow(false)
-    val isNetworkRunning: StateFlow<Boolean> = _isNetworkRunning
+    val isNetworkRunning: StateFlow<Boolean> = _isNetworkRunning.asStateFlow()
 
     private val _endpoints = MutableStateFlow<List<NearbyVirtualNetwork.EndpointInfo>>(emptyList())
-    val endpoints: StateFlow<List<NearbyVirtualNetwork.EndpointInfo>> = _endpoints
+    val endpoints: StateFlow<List<NearbyVirtualNetwork.EndpointInfo>> = _endpoints.asStateFlow()
 
     private val _logs = MutableStateFlow<List<String>>(emptyList())
-    val logs: StateFlow<List<String>> = _logs
+    val logs: StateFlow<List<String>> = _logs.asStateFlow()
 
     private val _messages = MutableStateFlow<List<String>>(emptyList())
-    val messages: StateFlow<List<String>> = _messages
+    val messages: StateFlow<List<String>> = _messages.asStateFlow()
 
     private lateinit var nearbyNetwork: NearbyVirtualNetwork
     private lateinit var chatServer: ChatServer
+    private var isNetworkInitialized = false
 
     private val logger = object : MNetLogger() {
         override fun invoke(priority: Int, message: String, exception: Exception?) {
             val logMessage = "${MNetLogger.priorityLabel(priority)}: $message"
-            _logs.update { it + logMessage } // Use update for thread-safe modification
+            viewModelScope.launch(Dispatchers.Main) {
+                _logs.update { it + logMessage }
+            }
         }
 
         override fun invoke(priority: Int, message: () -> String, exception: Exception?) {
@@ -47,7 +53,6 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         initializeNearbyNetwork()
-        initializeChatServer()
     }
 
     private fun initializeNearbyNetwork() {
@@ -66,14 +71,12 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
         nearbyNetwork.setOnMessageReceivedListener { endpointId, payload ->
             handleIncomingPayload(endpointId, payload)
         }
-    }
 
-    private fun initializeChatServer() {
         chatServer = ChatServer(nearbyNetwork)
 
         viewModelScope.launch {
             chatServer.chatMessages.collect { messages ->
-                _messages.update { messages.map { it.message } } // Use update for thread-safe modification
+                _messages.update { messages.map { it.message } }
             }
         }
     }
@@ -84,52 +87,87 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun startNetwork() {
-        try {
-            nearbyNetwork.start()
-            _isNetworkRunning.value = true
-            observeEndpoints()
-            logger.invoke(Log.INFO, "Network started successfully")
-        } catch (e: IllegalStateException) {
-            logger.invoke(Log.ERROR, "Failed to start network: ${e.message}")
+        if (!isNetworkInitialized) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    nearbyNetwork.start()
+                    _isNetworkRunning.value = true
+                    isNetworkInitialized = true
+                    observeEndpoints()
+                    logger.invoke(Log.INFO, "Network started successfully")
+                } catch (e: IllegalStateException) {
+                    logger.invoke(Log.ERROR, "Failed to start network: ${e.message}")
+                }
+            }
+        } else {
+            logger.invoke(Log.INFO, "Network is already running.")
         }
     }
 
     fun stopNetwork() {
-        nearbyNetwork.close()
-        chatServer.close()
-        _isNetworkRunning.value = false
-        logger.invoke(Log.INFO, "Network stopped successfully")
+        if (isNetworkInitialized) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    nearbyNetwork.close()
+                    chatServer.close()
+                    resetState()
+                    _isNetworkRunning.value = false
+                    isNetworkInitialized = false
+                    logger.invoke(Log.INFO, "Network stopped successfully")
+                } catch (e: Exception) {
+                    logger.invoke(Log.ERROR, "Failed to stop network: ${e.message}")
+                }
+            }
+        } else {
+            logger.invoke(Log.INFO, "Network is not running.")
+        }
+    }
+
+    private fun resetState() {
+        _logs.value = emptyList()
+        _messages.value = emptyList()
+        _endpoints.value = emptyList()
     }
 
     private fun observeEndpoints() {
         viewModelScope.launch {
             nearbyNetwork.endpointStatusFlow.collect { endpointMap ->
-                _endpoints.update { endpointMap.values.toList() } // Use update for thread-safe modification
+                _endpoints.value = endpointMap.values
+                    .filter { it.status == NearbyVirtualNetwork.EndpointStatus.CONNECTED }
+                    .distinctBy { it.endpointId }
             }
         }
     }
 
     fun sendMessage(message: String) {
-        viewModelScope.launch {
-            try {
-                chatServer.sendMessage(message)
-                logger.invoke(Log.INFO, "Message sent: $message")
-            } catch (e: IllegalStateException) {
-                logger.invoke(Log.ERROR, "Failed to send message: ${e.message}")
+        val trimmedMessage = message.trim()
+        if (trimmedMessage.isNotEmpty()) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    chatServer.sendMessage(trimmedMessage)
+                    logger.invoke(Log.INFO, "Message sent: $trimmedMessage")
+                } catch (e: IllegalStateException) {
+                    logger.invoke(Log.ERROR, "Failed to send message: ${e.message}")
+                }
             }
+        } else {
+            logger.invoke(Log.INFO, "Empty message not sent.")
         }
     }
 
     private fun handleIncomingPayload(endpointId: String, payload: Payload) {
         if (payload.type == Payload.Type.BYTES) {
             val bytes = payload.asBytes() ?: return
-            val message = String(bytes, Charsets.UTF_8)
-            _messages.update { it + message } // Use update for thread-safe modification
+            val message = String(bytes, Charsets.UTF_8).trim() // Trim the incoming message
+            viewModelScope.launch(Dispatchers.Main) {
+                _messages.update { it + message }
+            }
             logger.invoke(Log.INFO, "Received message from $endpointId: $message")
         } else {
             logger.invoke(Log.INFO, "Received unsupported payload type from $endpointId")
         }
     }
+
 
     override fun onCleared() {
         super.onCleared()
