@@ -414,6 +414,13 @@ class OriginatingMessageManager(
         }
     }
 
+    fun selectOutgoingAddrForDestination(
+        destination: InetAddress
+    ): InetAddress {
+        TODO("select the address for the interface that has the fewest hops to reach destination")
+    }
+
+
 
     fun close(){
         sendOriginatorMessagesFuture.cancel(true)
