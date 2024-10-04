@@ -87,7 +87,7 @@ abstract class VirtualNode(
     final override val address: InetAddress = randomApipaInetAddr(),
     override val networkPrefixLength: Int = 16,
     val config: NodeConfig = NodeConfig.DEFAULT_CONFIG,
-): VirtualRouter, Closeable {
+) : VirtualRouter, Closeable {
 
     val addressAsInt: Int = address.requireAddressAsInt()
 
@@ -115,9 +115,11 @@ abstract class VirtualNode(
 
     private val forwardingRules: MutableMap<ForwardBindPoint, UdpForwardRule> = ConcurrentHashMap()
 
-    private val _virtualNetworkInterfaces: Flow<List<VirtualNetworkInterface>> = MutableStateFlow(
+    private val _virtualNetworkInterfaces = MutableStateFlow<List<VirtualNetworkInterface>>(
         emptyList()
     )
+    val virtualNetworkInterfaces: Flow<List<VirtualNetworkInterface>> =
+        _virtualNetworkInterfaces.asStateFlow()
 
     /**
      * @param originatorMessage the Originator message itself
@@ -134,7 +136,7 @@ abstract class VirtualNode(
         val lastHopRealPort: Int,
         val receivedFromInterface: VirtualNetworkInterface? = null,
 
-    )
+        )
 
     @Suppress("unused") //Part of the API
     enum class Zone {
@@ -142,7 +144,9 @@ abstract class VirtualNode(
     }
 
     private val originatingMessageManager = OriginatingMessageManager(
-        localNodeInetAddr = address,
+        virtualNetworkInterfaces = {
+            _virtualNetworkInterfaces.value
+        },
         logger = logger,
         scheduledExecutorService = scheduledExecutor,
         nextMmcpMessageId = this::nextMmcpMessageId,
@@ -180,7 +184,8 @@ abstract class VirtualNode(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    val incomingMmcpMessages: Flow<MmcpMessageAndPacketHeader> = _incomingMmcpMessages.asSharedFlow()
+    val incomingMmcpMessages: Flow<MmcpMessageAndPacketHeader> =
+        _incomingMmcpMessages.asSharedFlow()
 
     private val activeSockets: MutableMap<Int, VirtualDatagramSocketImpl> = ConcurrentHashMap()
 
@@ -210,8 +215,8 @@ abstract class VirtualNode(
         virtualDatagramSocketImpl: VirtualDatagramSocketImpl,
         portNum: Int
     ): Int {
-        if(portNum > 0) {
-            if(activeSockets.containsKey(portNum))
+        if (portNum > 0) {
+            if (activeSockets.containsKey(portNum))
                 throw IllegalStateException("VirtualNode: port $portNum already allocated!")
 
             //requested port is not allocated, everything OK
@@ -222,13 +227,13 @@ abstract class VirtualNode(
         var attemptCount = 0
         do {
             val randomPort = Random.nextInt(0, Short.MAX_VALUE.toInt())
-            if(!activeSockets.containsKey(randomPort)) {
+            if (!activeSockets.containsKey(randomPort)) {
                 activeSockets[randomPort] = virtualDatagramSocketImpl
                 return randomPort
             }
 
             attemptCount++
-        }while(attemptCount < 100)
+        } while (attemptCount < 100)
 
         throw IllegalStateException("Could not allocate random free port")
     }
@@ -255,12 +260,12 @@ abstract class VirtualNode(
         bindPort: Int,
         destAddress: InetAddress,
         destPort: Int,
-    ) : Int {
-        val listenSocket = if(
+    ): Int {
+        val listenSocket = if (
             bindAddress.prefixMatches(networkPrefixLength, address)
         ) {
             createBoundDatagramSocket(bindPort)
-        }else {
+        } else {
             DatagramSocket(bindPort, bindAddress)
         }
 
@@ -277,9 +282,9 @@ abstract class VirtualNode(
         destAddress: InetAddress,
         destPort: Int
     ): Int {
-        val listenSocket = if(bindZone == Zone.VNET) {
+        val listenSocket = if (bindZone == Zone.VNET) {
             createBoundDatagramSocket(bindPort)
-        }else {
+        } else {
             DatagramSocket(bindPort)
         }
         val forwardRule = createForwardRule(listenSocket, destAddress, destPort)
@@ -306,7 +311,7 @@ abstract class VirtualNode(
         listenSocket: DatagramSocket,
         destAddress: InetAddress,
         destPort: Int,
-    ) : UdpForwardRule {
+    ): UdpForwardRule {
         return UdpForwardRule(
             boundSocket = listenSocket,
             ioExecutor = this.connectionExecutor,
@@ -325,7 +330,7 @@ abstract class VirtualNode(
     protected fun generateConnectLink(
         hotspot: WifiConnectConfig?,
         bluetoothConfig: MeshrabiyaBluetoothState? = null,
-    ) : MeshrabiyaConnectLink {
+    ): MeshrabiyaConnectLink {
         return MeshrabiyaConnectLink.fromComponents(
             nodeAddr = addressAsInt,
             port = localDatagramPort,
@@ -339,7 +344,7 @@ abstract class VirtualNode(
         virtualPacket: VirtualPacket,
         datagramPacket: DatagramPacket?,
         datagramSocket: VirtualNodeDatagramSocket?,
-    ) : Boolean {
+    ): Boolean {
         //This is an Mmcp message
         try {
             val mmcpMessage = MmcpMessage.fromVirtualPacket(virtualPacket)
@@ -347,7 +352,7 @@ abstract class VirtualNode(
             logger(Log.VERBOSE,
                 message = {
                     "$logPrefix received MMCP message (${mmcpMessage::class.simpleName}) " +
-                    "from ${from.addressToDotNotation()}"
+                            "from ${from.addressToDotNotation()}"
                 }
             )
 
@@ -373,12 +378,16 @@ abstract class VirtualNode(
                         fromAddr = addressAsInt
                     )
 
-                    logger(Log.VERBOSE, { "$logPrefix Sending pong to ${from.addressToDotNotation()}" })
+                    logger(
+                        Log.VERBOSE,
+                        { "$logPrefix Sending pong to ${from.addressToDotNotation()}" })
                     route(replyPacket)
                 }
 
                 mmcpMessage is MmcpPong && isToThisNode -> {
-                    logger(Log.VERBOSE, { "$logPrefix Received pong(id=${mmcpMessage.messageId})}" })
+                    logger(
+                        Log.VERBOSE,
+                        { "$logPrefix Received pong(id=${mmcpMessage.messageId})}" })
                     originatingMessageManager.onPongReceived(from, mmcpMessage)
                     pongListeners.forEach {
                         it.onPongReceived(from, mmcpMessage)
@@ -386,13 +395,17 @@ abstract class VirtualNode(
                 }
 
                 mmcpMessage is MmcpHotspotRequest && isToThisNode -> {
-                    logger(Log.INFO, "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})", null)
+                    logger(
+                        Log.INFO,
+                        "$logPrefix Received hotspotrequest (id=${mmcpMessage.messageId})",
+                        null
+                    )
                     coroutineScope.launch {
                         val hotspotResult = meshrabiyaWifiManager.requestHotspot(
                             mmcpMessage.messageId, mmcpMessage.hotspotRequest
                         )
 
-                        if(from != addressAsInt) {
+                        if (from != addressAsInt) {
                             val replyPacket = MmcpHotspotResponse(
                                 messageId = mmcpMessage.messageId,
                                 result = hotspotResult
@@ -400,7 +413,11 @@ abstract class VirtualNode(
                                 toAddr = from,
                                 fromAddr = addressAsInt
                             )
-                            logger(Log.INFO, "$logPrefix sending hotspotresponse to ${from.addressToDotNotation()}", null)
+                            logger(
+                                Log.INFO,
+                                "$logPrefix sending hotspotresponse to ${from.addressToDotNotation()}",
+                                null
+                            )
                             route(replyPacket)
                         }
                     }
@@ -420,10 +437,15 @@ abstract class VirtualNode(
                 }
             }
 
-            _incomingMmcpMessages.tryEmit(MmcpMessageAndPacketHeader(mmcpMessage, virtualPacket.header))
+            _incomingMmcpMessages.tryEmit(
+                MmcpMessageAndPacketHeader(
+                    mmcpMessage,
+                    virtualPacket.header
+                )
+            )
 
             return shouldRoute
-        }catch(e: Exception) {
+        } catch (e: Exception) {
             e.printStackTrace()
             return false
         }
@@ -439,36 +461,41 @@ abstract class VirtualNode(
         try {
             val fromLastHop = packet.header.lastHopAddr
 
-            if(packet.header.hopCount >= config.maxHops) {
-                logger(Log.DEBUG,
+            if (packet.header.hopCount >= config.maxHops) {
+                logger(
+                    Log.DEBUG,
                     "Drop packet from ${packet.header.fromAddr.addressToDotNotation()} - " +
                             "${packet.header.hopCount} exceeds ${config.maxHops}",
-                    null)
+                    null
+                )
                 return
             }
 
-            if(packet.header.toPort == 0 && packet.header.fromAddr != addressAsInt){
+            if (packet.header.toPort == 0 && packet.header.fromAddr != addressAsInt) {
                 //this is an MMCP message
-                if(!onIncomingMmcpMessage(packet, datagramPacket, virtualNodeDatagramSocket)){
+                if (!onIncomingMmcpMessage(packet, datagramPacket, virtualNodeDatagramSocket)) {
                     //It was determined that this packet should go no further by MMCP processing
                     logger(Log.DEBUG, "Drop mmcp packet from ${packet.header.fromAddr}", null)
                 }
             }
 
-            if(packet.header.toAddr == addressAsInt) {
+            if (packet.header.toAddr == addressAsInt) {
                 //this is an incoming packet - give to the destination virtual socket/forwarding
                 val listeningSocket = activeSockets[packet.header.toPort]
-                if(listeningSocket != null) {
+                if (listeningSocket != null) {
                     listeningSocket.onIncomingPacket(packet)
-                }else {
-                    logger(Log.DEBUG, "$logPrefix Incoming packet received, but no socket listening on: ${packet.header.toPort}")
+                } else {
+                    logger(
+                        Log.DEBUG,
+                        "$logPrefix Incoming packet received, but no socket listening on: ${packet.header.toPort}"
+                    )
                 }
-            }else {
+            } else {
                 //packet needs to be sent to next hop / destination
                 val toAddr = packet.header.toAddr
 
                 packet.updateLastHopAddrAndIncrementHopCountInData(addressAsInt)
-                if(toAddr == ADDR_BROADCAST) {
+                if (toAddr == ADDR_BROADCAST) {
                     originatingMessageManager.neighbors().filter {
                         it.first != fromLastHop && it.first != packet.header.fromAddr
                     }.forEach {
@@ -488,23 +515,26 @@ abstract class VirtualNode(
                         )
                     }
 
-                }else {
+                } else {
                     val originatorMessage = originatingMessageManager
                         .findOriginatingMessageFor(packet.header.toAddr)
-                    if(originatorMessage != null) {
+                    if (originatorMessage != null) {
                         originatorMessage.receivedFromSocket.send(
                             nextHopAddress = originatorMessage.lastHopRealInetAddr,
                             nextHopPort = originatorMessage.lastHopRealPort,
                             virtualPacket = packet
                         )
-                    }else {
-                        logger(Log.WARN, "$logPrefix route: Cannot route packet to " +
-                                "${packet.header.toAddr.addressToDotNotation()} : no known nexthop")
+                    } else {
+                        logger(
+                            Log.WARN, "$logPrefix route: Cannot route packet to " +
+                                    "${packet.header.toAddr.addressToDotNotation()} : no known nexthop"
+                        )
                     }
                 }
             }
-        }catch(e: Exception) {
-            logger(Log.ERROR,
+        } catch (e: Exception) {
+            logger(
+                Log.ERROR,
                 "$logPrefix : route : exception routing packet from ${packet.header.fromAddr.addressToDotNotation()}",
                 e
             )
@@ -526,7 +556,8 @@ abstract class VirtualNode(
         neighborNodeVirtualAddr: Int,
         socket: VirtualNodeDatagramSocket,
     ) {
-        logger(Log.DEBUG,
+        logger(
+            Log.DEBUG,
             "$logPrefix addNewNeighborConnection connection to virtual addr " +
                     "${neighborNodeVirtualAddr.addressToDotNotation()} " +
                     "via datagram to $address:$port",
@@ -537,7 +568,7 @@ abstract class VirtualNode(
             originatingMessageManager.addNeighbor(
                 neighborRealInetAddr = address,
                 neighborRealPort = port,
-                socket =  socket,
+                socket = socket,
             )
         }
 
@@ -556,15 +587,15 @@ abstract class VirtualNode(
         preferredBand: ConnectBand = ConnectBand.BAND_2GHZ,
         hotspotType: HotspotType = HotspotType.AUTO,
     ): LocalHotspotResponse? {
-        return if(enabled){
-             meshrabiyaWifiManager.requestHotspot(
+        return if (enabled) {
+            meshrabiyaWifiManager.requestHotspot(
                 requestMessageId = nextMmcpMessageId(),
                 request = LocalHotspotRequest(
                     preferredBand = preferredBand,
                     preferredType = hotspotType,
                 )
             )
-        }else {
+        } else {
             meshrabiyaWifiManager.deactivateHotspot()
             LocalHotspotResponse(
                 responseToMessageId = 0,
