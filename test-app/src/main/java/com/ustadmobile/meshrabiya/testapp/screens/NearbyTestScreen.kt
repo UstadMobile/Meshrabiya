@@ -90,15 +90,21 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
                         .align(Alignment.Start), // Align to start (left)
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 ) {
-                    Text(
-                        text = message.trim(), // Trim spaces
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(8.dp) // Padding inside each message card
-                    )
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Sender: ${message.sender}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = message.message,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
                 }
             }
         }
-
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -154,6 +160,8 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
         }
     }
 }
+
+
 
 
 

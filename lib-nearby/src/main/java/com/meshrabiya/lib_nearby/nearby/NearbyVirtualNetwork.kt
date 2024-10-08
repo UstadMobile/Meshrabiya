@@ -16,6 +16,7 @@ import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
+import com.ustadmobile.meshrabiya.ext.asInetAddress
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
@@ -44,18 +45,15 @@ class NearbyVirtualNetwork(
     private val virtualIpAddress: Int,
     private val broadcastAddress: Int,
     private val strategy: Strategy = Strategy.P2P_CLUSTER,
-    override val logger: MNetLogger
+    override val logger: MNetLogger,
+    private val onPacketReceived: (VirtualPacket) -> Unit
 ) : VirtualNetworkInterface {
 
-    private var messageReceivedListener: ((String, Payload) -> Unit)? = null
+    override val virtualAddress: InetAddress get() = InetAddress.getByAddress(virtualIpAddress.addressToByteArray())
+
 
     private val streamReplies = ConcurrentHashMap<Int, CompletableFuture<InputStream>>()
-
-    fun getVirtualIpAddress(): Int = virtualIpAddress
-
-    fun setOnMessageReceivedListener(listener: (String, Payload) -> Unit) {
-        messageReceivedListener = listener
-    }
+    private val endpointIpMap = ConcurrentHashMap<String, InetAddress>()
 
     private val connectionsClient = Nearby.getConnectionsClient(context)
     private val desiredOutgoingConnections = 3
@@ -93,14 +91,29 @@ class NearbyVirtualNetwork(
         startDiscovery()
     }
 
-    override val virtualAddress: InetAddress
-        get() = TODO("Not yet implemented")
 
     override fun send(virtualPacket: VirtualPacket, nextHopAddress: InetAddress) {
-        //broadcastToAllConnected here
         val connectedEndpoints = _endpointStatusFlow.value.filter { it.value.status == EndpointStatus.CONNECTED }
-        connectedEndpoints.forEach { (endpointId, _) ->
-            sendPacketToEndpoint(endpointId, virtualPacket)
+
+        //If the nextHopAddress is the broadcast address, send to all known points.
+        //Else, send only to the related endpoint; if not found, throw exception.
+        if (nextHopAddress.address.contentEquals(InetAddress.getByAddress(broadcastAddress.addressToByteArray()).address)) {
+            log(LogLevel.INFO, "Broadcasting packet to all connected endpoints")
+            connectedEndpoints.forEach { (endpointId, _) ->
+                sendPacketToEndpoint(endpointId, virtualPacket)
+            }
+        }
+        else {
+            val matchingEndpoint = connectedEndpoints.entries.find { (_, info) ->
+                info.ipAddress?.address?.contentEquals(nextHopAddress.address) == true
+            }
+
+            if (matchingEndpoint != null) {
+                log(LogLevel.INFO, "Sending packet to specific endpoint: ${matchingEndpoint.key}")
+                sendPacketToEndpoint(matchingEndpoint.key, virtualPacket)
+            } else {
+                throw IllegalArgumentException("No connected endpoint found for IP address: $nextHopAddress")
+            }
         }
     }
 
@@ -122,12 +135,9 @@ class NearbyVirtualNetwork(
             connectionsClient.stopDiscovery()
             connectionsClient.stopAllEndpoints()
             _endpointStatusFlow.value.clear()
-            streamReplies.clear() // Clear any ongoing stream replies
-            scope.cancel() // Cancel any ongoing coroutines
+            scope.cancel()
             log(LogLevel.INFO, "Network is closed and all connections have been stopped.")
         }
-
-        isClosed.set(false) // Reset the closed state if you're planning to reuse this instance
     }
 
 
@@ -169,7 +179,7 @@ class NearbyVirtualNetwork(
             if (result.status.isSuccess) {
                 log(LogLevel.INFO, "Successfully connected to endpoint: $endpointId")
                 updateEndpointStatus(endpointId, EndpointStatus.CONNECTED)
-//                sendMmcpPingPacket(endpointId)
+                sendMmcpPingPacket(endpointId)
             } else {
                 log(LogLevel.ERROR, "Failed to connect to endpoint: $endpointId. Reason: ${result.status}")
                 updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
@@ -254,18 +264,38 @@ class NearbyVirtualNetwork(
             }
     }
 
+
     private fun handleBytesPayload(endpointId: String, payload: Payload) {
         checkClosed()
+
+        // Payload should be converted to VirtualPacket always
         val bytes = payload.asBytes()
         if (bytes == null) {
             log(LogLevel.WARNING, "Received null payload from endpoint: $endpointId")
             return
         }
 
-        try {
-            messageReceivedListener?.invoke(endpointId, payload)
+        val virtualPacket: VirtualPacket = try {
+            VirtualPacket.fromData(bytes, 0)
         } catch (e: Exception) {
-            log(LogLevel.ERROR, "Error handling payload from $endpointId", e)
+            log(LogLevel.ERROR, "Failed to convert payload to VirtualPacket from endpoint: $endpointId", e)
+            return
+        }
+
+        // Update the mapping of endpointId to virtual IP address
+        val lastHopAddress = virtualPacket.header.toAddr // toAddr holds the last hop address
+        if (lastHopAddress != null) {
+            endpointIpMap[endpointId] = lastHopAddress.asInetAddress()
+            log(LogLevel.DEBUG, "Updated IP mapping for endpoint $endpointId to $lastHopAddress")
+        } else {
+            log(LogLevel.WARNING, "Last hop address is null for the received packet from endpoint $endpointId")
+        }
+
+        // Invoke the onPacketReceived callback with the converted VirtualPacket
+        try {
+            onPacketReceived(virtualPacket)
+        } catch (e: Exception) {
+            log(LogLevel.ERROR, "Error processing VirtualPacket from $endpointId", e)
         }
 
         try {
@@ -337,7 +367,7 @@ class NearbyVirtualNetwork(
 
     private fun checkClosed() {
         if (isClosed.get()) {
-            log(LogLevel.INFO, "Network is closed")
+            throw IllegalStateException("Network is closed")
         }
     }
 }
