@@ -48,6 +48,8 @@ class ChatServer(
     private val localVirtualIp = nearbyVirtualNetwork.virtualAddress.hostAddress
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+    private val connectedUsers = mutableSetOf<String>()
+
     init {
         listenForUdpMessages()
     }
@@ -72,20 +74,18 @@ class ChatServer(
     }
 
     private fun processReceivedPacket(packet: DatagramPacket) {
-        val receivedData = packet.data.copyOf(packet.length)
-        val buffer = ByteBuffer.wrap(receivedData)
+        val message = String(packet.data, 0, packet.length, StandardCharsets.UTF_8)
+        val parts = message.split("|")
+        if (parts.size == 2) {
+            val senderIp = parts[0]
+            val chatMessage = parts[1]
 
-        try {
-            val senderVirtualIp = extractVirtualIp(buffer)
-            val message = extractMessage(buffer)
-
-            if (senderVirtualIp != localVirtualIp) {
-                val chatMessage = ChatMessage(System.currentTimeMillis(), senderVirtualIp, message)
-                _chatMessages.update { it + chatMessage }
-                logger.invoke(Log.INFO, "Received message: \"$message\" from virtual IP: $senderVirtualIp")
+            if (senderIp != localVirtualIp) {
+                connectedUsers.add(senderIp)
+                val newMessage = ChatMessage(System.currentTimeMillis(), senderIp, chatMessage)
+                _chatMessages.value = _chatMessages.value + newMessage
+                logger.invoke(Log.INFO, "Received message: \"$chatMessage\" from: $senderIp")
             }
-        } catch (e: Exception) {
-            logger.invoke(Log.ERROR, "Error processing received packet: ${e.message}", e)
         }
     }
 
@@ -97,45 +97,25 @@ class ChatServer(
         }
 
         val chatMessage = ChatMessage(System.currentTimeMillis(), localVirtualIp, trimmedMessage)
-        _chatMessages.update { it + chatMessage } // Add to local messages
+        _chatMessages.value = _chatMessages.value + chatMessage
 
-        val messageBytes = trimmedMessage.toByteArray(StandardCharsets.UTF_8)
-        if (messageBytes.size > MAX_MESSAGE_SIZE) {
-            logger.invoke(Log.INFO, "Error: Message size exceeds $MAX_MESSAGE_SIZE bytes.")
+        val fullMessage = "$localVirtualIp|$trimmedMessage"
+        val messageBytes = fullMessage.toByteArray(StandardCharsets.UTF_8)
+
+        if (messageBytes.size > MAX_UDP_PACKET_SIZE) {
+            logger.invoke(Log.INFO, "Error: Message size exceeds $MAX_UDP_PACKET_SIZE bytes.")
             return
         }
 
         scope.launch(Dispatchers.IO) {
             try {
-                val packet = buildDatagramPacket(messageBytes)
+                val packet = DatagramPacket(messageBytes, messageBytes.size, InetAddress.getByName(BROADCAST_IP), UDP_PORT)
                 udpSocket.send(packet)
-
-                logger.invoke(Log.INFO, "Sent message: \"$trimmedMessage\" to broadcast address from virtual IP: $localVirtualIp")
+                logger.invoke(Log.INFO, "Sent message: \"$trimmedMessage\" to all connected users")
             } catch (e: Exception) {
                 logger.invoke(Log.ERROR, "Error sending message: ${e.message}", e)
             }
         }
-    }
-
-    private fun buildDatagramPacket(messageBytes: ByteArray): DatagramPacket {
-        val buffer = ByteBuffer.allocate(4 + messageBytes.size)
-        buffer.put(nearbyVirtualNetwork.virtualAddress.address)
-        buffer.put(messageBytes)
-
-        val broadcastAddress = InetAddress.getByName(BROADCAST_IP)
-        return DatagramPacket(buffer.array(), buffer.position(), broadcastAddress, UDP_PORT)
-    }
-
-    private fun extractVirtualIp(buffer: ByteBuffer): String {
-        val virtualIpBytes = ByteArray(4)
-        buffer.get(virtualIpBytes)
-        return InetAddress.getByAddress(virtualIpBytes).hostAddress
-    }
-
-    private fun extractMessage(buffer: ByteBuffer): String {
-        val messageBytes = ByteArray(buffer.remaining())
-        buffer.get(messageBytes)
-        return String(messageBytes, StandardCharsets.UTF_8).trim()
     }
 
     fun close() {
@@ -146,7 +126,6 @@ class ChatServer(
     companion object {
         const val UDP_PORT = 8888
         const val MAX_UDP_PACKET_SIZE = 65507 // Maximum theoretical UDP packet size
-        const val MAX_MESSAGE_SIZE = MAX_UDP_PACKET_SIZE - 4 // 4 bytes for virtual IP
         const val BROADCAST_IP = "255.255.255.255"
     }
 }

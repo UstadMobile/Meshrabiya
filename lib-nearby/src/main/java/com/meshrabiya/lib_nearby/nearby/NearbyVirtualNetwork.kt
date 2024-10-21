@@ -3,11 +3,13 @@ package com.meshrabiya.lib_nearby.nearby
 
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.AdvertisingOptions
 import com.google.android.gms.nearby.connection.ConnectionInfo
 import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
 import com.google.android.gms.nearby.connection.ConnectionResolution
+import com.google.android.gms.nearby.connection.ConnectionsStatusCodes
 import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
 import com.google.android.gms.nearby.connection.DiscoveryOptions
 import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback
@@ -25,11 +27,13 @@ import com.ustadmobile.meshrabiya.vnet.netinterface.VSocket
 import com.ustadmobile.meshrabiya.vnet.netinterface.VirtualNetworkInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import java.io.InputStream
 import java.net.InetAddress
 import java.util.concurrent.CompletableFuture
@@ -51,6 +55,7 @@ class NearbyVirtualNetwork(
 
     override val virtualAddress: InetAddress get() = InetAddress.getByAddress(virtualIpAddress.addressToByteArray())
 
+    private val connectionRequests = ConcurrentHashMap<String, Job>()
 
     private val streamReplies = ConcurrentHashMap<Int, CompletableFuture<InputStream>>()
     private val endpointIpMap = ConcurrentHashMap<String, InetAddress>()
@@ -254,16 +259,54 @@ class NearbyVirtualNetwork(
 
     private fun requestConnection(endpointId: String) {
         checkClosed()
-        connectionsClient.requestConnection(name, endpointId, connectionLifecycleCallback)
-            .addOnSuccessListener {
-                log(LogLevel.INFO, "Connection request sent to endpoint: $endpointId")
-            }
-            .addOnFailureListener { e ->
-                log(LogLevel.ERROR, "Failed to request connection to endpoint: $endpointId", e)
-                updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
-            }
-    }
+        if (connectionRequests.containsKey(endpointId)) {
+            log(LogLevel.WARNING, "Connection request already in progress for endpoint: $endpointId")
+            return
+        }
 
+        val job = scope.launch {
+            try {
+                log(LogLevel.INFO, "Requesting connection to endpoint: $endpointId")
+                connectionsClient.requestConnection(name, endpointId, connectionLifecycleCallback)
+                    .addOnSuccessListener {
+                        log(LogLevel.INFO, "Connection request sent to endpoint: $endpointId")
+                    }
+                    .addOnFailureListener { e ->
+                        when ((e as? ApiException)?.statusCode) {
+                            ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT -> {
+                                log(LogLevel.WARNING, "Already connected to endpoint: $endpointId")
+                                updateEndpointStatus(endpointId, EndpointStatus.CONNECTED)
+                            }
+                            ConnectionsStatusCodes.STATUS_ENDPOINT_IO_ERROR -> {
+                                log(LogLevel.ERROR, "IO error while connecting to endpoint: $endpointId")
+                                updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
+                            }
+                            else -> {
+                                log(LogLevel.ERROR, "Failed to request connection to endpoint: $endpointId", e)
+                                updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
+                            }
+                        }
+                    }
+
+                // Timeout logic using a non-suspending approach
+                val startTime = System.currentTimeMillis()
+                while (System.currentTimeMillis() - startTime < 30000) {
+                    if (_endpointStatusFlow.value[endpointId]?.status == EndpointStatus.CONNECTED) {
+                        break
+                    }
+                    yield() // Allows other coroutines to run
+                }
+
+                if (_endpointStatusFlow.value[endpointId]?.status != EndpointStatus.CONNECTED) {
+                    log(LogLevel.WARNING, "Connection request timed out for endpoint: $endpointId")
+                    updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
+                }
+            } finally {
+                connectionRequests.remove(endpointId)
+            }
+        }
+        connectionRequests[endpointId] = job
+    }
 
     private fun handleBytesPayload(endpointId: String, payload: Payload) {
         checkClosed()

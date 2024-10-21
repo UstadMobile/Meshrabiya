@@ -4,22 +4,18 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.nearby.connection.Payload
 import com.meshrabiya.lib_nearby.nearby.NearbyVirtualNetwork
-import com.ustadmobile.meshrabiya.ext.asInetAddress
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.server.ChatMessage
 import com.ustadmobile.meshrabiya.testapp.server.ChatServer
-import com.ustadmobile.meshrabiya.vnet.VirtualPacket
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import kotlin.random.Random
@@ -49,6 +45,9 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
             viewModelScope.launch {
                 _logs.update { it + logMessage }
             }
+            if (exception != null) {
+                Log.e("NearbyTestViewModel", message, exception)
+            }
         }
 
         override fun invoke(priority: Int, message: () -> String, exception: Exception?) {
@@ -61,18 +60,19 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun initializeNearbyNetwork() {
-        val virtualIpAddress = generateVirtualIpAddress()
+        val virtualIpAddress =  "169.254.${Random.nextInt(1, 255)}.${Random.nextInt(1, 255)}"
+
         val broadcastAddress = BROADCAST_IP_ADDRESS
 
         nearbyNetwork = NearbyVirtualNetwork(
             context = getApplication(),
-            name = generateDeviceName(),
+            name = "Device-${Random.nextInt(DEVICE_NAME_SUFFIX_LIMIT)}",
             serviceId = NETWORK_SERVICE_ID,
             virtualIpAddress = ipToInt(virtualIpAddress),
             broadcastAddress = ipToInt(broadcastAddress),
             logger = logger
         ) { packet ->
-            // Handle received packet if needed
+            logger.invoke(Log.DEBUG, "Received packet: $packet")
         }
 
         chatServer = ChatServer(nearbyNetwork, logger)
@@ -80,11 +80,6 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
         observeChatMessages()
     }
 
-    private fun generateVirtualIpAddress(): String =
-        "169.254.${Random.nextInt(1, 255)}.${Random.nextInt(1, 255)}"
-
-    private fun generateDeviceName(): String =
-        "Device-${Random.nextInt(DEVICE_NAME_SUFFIX_LIMIT)}"
 
     private fun ipToInt(ipAddress: String): Int {
         val inetAddress = InetAddress.getByName(ipAddress)
@@ -99,6 +94,7 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
+
                 nearbyNetwork.start()
                 _isNetworkRunning.value = true
                 isNetworkInitialized = true
@@ -106,9 +102,19 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
                 logger.invoke(Log.INFO, "Network started successfully with IP: ${nearbyNetwork.virtualAddress.hostAddress}")
             } catch (e: IllegalStateException) {
                 logger.invoke(Log.ERROR, "Failed to start network: ${e.message}", e)
+                retryStartNetwork()
             }
         }
     }
+
+    private fun retryStartNetwork() {
+        viewModelScope.launch {
+            delay(RETRY_DELAY)
+            logger.invoke(Log.INFO, "Retrying to start network...")
+            startNetwork()
+        }
+    }
+
 
     fun stopNetwork() {
         if (!isNetworkInitialized) {
@@ -194,5 +200,6 @@ class NearbyTestViewModel(application: Application) : AndroidViewModel(applicati
         private const val BROADCAST_IP_ADDRESS = "255.255.255.255"
         private const val NETWORK_SERVICE_ID = "com.ustadmobile.meshrabiya.test"
         private const val DEVICE_NAME_SUFFIX_LIMIT = 1000
+        private const val RETRY_DELAY = 5000L // 5 seconds
     }
 }
