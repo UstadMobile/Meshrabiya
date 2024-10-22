@@ -264,53 +264,14 @@ class NearbyVirtualNetwork(
 
     private fun requestConnection(endpointId: String) {
         checkClosed()
-        if (connectionRequests.containsKey(endpointId)) {
-            log(LogLevel.WARNING, "Connection request already in progress for endpoint: $endpointId")
-            return
-        }
-
-        val job = scope.launch {
-            try {
-                log(LogLevel.INFO, "Requesting connection to endpoint: $endpointId")
-                connectionsClient.requestConnection(name, endpointId, connectionLifecycleCallback)
-                    .addOnSuccessListener {
-                        log(LogLevel.INFO, "Connection request sent to endpoint: $endpointId")
-                    }
-                    .addOnFailureListener { e ->
-                        when ((e as? ApiException)?.statusCode) {
-                            ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT -> {
-                                log(LogLevel.WARNING, "Already connected to endpoint: $endpointId")
-                                updateEndpointStatus(endpointId, EndpointStatus.CONNECTED)
-                            }
-                            ConnectionsStatusCodes.STATUS_ENDPOINT_IO_ERROR -> {
-                                log(LogLevel.ERROR, "IO error while connecting to endpoint: $endpointId")
-                                updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
-                            }
-                            else -> {
-                                log(LogLevel.ERROR, "Failed to request connection to endpoint: $endpointId", e)
-                                updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
-                            }
-                        }
-                    }
-
-                // Timeout logic using a non-suspending approach
-                val startTime = System.currentTimeMillis()
-                while (System.currentTimeMillis() - startTime < 30000) {
-                    if (_endpointStatusFlow.value[endpointId]?.status == EndpointStatus.CONNECTED) {
-                        break
-                    }
-                    yield() // Allows other coroutines to run
-                }
-
-                if (_endpointStatusFlow.value[endpointId]?.status != EndpointStatus.CONNECTED) {
-                    log(LogLevel.WARNING, "Connection request timed out for endpoint: $endpointId")
-                    updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
-                }
-            } finally {
-                connectionRequests.remove(endpointId)
+        connectionsClient.requestConnection(name, endpointId, connectionLifecycleCallback)
+            .addOnSuccessListener {
+                log(LogLevel.INFO, "Connection request sent to endpoint: $endpointId")
             }
-        }
-        connectionRequests[endpointId] = job
+            .addOnFailureListener { e ->
+                log(LogLevel.ERROR, "Failed to request connection to endpoint: $endpointId", e)
+                updateEndpointStatus(endpointId, EndpointStatus.DISCONNECTED)
+            }
     }
 
     private fun handleBytesPayload(endpointId: String, payload: Payload) {
