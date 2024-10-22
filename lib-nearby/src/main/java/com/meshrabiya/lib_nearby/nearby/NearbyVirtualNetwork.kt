@@ -135,13 +135,18 @@ class NearbyVirtualNetwork(
     }
 
     override fun close() {
-        if (isClosed.compareAndSet(false, true)) {
+        try {
             connectionsClient.stopAdvertising()
             connectionsClient.stopDiscovery()
             connectionsClient.stopAllEndpoints()
             _endpointStatusFlow.value.clear()
             scope.cancel()
-            log(LogLevel.INFO, "Network is closed and all connections have been stopped.")
+            streamReplies.forEach { (_, future) -> future.cancel(true) }
+            streamReplies.clear()
+            endpointIpMap.clear()
+            log(LogLevel.INFO, "Network is closed and all operations have been stopped.")
+        } catch (e: Exception) {
+            log(LogLevel.ERROR, "Error during network closure", e)
         }
     }
 
