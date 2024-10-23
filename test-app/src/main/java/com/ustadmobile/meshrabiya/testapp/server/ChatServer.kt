@@ -1,3 +1,4 @@
+
 package com.ustadmobile.meshrabiya.testapp.server
 
 
@@ -11,122 +12,115 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-
-
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import java.net.*
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-
-
-data class ChatMessage(
-    val timestamp: Long,
-    val sender: String,
-    val message: String
-)
-
 class ChatServer(
-    private val nearbyVirtualNetwork: NearbyVirtualNetwork,
+    private val nearbyNetwork: NearbyVirtualNetwork,
     private val logger: MNetLogger
 ) {
     private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val chatMessages = _chatMessages.asStateFlow()
 
-    private val udpSocket = DatagramSocket(null).apply {
-        reuseAddress = true
-        bind(InetSocketAddress(UDP_PORT))
-        broadcast = true
-    }
-    private val localVirtualIp = nearbyVirtualNetwork.virtualAddress.hostAddress
+    private val localVirtualIp = nearbyNetwork.virtualAddress.hostAddress
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    private val connectedUsers = mutableSetOf<String>()
-
-    init {
-        listenForUdpMessages()
-    }
-
-    private fun listenForUdpMessages() {
-        scope.launch(Dispatchers.IO) {
-            val buffer = ByteArray(MAX_UDP_PACKET_SIZE)
-            while (isActive) {
-                val packet = DatagramPacket(buffer, buffer.size)
-                try {
-                    udpSocket.receive(packet)
-                    processReceivedPacket(packet)
-                } catch (e: SocketException) {
-                    if (!udpSocket.isClosed) {
-                        logger.invoke(Log.WARN, "SocketException while receiving UDP message: ${e.message}")
-                    }
-                } catch (e: Exception) {
-                    logger.invoke(Log.ERROR, "Unexpected error while receiving UDP message: ${e.message}", e)
-                }
-            }
-        }
-    }
-
-    private fun processReceivedPacket(packet: DatagramPacket) {
-        val message = String(packet.data, 0, packet.length, StandardCharsets.UTF_8)
-        val parts = message.split("|")
-        if (parts.size == 2) {
-            val senderIp = parts[0]
-            val chatMessage = parts[1]
-
-            if (senderIp != localVirtualIp) {
-                connectedUsers.add(senderIp)
-                val newMessage = ChatMessage(System.currentTimeMillis(), senderIp, chatMessage)
-                _chatMessages.value = _chatMessages.value + newMessage
-                logger.invoke(Log.INFO, "Received message: \"$chatMessage\" from: $senderIp")
-            }
-        }
-    }
-
+    /**
+     * Sends a chat message to all connected endpoints in the network.
+     */
     fun sendMessage(message: String) {
-        val trimmedMessage = message.trim()
-        if (trimmedMessage.isEmpty()) {
-            logger.invoke(Log.INFO, "Error: Empty message not sent.")
+        if (message.isBlank()) {
+            logger.invoke(Log.INFO, "Empty message not sent.")
             return
         }
 
-        val chatMessage = ChatMessage(System.currentTimeMillis(), localVirtualIp, trimmedMessage)
-        _chatMessages.value = _chatMessages.value + chatMessage
+        // Create chat message
+        val chatMessage = ChatMessage(
+            timestamp = System.currentTimeMillis(),
+            sender = localVirtualIp,
+            message = message.trim()
+        )
 
-        val fullMessage = "$localVirtualIp|$trimmedMessage"
-        val messageBytes = fullMessage.toByteArray(StandardCharsets.UTF_8)
+        // Add to local history first
+        _chatMessages.update { it + chatMessage }
 
-        if (messageBytes.size > MAX_UDP_PACKET_SIZE) {
-            logger.invoke(Log.INFO, "Error: Message size exceeds $MAX_UDP_PACKET_SIZE bytes.")
+        // Format message for sending: "senderIP|message"
+        val messageText = "$localVirtualIp|${message.trim()}"
+        val messageData = messageText.toByteArray(StandardCharsets.UTF_8)
+
+        // Check message size
+        if (messageData.size > MAX_UDP_PACKET_SIZE) {
+            logger.invoke(Log.INFO, "Message too large, not sent")
             return
         }
 
+        // Send to all connected endpoints
         scope.launch(Dispatchers.IO) {
             try {
-                val packet = DatagramPacket(messageBytes, messageBytes.size, InetAddress.getByName(BROADCAST_IP), UDP_PORT)
-                udpSocket.send(packet)
-                logger.invoke(Log.INFO, "Sent message: \"$trimmedMessage\" to all connected users")
+                val connectedEndpoints = nearbyNetwork.endpointStatusFlow.value
+                    .filter { it.value.status == NearbyVirtualNetwork.EndpointStatus.CONNECTED }
+
+                logger.invoke(Log.DEBUG, "Found ${connectedEndpoints.size} endpoints to send to")
+
+                // Send to each endpoint
+                connectedEndpoints.forEach { (endpointId, _) ->
+                    try {
+                        nearbyNetwork.sendUdpPacket(
+                            endpointId = endpointId,
+                            sourcePort = UDP_PORT,
+                            destinationPort = UDP_PORT,
+                            data = messageData
+                        )
+                        logger.invoke(Log.DEBUG, "Message sent to endpoint: $endpointId")
+                    } catch (e: Exception) {
+                        logger.invoke(Log.ERROR, "Failed to send to endpoint: $endpointId", e)
+                    }
+                }
             } catch (e: Exception) {
-                logger.invoke(Log.ERROR, "Error sending message: ${e.message}", e)
+                logger.invoke(Log.ERROR, "Failed to send message", e)
             }
+        }
+    }
+
+    /**
+     * Adds a received message to the chat history
+     */
+    fun processReceivedMessage(messageBytes: ByteArray) {
+        try {
+            val message = String(messageBytes, StandardCharsets.UTF_8)
+            val parts = message.split("|")
+
+            if (parts.size == 2) {
+                val (sender, messageText) = parts
+                if (sender != localVirtualIp) {  // Skip own messages
+                    val chatMessage = ChatMessage(
+                        timestamp = System.currentTimeMillis(),
+                        sender = sender,
+                        message = messageText
+                    )
+                    _chatMessages.update { it + chatMessage }
+                    logger.invoke(Log.INFO, "Message received from $sender")
+                }
+            }
+        } catch (e: Exception) {
+            logger.invoke(Log.ERROR, "Error processing received message", e)
         }
     }
 
     fun close() {
         scope.cancel()
-        udpSocket.close()
     }
 
     companion object {
         const val UDP_PORT = 8888
-        const val MAX_UDP_PACKET_SIZE = 65507 // Maximum theoretical UDP packet size
-        const val BROADCAST_IP = "255.255.255.255"
+        const val MAX_UDP_PACKET_SIZE = 65507
     }
 }
-
+/**
+ * Data class representing a chat message
+ */
+data class ChatMessage(
+    val timestamp: Long,
+    val sender: String,
+    val message: String
+)

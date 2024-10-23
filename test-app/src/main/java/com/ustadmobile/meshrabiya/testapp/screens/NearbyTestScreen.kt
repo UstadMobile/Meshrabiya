@@ -1,7 +1,6 @@
 package com.ustadmobile.meshrabiya.testapp.screens
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,11 +18,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -33,19 +30,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
 
 @Composable
 fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
-    val isNetworkRunning by viewModel.isNetworkRunning.collectAsState()
-    val endpoints by viewModel.endpoints.collectAsState()
-    val logs by viewModel.logs.collectAsState()
-    val messages by viewModel.messages.collectAsState()
+    // Use single uiState instead of multiple state collections
+    val uiState by viewModel.uiState.collectAsState()
     var messageText by remember { mutableStateOf("") }
-
-    // State for log scroll position
     val logScrollState = rememberLazyListState()
 
     Column(
@@ -55,20 +47,22 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
     ) {
         Button(
             onClick = {
-                if (isNetworkRunning) viewModel.stopNetwork() else viewModel.startNetwork()
+                if (uiState.isNetworkRunning) viewModel.stopNetwork() else viewModel.startNetwork()
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
             )
         ) {
-            Text(if (isNetworkRunning) "Stop Network" else "Start Network")
+            Text(if (uiState.isNetworkRunning) "Stop Network" else "Start Network")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Display endpoints in a single line
-        Text("Endpoints: ${endpoints.joinToString(", ") { it.endpointId }}", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Endpoints: ${uiState.endpoints.joinToString(", ") { it.endpointId }}",
+            style = MaterialTheme.typography.titleMedium
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -81,13 +75,12 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
                 .padding(8.dp),
             contentPadding = PaddingValues(bottom = 8.dp)
         ) {
-            items(messages) { message ->
-                // Create a card that wraps tightly around the text
+            items(uiState.messages) { message ->
                 Card(
                     modifier = Modifier
-                        .wrapContentWidth() // Wrap content width based on text size
-                        .padding(vertical = 4.dp) // Spacing between messages
-                        .align(Alignment.Start), // Align to start (left)
+                        .wrapContentWidth()
+                        .padding(vertical = 4.dp)
+                        .align(Alignment.Start),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
@@ -126,7 +119,7 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
                         messageText = ""
                     }
                 },
-                enabled = isNetworkRunning && messageText.isNotBlank(),
+                enabled = uiState.isNetworkRunning && messageText.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )
@@ -141,26 +134,23 @@ fun NearbyTestScreen(viewModel: NearbyTestViewModel) {
         LazyColumn(
             state = logScrollState,
             modifier = Modifier
-                .height(100.dp) // Height can be adjusted as needed
+                .height(100.dp)
                 .fillMaxWidth()
                 .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                 .padding(8.dp)
         ) {
-            items(logs) { log ->
+            items(uiState.logs) { log ->
                 Text(log, style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        // Automatically scroll to the bottom of the logs
-        LaunchedEffect(logs.size) {
-            // Check if there are logs before scrolling
-            if (logs.isNotEmpty()) {
-                logScrollState.animateScrollToItem(logs.size - 1)
+        LaunchedEffect(uiState.logs.size) {
+            if (uiState.logs.isNotEmpty()) {
+                logScrollState.animateScrollToItem(uiState.logs.size - 1)
             }
         }
     }
 }
-
 
 
 
