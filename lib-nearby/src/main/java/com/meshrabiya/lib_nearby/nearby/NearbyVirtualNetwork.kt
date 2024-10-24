@@ -125,66 +125,6 @@ class NearbyVirtualNetwork(
             .addOnFailureListener { e -> log(LogLevel.ERROR, "Failed to send virtual packet to $endpointId", e) }
     }
 
-    fun sendUdpPacket(endpointId: String, sourcePort: Int, destinationPort: Int, data: ByteArray) {
-        checkClosed()
-
-        try {
-            log(LogLevel.DEBUG, "Creating UDP packet for endpoint: $endpointId")
-
-            // Create UDP header
-            val udpHeader = ByteBuffer.allocate(8).apply {
-                putShort(sourcePort.toShort())
-                putShort(destinationPort.toShort())
-                putShort((8 + data.size).toShort())
-                putShort(0)  // Checksum
-            }
-
-            log(LogLevel.DEBUG, "UDP Header created: srcPort=$sourcePort, destPort=$destinationPort")
-
-            // Combine header and data
-            val udpPacket = ByteArray(udpHeader.capacity() + data.size)
-            System.arraycopy(udpHeader.array(), 0, udpPacket, 0, udpHeader.capacity())
-            System.arraycopy(data, 0, udpPacket, udpHeader.capacity(), data.size)
-
-            // Create virtual packet header
-            val header = VirtualPacketHeader(
-                fromAddr = virtualIpAddress,
-                toAddr = broadcastAddress,
-                fromPort = sourcePort,
-                toPort = destinationPort,
-                payloadSize = udpPacket.size,
-                hopCount = 0,
-                maxHops = 10,
-                lastHopAddr = virtualIpAddress
-            )
-
-            log(LogLevel.DEBUG, "Created virtual packet header: $header")
-
-            // Create virtual packet
-            val virtualPacket = VirtualPacket.fromHeaderAndPayloadData(
-                header = header,
-                data = ByteArray(VirtualPacket.VIRTUAL_PACKET_BUF_SIZE),
-                payloadOffset = VirtualPacketHeader.HEADER_SIZE
-            )
-
-            // Copy UDP packet data
-            System.arraycopy(udpPacket, 0, virtualPacket.data, virtualPacket.payloadOffset, udpPacket.size)
-
-            // Send payload
-            val payload = Payload.fromBytes(virtualPacket.data)
-            connectionsClient.sendPayload(endpointId, payload)
-                .addOnSuccessListener {
-                    log(LogLevel.INFO, "UDP packet sent successfully to $endpointId")
-                }
-                .addOnFailureListener { e ->
-                    log(LogLevel.ERROR, "Failed to send UDP packet to $endpointId", e)
-                }
-
-        } catch (e: Exception) {
-            log(LogLevel.ERROR, "Error creating/sending UDP packet", e)
-            throw e
-        }
-    }
     override fun connectSocket(nextHopAddress: InetAddress, destAddress: InetAddress, destPort: Int): VSocket {
         log(LogLevel.INFO, "Connecting to socket: $nextHopAddress -> $destAddress:$destPort")
         return TODO("Provide the return value")
