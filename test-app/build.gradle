@@ -3,6 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id "com.jaredsburrows.license" version "0.9.3"
+
 }
 
 android {
@@ -58,56 +59,60 @@ android {
 }
 
 dependencies {
+    implementation(project(":lib-meshrabiya"))
+    implementation(project(":lib-nearby"))
+    implementation(project(":lib-meshrabiya-vpn"))
 
-    implementation project(':lib-meshrabiya')
-    implementation "ch.acra:acra-http:$version_acra"
-    implementation "ch.acra:acra-dialog:$version_acra"
+    implementation(libs.google.play.services.nearby)
 
-    implementation "com.github.yuriy-budiyev:code-scanner:$version_code_scanner"
-    implementation "androidx.navigation:navigation-compose:$version_navigation"
+    implementation libs.acra.http
+    implementation libs.acra.dialog
+
+    implementation libs.code.scanner
+    implementation libs.androidx.navigation.compose
     implementation "org.kodein.di:kodein-di-framework-compose:$version_kodein_di"
-    implementation "org.kodein.di:kodein-di-framework-android-x:$version_kodein_di"
-    implementation "androidx.datastore:datastore-preferences:$version_datastore"
-    implementation "com.squareup.okhttp3:okhttp:$version_okhttp"
-    implementation "org.nanohttpd:nanohttpd:$version_nanohttpd"
-    implementation "com.github.seancfoley:ipaddress:$version_ip_address"
+    implementation libs.kodein.di.framework.android.x
+    implementation libs.datastore
+    implementation libs.okhttp
+    implementation libs.nanohttpd
+    implementation libs.ipaddress
 
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$version_kotlinx_serialization"
-    implementation "com.journeyapps:zxing-android-embedded:$version_zxing_embedded"
+    implementation libs.zxing.android.embedded
 
 
-    implementation "androidx.core:core:$version_androidx_core"
-    implementation "androidx.core:core-ktx:$version_androidx_core"
-    implementation "androidx.lifecycle:lifecycle-runtime-ktx:$version_android_lifecycle"
-    implementation "androidx.activity:activity-compose:$version_android_activity"
+    implementation libs.core
+    implementation libs.androidx.core
+    implementation libs.androidx.lifecycle.runtime.ktx
+    implementation libs.androidx.activity.compose
     implementation platform("androidx.compose:compose-bom:$version_compose_bom")
-    implementation 'androidx.compose.ui:ui'
-    implementation 'androidx.compose.ui:ui-graphics'
-    implementation 'androidx.compose.ui:ui-tooling-preview'
-    implementation 'androidx.compose.material3:material3'
-    implementation "androidx.compose.material:material-icons-extended"
+    implementation libs.ui
+    implementation libs.ui.graphics
+    implementation libs.ui.tooling.preview
+    implementation libs.material3
+    implementation libs.material.icons.extended
 
-    implementation "org.bouncycastle:bcprov-jdk18on:$version_bouncycastle"
-    implementation "org.bouncycastle:bcpkix-jdk18on:$version_bouncycastle"
-    implementation "com.google.accompanist:accompanist-webview:$version_compose_accompanist"
+    implementation libs.bouncycastle.prov
+    implementation libs.bouncycastle.pkix
+    implementation libs.accompanist.webview
 
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs_nio:$version_android_desugaring"
 
-    testImplementation "junit:junit:$version_junit"
-    androidTestImplementation "androidx.test.ext:junit:$version_android_test_ext_junit"
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit
     androidTestImplementation platform("androidx.compose:compose-bom:$version_compose_bom")
-    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    androidTestImplementation libs.ui.test.junit4
 
-    androidTestImplementation "androidx.test:runner:$version_android_junit_runner"
-    androidTestImplementation "androidx.test:rules:$version_androidx_test_rules"
+    androidTestImplementation libs.android.junit.runner
+    androidTestImplementation libs.androidx.test.rules
     androidTestImplementation project(":test-shared")
 
-    androidTestImplementation "org.mockito:mockito-android:$version_android_mockito"
-    androidTestImplementation "org.mockito.kotlin:mockito-kotlin:$version_kotlin_mockito"
+    androidTestImplementation libs.mockito.android
+    androidTestImplementation libs.mockito.kotlin
     androidTestImplementation "app.cash.turbine:turbine:$version_turbine"
 
     androidTestUtil "androidx.test:orchestrator:$version_androidx_orchestrator"
 
-    debugImplementation 'androidx.compose.ui:ui-tooling'
-    debugImplementation 'androidx.compose.ui:ui-test-manifest'
+    debugImplementation libs.ui.tooling
+    debugImplementation libs.ui.test.manifest
 }
