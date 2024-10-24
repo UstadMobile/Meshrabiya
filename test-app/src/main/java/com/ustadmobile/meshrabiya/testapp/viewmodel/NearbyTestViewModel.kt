@@ -8,7 +8,9 @@ import com.meshrabiya.lib_nearby.nearby.NearbyVirtualNetwork
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.server.ChatMessage
 import com.ustadmobile.meshrabiya.testapp.server.ChatServer
+import com.ustadmobile.meshrabiya.testapp.server.MeshrabiyaDatagramSocket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,13 +23,6 @@ import java.nio.ByteBuffer
 import kotlin.random.Random
 
 
-data class NearbyTestUiState(
-    val isNetworkRunning: Boolean = false,
-    val endpoints: List<NearbyVirtualNetwork.EndpointInfo> = emptyList(),
-    val logs: List<String> = emptyList(),
-    val messages: List<ChatMessage> = emptyList()
-)
-
 class NearbyTestViewModel(
     application: Application
 ) : AndroidViewModel(application) {
@@ -35,8 +30,8 @@ class NearbyTestViewModel(
     private val _uiState = MutableStateFlow(NearbyTestUiState())
     val uiState: StateFlow<NearbyTestUiState> = _uiState.asStateFlow()
 
-    private lateinit var nearbyNetwork: NearbyVirtualNetwork
-    private lateinit var chatServer: ChatServer
+    private var nearbyNetwork: NearbyVirtualNetwork? = null
+    private var chatServer: ChatServer? = null
     private var isNetworkInitialized = false
 
     private val logger = object : MNetLogger() {
@@ -62,59 +57,103 @@ class NearbyTestViewModel(
     }
 
     private fun initializeNearbyNetwork() {
-        val virtualIpAddress = "$IP_PREFIX${Random.nextInt(IP_START, IP_END)}.${Random.nextInt(IP_START, IP_END)}"
+        try {
+            val virtualIpAddress = "$IP_PREFIX${Random.nextInt(IP_START, IP_END)}.${Random.nextInt(IP_START, IP_END)}"
 
-        nearbyNetwork = NearbyVirtualNetwork(
-            context = getApplication(),
-            name = "Device-${Random.nextInt(DEVICE_NAME_SUFFIX_LIMIT)}",
-            serviceId = NETWORK_SERVICE_ID,
-            virtualIpAddress = ipToInt(virtualIpAddress),
-            broadcastAddress = ipToInt(BROADCAST_IP_ADDRESS),
-            logger = logger
-        ) { packet ->
-            handleIncomingPacket(packet)
+            nearbyNetwork = NearbyVirtualNetwork(
+                context = getApplication(),
+                name = "Device-${Random.nextInt(DEVICE_NAME_SUFFIX_LIMIT)}",
+                serviceId = NETWORK_SERVICE_ID,
+                virtualIpAddress = ipToInt(virtualIpAddress),
+                broadcastAddress = ipToInt(BROADCAST_IP_ADDRESS),
+                logger = logger
+            ) { packet ->
+                handleIncomingPacket(packet)
+            }
+
+            chatServer = nearbyNetwork?.let { network ->
+                ChatServer(network, logger).also { server ->
+                    observeChatMessages(server)
+                }
+            }
+
+            logger(Log.INFO, "Network initialized with IP: $virtualIpAddress")
+        } catch (e: Exception) {
+            logger(Log.ERROR, "Failed to initialize network", e)
         }
-
-        chatServer = ChatServer(nearbyNetwork, logger)
-        observeChatMessages()
     }
 
-    private fun handleIncomingPacket(packet: VirtualPacket) {
-        logger.invoke(Log.DEBUG, "Received virtual packet: ${packet.header}")
-
-        if (packet.header.toPort == ChatServer.UDP_PORT) {
+    private fun observeEndpoints() {
+        viewModelScope.launch {
             try {
-                val messageData = ByteArray(packet.header.payloadSize).apply {
-                    System.arraycopy(packet.data, packet.payloadOffset, this, 0, packet.header.payloadSize)
+                nearbyNetwork?.endpointStatusFlow?.collect { endpointMap ->
+                    val connectedEndpoints = endpointMap.values
+                        .filter { it.status == NearbyVirtualNetwork.EndpointStatus.CONNECTED }
+                        .distinctBy { it.endpointId }
+
+                    _uiState.update { it.copy(endpoints = connectedEndpoints) }
+
+                    logger(
+                        Log.INFO,
+                        "Connected endpoints: ${connectedEndpoints.joinToString { "${it.endpointId}: ${it.ipAddress?.hostAddress}" }}"
+                    )
                 }
-                // Pass the data to chat server for processing
-                chatServer.processReceivedMessage(messageData)
             } catch (e: Exception) {
-                logger.invoke(Log.ERROR, "Error processing chat packet", e)
+                logger(Log.ERROR, "Error observing endpoints", e)
             }
         }
     }
 
-    private fun ipToInt(ipAddress: String): Int {
-        val inetAddress = InetAddress.getByName(ipAddress)
-        return ByteBuffer.wrap(inetAddress.address).int
+    private fun observeChatMessages(server: ChatServer) {
+        viewModelScope.launch {
+            try {
+                server.chatMessages.collect { messages ->
+                    _uiState.update { it.copy(messages = messages) }
+                    messages.lastOrNull()?.let { lastMessage ->
+                        logger(
+                            Log.INFO,
+                            "Received message from ${lastMessage.sender}: ${lastMessage.message}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                logger(Log.ERROR, "Error observing chat messages", e)
+            }
+        }
+    }
+
+    private fun handleIncomingPacket(packet: VirtualPacket) {
+        try {
+            logger(Log.DEBUG, "Received virtual packet: ${packet.header}")
+
+            if (packet.header.toPort == ChatServer.UDP_PORT) {
+                val messageData = ByteArray(packet.header.payloadSize).apply {
+                    System.arraycopy(packet.data, packet.payloadOffset, this, 0, packet.header.payloadSize)
+                }
+                chatServer?.processReceivedMessage(messageData)
+            }
+        } catch (e: Exception) {
+            logger(Log.ERROR, "Error handling incoming packet", e)
+        }
     }
 
     fun startNetwork() {
         if (isNetworkInitialized) {
-            logger.invoke(Log.INFO, "Network is already running.")
+            logger(Log.INFO, "Network is already running")
             return
         }
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+            retryStartNetwork()
+        }) {
             try {
-                nearbyNetwork.start()
+                nearbyNetwork?.start()
                 _uiState.update { it.copy(isNetworkRunning = true) }
                 isNetworkInitialized = true
                 observeEndpoints()
-                logger.invoke(Log.INFO, "Network started successfully with IP: ${nearbyNetwork.virtualAddress.hostAddress}")
-            } catch (e: IllegalStateException) {
-                logger.invoke(Log.ERROR, "Failed to start network: ${e.message}", e)
+                logger(Log.INFO, "Network started successfully with IP: ${nearbyNetwork?.virtualAddress?.hostAddress}")
+            } catch (e: Exception) {
+                logger(Log.ERROR, "Failed to start network", e)
                 retryStartNetwork()
             }
         }
@@ -123,90 +162,70 @@ class NearbyTestViewModel(
     private fun retryStartNetwork() {
         viewModelScope.launch {
             delay(RETRY_DELAY)
-            logger.invoke(Log.INFO, "Retrying to start network...")
+            logger(Log.INFO, "Retrying to start network...")
             startNetwork()
         }
     }
 
     fun stopNetwork() {
         if (!isNetworkInitialized) {
-            logger.invoke(Log.INFO, "Network is not running.")
+            logger(Log.INFO, "Network is not running")
             return
         }
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                nearbyNetwork.close()
-                chatServer.close()
+                chatServer?.close()
+                nearbyNetwork?.close()
                 resetState()
-                logger.invoke(Log.INFO, "Network stopped successfully")
+                logger(Log.INFO, "Network stopped successfully")
             } catch (e: Exception) {
-                logger.invoke(Log.ERROR, "Failed to stop network: ${e.message}", e)
+                logger(Log.ERROR, "Failed to stop network", e)
             }
         }
     }
 
     private fun resetState() {
-        _uiState.update {
-            NearbyTestUiState()
-        }
+        _uiState.update { NearbyTestUiState() }
         isNetworkInitialized = false
-    }
-
-    private fun observeEndpoints() {
-        viewModelScope.launch {
-            nearbyNetwork.endpointStatusFlow
-                .collect { endpointMap ->
-                    val connectedEndpoints = endpointMap.values
-                        .filter { it.status == NearbyVirtualNetwork.EndpointStatus.CONNECTED }
-                        .distinctBy { it.endpointId }
-
-                    _uiState.update { it.copy(endpoints = connectedEndpoints) }
-
-                    logger.invoke(
-                        Log.INFO,
-                        "Connected endpoints: ${connectedEndpoints.joinToString {
-                            "${it.endpointId}: ${it.ipAddress?.hostAddress}"
-                        }}"
-                    )
-                }
-        }
-    }
-
-    private fun observeChatMessages() {
-        viewModelScope.launch {
-            chatServer.chatMessages
-                .collect { messages ->
-                    _uiState.update { it.copy(messages = messages) }
-                    messages.lastOrNull()?.let { lastMessage ->
-                        logger.invoke(
-                            Log.INFO,
-                            "Received message from ${lastMessage.sender}: ${lastMessage.message}"
-                        )
-                    }
-                }
-        }
     }
 
     fun sendMessage(message: String) {
         val trimmedMessage = message.trim()
-        if (trimmedMessage.isNotEmpty()) {
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    chatServer.sendMessage(trimmedMessage)
-                    logger.invoke(Log.INFO, "Sent message: $trimmedMessage")
-                } catch (e: Exception) {
-                    logger.invoke(Log.ERROR, "Failed to send message: ${e.message}", e)
-                }
+        if (trimmedMessage.isEmpty()) {
+            logger(Log.INFO, "Empty message not sent")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                chatServer?.sendMessage(trimmedMessage)
+                logger(Log.INFO, "Sent message: $trimmedMessage")
+            } catch (e: Exception) {
+                logger(Log.ERROR, "Failed to send message", e)
             }
-        } else {
-            logger.invoke(Log.INFO, "Empty message not sent.")
+        }
+    }
+
+    private fun ipToInt(ipAddress: String): Int {
+        return try {
+            val inetAddress = InetAddress.getByName(ipAddress)
+            ByteBuffer.wrap(inetAddress.address).int
+        } catch (e: Exception) {
+            logger(Log.ERROR, "Failed to convert IP address", e)
+            throw e
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        stopNetwork()
+        viewModelScope.launch {
+            try {
+                stopNetwork()
+            } catch (e: Exception) {
+                logger(Log.ERROR, "Error during ViewModel cleanup", e)
+            }
+        }
     }
 
     companion object {
@@ -220,3 +239,10 @@ class NearbyTestViewModel(
         private const val IP_END = 255
     }
 }
+
+data class NearbyTestUiState(
+    val isNetworkRunning: Boolean = false,
+    val endpoints: List<NearbyVirtualNetwork.EndpointInfo> = emptyList(),
+    val logs: List<String> = emptyList(),
+    val messages: List<ChatMessage> = emptyList()
+)
