@@ -2,12 +2,14 @@ package com.ustadmobile.meshrabiya.vnet
 
 import android.util.Log
 import com.ustadmobile.meshrabiya.ext.addressToDotNotation
+import com.ustadmobile.meshrabiya.ext.asInetAddress
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.mmcp.MmcpOriginatorMessage
 import com.ustadmobile.meshrabiya.mmcp.MmcpPing
 import com.ustadmobile.meshrabiya.mmcp.MmcpPong
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
+import com.ustadmobile.meshrabiya.vnet.netinterface.VirtualNetworkInterface
 import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
 import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.net.DatagramPacket
@@ -33,8 +36,12 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
 
+/**
+ * @param virtualNetworkInterfaces function that provide a list of current virtual ip addresses for node.
+ */
+
 class OriginatingMessageManager(
-    localNodeInetAddr: InetAddress,
+    private val virtualNetworkInterfaces: () -> List<VirtualNetworkInterface>,
     private val logger: MNetLogger,
     private val scheduledExecutorService: ScheduledExecutorService,
     private val nextMmcpMessageId: () -> Int,
@@ -44,23 +51,22 @@ class OriginatingMessageManager(
     lostNodeCheckInterval: Int = 1_000,
 ) {
 
-    private val logPrefix ="[OriginatingMessageManager for ${localNodeInetAddr}] "
+    private val logPrefix = "[OriginatingMessageManager for ${virtualNetworkInterfaces}] "
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
-
-    private val localNodeAddress = localNodeInetAddr.requireAddressAsInt()
 
     /**
      * The currently known latest originator messages that can be used to route traffic.
      */
-    private val originatorMessages: MutableMap<Int, VirtualNode.LastOriginatorMessage> = ConcurrentHashMap()
+    private val originatorMessages: MutableMap<Int, VirtualNode.LastOriginatorMessage> =
+        ConcurrentHashMap()
 
     private val _state = MutableStateFlow<Map<Int, VirtualNode.LastOriginatorMessage>>(emptyMap())
 
     val state: Flow<Map<Int, VirtualNode.LastOriginatorMessage>> = _state.asStateFlow()
 
     private val receivedMessages: Flow<VirtualNode.LastOriginatorMessage> = MutableSharedFlow(
-        replay = 1 , extraBufferCapacity = 0, onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        replay = 1, extraBufferCapacity = 0, onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
     data class PendingPing(
@@ -84,90 +90,108 @@ class OriginatingMessageManager(
 
         logger(
             priority = Log.VERBOSE,
-            message = { "$logPrefix sending originating message " +
-                    "messageId=${originatingMessage.messageId} sentTime=${originatingMessage.sentTime}"
+            message = {
+                "$logPrefix sending originating message " +
+                        "messageId=${originatingMessage.messageId} sentTime=${originatingMessage.sentTime}"
             }
         )
 
-        val packet = originatingMessage.toVirtualPacket(
-            toAddr = ADDR_BROADCAST,
-            fromAddr = localNodeAddress,
-            lastHopAddr = localNodeAddress,
-            hopCount = 1,
-        )
+
+        //TODO: This should be a loop - it should go over all known addresses and broadcast for each one
+        //It should then go over each INTERFACE and send the broadcast - the interface is responsible
+        //to know who the neighbors are
+
+        val networkInterfaces = virtualNetworkInterfaces()
+        val addresses = networkInterfaces.map { it.virtualAddress }
+
+        networkInterfaces.forEach { virtualNetworkInterface ->
+
+            val networkInterfaceAddress = virtualNetworkInterface.virtualAddress.requireAddressAsInt()
+
+            addresses.forEach { address->
+                val packet = originatingMessage.toVirtualPacket(
+                    toAddr = ADDR_BROADCAST,
+                    fromAddr = address.requireAddressAsInt(),
+                    lastHopAddr = networkInterfaceAddress,
+                    hopCount = 1,
+                )
+
+                virtualNetworkInterface.send(packet, ADDR_BROADCAST.asInetAddress())
+            }
+        }
+
 
         val neighbors = originatorMessages.filter {
             it.value.hopCount == 1.toByte()
         }
 
-        neighbors.forEach {
-            val lastOriginatorMessage = it.value
+        neighbors.forEach { (neighborAddr, lastOriginatorMessage) ->
             try {
-                lastOriginatorMessage.receivedFromSocket.send(
-                    nextHopAddress = lastOriginatorMessage.lastHopRealInetAddr,
-                    nextHopPort = lastOriginatorMessage.lastHopRealPort,
-                    virtualPacket = packet,
+                val outgoingAddr = selectOutgoingAddrForDestination(neighborAddr.asInetAddress())
+                val packet = originatingMessage.toVirtualPacket(
+                    toAddr = neighborAddr,
+                    fromAddr = outgoingAddr.requireAddressAsInt(),
+                    lastHopAddr = outgoingAddr.requireAddressAsInt(),
+                    hopCount = 1,
                 )
-            }catch(e: Exception) {
-                logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable: exception sending to " +
-                        "${it.key.addressToDotNotation()} through ${it.value.lastHopRealInetAddr}:${it.value.lastHopRealPort}",
-                    e)
+                lastOriginatorMessage.receivedFromInterface?.send(
+                    virtualPacket = packet,
+                    nextHopAddress = lastOriginatorMessage.lastHopAddr.asInetAddress()
+                )
+            } catch (e: Exception) {
+                logger(
+                    Log.WARN,
+                    "$logPrefix : sendOriginatingMessagesRunnable: exception sending to ${neighborAddr.addressToDotNotation()}",
+                    e
+                )
             }
         }
-
-        //check if we have an active station connection but have lost the originating message from
-        // the hotspot node e.g. node slowed down for a while, app restart, etc.
-        //Send it an originating message even if we haven't receive one from it lately
-        //This could help restore a connection that died temporarily.
-        val stationState = getWifiState().wifiStationState
-        val stationNeighborInetAddr = stationState.config?.linkLocalAddr
-        val stationDatagramPort = stationState.config?.port
-        if(stationNeighborInetAddr != null &&
-            !neighbors.any { it.value.lastHopRealInetAddr == stationNeighborInetAddr }
-            && stationDatagramPort != null
-            && stationState.stationBoundDatagramSocket != null
-        ) {
-            logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable: have not received " +
-                    " originating message from hotspot we are connected to as station. Retrying")
-            try {
-                stationState.stationBoundDatagramSocket.send(
-                    nextHopAddress = stationNeighborInetAddr,
-                    nextHopPort = stationDatagramPort,
-                    virtualPacket = packet,
-                )
-            }catch(e: Exception) {
-                logger(Log.ERROR, "$logPrefix : sendOriginatingMessagesRunnable: could not " +
-                        "send originating message to group owner", e)
-            }
-        }else if(stationNeighborInetAddr != null && stationState.stationBoundDatagramSocket == null) {
-            logger(Log.WARN, "$logPrefix : sendOriginatingMessagesRunnable : could not send " +
-                    "originating message to group owner socket not set on state")
-        }
-
+    //TODO: check on each interface if there are any known neighbors for which we do not have
+        //current originator messages
     }
 
     private val pingNeighborsRunnable = Runnable {
+
         val neighbors = neighbors()
         neighbors.forEach {
             val neighborVirtualAddr = it.first
             val lastOrigininatorMessage = it.second
             val pingMessage = MmcpPing(messageId = nextMmcpMessageId())
-            pendingPings.add(PendingPing(pingMessage, neighborVirtualAddr, System.currentTimeMillis()))
+            pendingPings.add(
+                PendingPing(
+                    pingMessage,
+                    neighborVirtualAddr,
+                    System.currentTimeMillis()
+                )
+            )
             logger(
                 priority = Log.VERBOSE,
                 message = { "$logPrefix pingNeighborsRunnable: send ping to ${neighborVirtualAddr.addressToDotNotation()}" }
             )
 
-            it.second.receivedFromSocket.send(
-                nextHopAddress = lastOrigininatorMessage.lastHopRealInetAddr,
-                nextHopPort = lastOrigininatorMessage.lastHopRealPort,
-                virtualPacket = pingMessage.toVirtualPacket(
-                    toAddr = neighborVirtualAddr,
-                    fromAddr = localNodeAddress,
-                    lastHopAddr = localNodeAddress,
-                    hopCount = 1,
-                )
-            )
+            val networkInterfaces = virtualNetworkInterfaces()
+            val addresses = networkInterfaces.map { it.virtualAddress }
+
+            networkInterfaces.forEach { virtualNetworkInterface ->
+
+                val networkInterfaceAddress = virtualNetworkInterface.virtualAddress.requireAddressAsInt()
+
+                addresses.forEach { address->
+                    it.second.receivedFromSocket.send(
+                        nextHopAddress = lastOrigininatorMessage.lastHopRealInetAddr,
+                        nextHopPort = lastOrigininatorMessage.lastHopRealPort,
+                        virtualPacket = pingMessage.toVirtualPacket(
+                            toAddr = neighborVirtualAddr,
+                            fromAddr = networkInterfaceAddress,
+                            lastHopAddr = networkInterfaceAddress,
+                            hopCount = 1,
+                        )
+                    )
+
+                }
+            }
+
+
         }
 
         //Remove expired pings
@@ -182,8 +206,10 @@ class OriginatingMessageManager(
         }
 
         nodesLost.forEach {
-            logger(Log.DEBUG, {"$logPrefix : checkLostNodesRunnable: " +
-                    "Lost ${it.key.addressToDotNotation()} - no contact for ${timeNow - it.value.timeReceived}ms"})
+            logger(Log.DEBUG, {
+                "$logPrefix : checkLostNodesRunnable: " +
+                        "Lost ${it.key.addressToDotNotation()} - no contact for ${timeNow - it.value.timeReceived}ms"
+            })
             originatorMessages.remove(it.key)
         }
 
@@ -199,7 +225,10 @@ class OriginatingMessageManager(
     )
 
     private val checkLostNodesFuture = scheduledExecutorService.scheduleAtFixedRate(
-        checkLostNodesRunnable, lostNodeCheckInterval.toLong(), lostNodeCheckInterval.toLong(), TimeUnit.MILLISECONDS
+        checkLostNodesRunnable,
+        lostNodeCheckInterval.toLong(),
+        lostNodeCheckInterval.toLong(),
+        TimeUnit.MILLISECONDS
     )
 
     @Volatile
@@ -217,7 +246,7 @@ class OriginatingMessageManager(
 
 
     private fun assertNotClosed() {
-        if(closed)
+        if (closed)
             throw IllegalStateException("$logPrefix is closed!")
     }
 
@@ -232,7 +261,7 @@ class OriginatingMessageManager(
         //Dont keep originator messages in our own table for this node
         logger(
             Log.VERBOSE,
-            message= {
+            message = {
                 "$logPrefix received originating message from " +
                         "${virtualPacket.header.fromAddr.addressToDotNotation()} via " +
                         virtualPacket.header.lastHopAddr.addressToDotNotation()
@@ -270,7 +299,7 @@ class OriginatingMessageManager(
             }
         )
 
-        if(currentOriginatorMessage == null || isMoreRecentOrBetter) {
+        if (currentOriginatorMessage == null || isMoreRecentOrBetter) {
             originatorMessages[virtualPacket.header.fromAddr] = VirtualNode.LastOriginatorMessage(
                 originatorMessage = mmcpMessage.copyWithPingTimeIncrement(connectionPingTime),
                 timeReceived = System.currentTimeMillis(),
@@ -291,7 +320,7 @@ class OriginatingMessageManager(
             _state.value = originatorMessages.toMap()
         }
 
-        if(isNewNeighbor) {
+        if (isNewNeighbor) {
             //trigger immediate sending of originator messages so it can see us
             scheduledExecutorService.submit(sendOriginatingMessageRunnable)
         }
@@ -303,15 +332,17 @@ class OriginatingMessageManager(
         fromVirtualAddr: Int,
         pong: MmcpPong,
     ) {
-        val pendingPingPredicate : (PendingPing) -> Boolean = {
+        val pendingPingPredicate: (PendingPing) -> Boolean = {
             it.ping.messageId == pong.replyToMessageId && it.toVirtualAddr == fromVirtualAddr
         }
 
         val pendingPing = pendingPings.firstOrNull(pendingPingPredicate)
 
-        if(pendingPing == null){
-            logger(Log.WARN, "$logPrefix : onPongReceived : pong from " +
-                    "${fromVirtualAddr.addressToDotNotation()} does not match any known sent ping")
+        if (pendingPing == null) {
+            logger(
+                Log.WARN, "$logPrefix : onPongReceived : pong from " +
+                        "${fromVirtualAddr.addressToDotNotation()} does not match any known sent ping"
+            )
             return
         }
 
@@ -320,8 +351,10 @@ class OriginatingMessageManager(
         //Sometimes unit tests will run very quickly, and test may fail if ping time is 0
         val pingTime = maxOf((timeNow - pendingPing.timesent).toShort(), 1)
         logger(
-            Log.VERBOSE, {"$logPrefix received ping from ${fromVirtualAddr.addressToDotNotation()} " +
-                "pingTime=$pingTime"}
+            Log.VERBOSE, {
+                "$logPrefix received ping from ${fromVirtualAddr.addressToDotNotation()} " +
+                        "pingTime=$pingTime"
+            }
         )
 
         neighborPingTimes[fromVirtualAddr] = PingTime(
@@ -339,27 +372,33 @@ class OriginatingMessageManager(
 
 
     fun lookupNextHopForChainSocket(address: InetAddress, port: Int): ChainSocketNextHop {
+
+
         val addressInt = address.requireAddressAsInt()
 
         val originatorMessage = originatorMessages[addressInt]
 
         return when {
             //Destination address is this node
-            addressInt == localNodeAddress -> {
+            virtualNetworkInterfaces().any { it.virtualAddress.requireAddressAsInt() == addressInt } -> {
                 ChainSocketNextHop(InetAddress.getLoopbackAddress(), port, true, null)
             }
 
             //Destination is a direct neighbor (final destination) - connect to the actual socket itself
             originatorMessage != null && originatorMessage.hopCount == 1.toByte() -> {
-                ChainSocketNextHop(originatorMessage.lastHopRealInetAddr, port, true,
-                        originatorMessage.receivedFromSocket.boundNetwork)
+                ChainSocketNextHop(
+                    originatorMessage.lastHopRealInetAddr, port, true,
+                    originatorMessage.receivedFromSocket.boundNetwork
+                )
             }
 
             //Destination is not a direct neighbor, but we have a route there
             originatorMessage != null -> {
-                ChainSocketNextHop(originatorMessage.lastHopRealInetAddr,
+                ChainSocketNextHop(
+                    originatorMessage.lastHopRealInetAddr,
                     originatorMessage.lastHopRealPort, false,
-                    originatorMessage.receivedFromSocket.boundNetwork)
+                    originatorMessage.receivedFromSocket.boundNetwork
+                )
             }
 
             //No route available to reach the given address
@@ -395,25 +434,32 @@ class OriginatingMessageManager(
     ) {
         logger(Log.DEBUG, "$logPrefix: addNeighbor - sending originating messages out")
 
-        //send originating packets out to the other device until we get something back from it
         val sendOriginatingMessageJob = scope.launch {
-            try {
-                val originatingMessage = makeOriginatingMessage()
-                socket.send(
-                    nextHopAddress = neighborRealInetAddr,
-                    nextHopPort = neighborRealPort,
-                    virtualPacket = originatingMessage.toVirtualPacket(
-                        toAddr = ADDR_BROADCAST,
-                        fromAddr = localNodeAddress,
-                        lastHopAddr = localNodeAddress,
-                        hopCount = 1,
+            while (isActive) {
+                try {
+                    val originatingMessage = makeOriginatingMessage()
+                    virtualNetworkInterfaces().forEach { iface ->
+                        val localAddress = iface.virtualAddress
+                        socket.send(
+                            nextHopAddress = neighborRealInetAddr,
+                            nextHopPort = neighborRealPort,
+                            virtualPacket = originatingMessage.toVirtualPacket(
+                                toAddr = ADDR_BROADCAST,
+                                fromAddr = localAddress.requireAddressAsInt(),
+                                lastHopAddr = localAddress.requireAddressAsInt(),
+                                hopCount = 1,
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    logger(
+                        Log.WARN,
+                        "$logPrefix : addNeighbor : exception trying to send originating message",
+                        e
                     )
-                )
-            }catch(e: Exception) {
-                logger(Log.WARN, "$logPrefix : addNeighbor : exception trying to send originating message", e)
+                }
+                delay(sendInterval.toLong())
             }
-
-            delay(sendInterval.toLong())
         }
 
         try {
@@ -421,23 +467,47 @@ class OriginatingMessageManager(
                 val replyMessage = receivedMessages.filter {
                     it.lastHopRealInetAddr == neighborRealInetAddr && it.lastHopRealPort == neighborRealPort
                 }.first()
-                logger(Log.DEBUG, "$logPrefix addNeighbor - received originating message reply " +
-                        "from ${replyMessage.lastHopAddr.addressToDotNotation()}")
+                logger(
+                    Log.DEBUG, "$logPrefix addNeighbor - received originating message reply " +
+                            "from ${replyMessage.lastHopAddr.addressToDotNotation()}"
+                )
             }
-        }finally {
+        } finally {
             sendOriginatingMessageJob.cancel()
         }
-
     }
 
-    fun neighbors() : List<Pair<Int, VirtualNode.LastOriginatorMessage>> {
+    fun neighbors(): List<Pair<Int, VirtualNode.LastOriginatorMessage>> {
         return originatorMessages.filter { it.value.hopCount == 1.toByte() }.map {
             it.key to it.value
         }
     }
 
+    fun selectOutgoingAddrForDestination(destination: InetAddress): InetAddress {
+        val destinationInt = destination.requireAddressAsInt()
 
-    fun close(){
+        // Find the originator message with the shortest path to the destination
+        val bestRoute = originatorMessages[destinationInt]
+
+        if (bestRoute == null) {
+            logger(Log.WARN, "$logPrefix No route found to destination $destination")
+            throw NoRouteToHostException("No route to host $destination")
+        }
+
+        // Find the virtual network interface that matches the last hop address
+        val outgoingInterface = virtualNetworkInterfaces().find { iface ->
+            iface.virtualAddress.requireAddressAsInt() == bestRoute.lastHopAddr
+        }
+
+        if (outgoingInterface == null) {
+            logger(Log.ERROR, "$logPrefix No matching interface found for route to $destination")
+            throw IllegalStateException("No matching interface for route to $destination")
+        }
+
+        logger(Log.INFO, "$logPrefix Selected outgoing address ${outgoingInterface.virtualAddress} with ${bestRoute.hopCount} hops to reach $destination")
+        return outgoingInterface.virtualAddress
+    }
+    fun close() {
         sendOriginatorMessagesFuture.cancel(true)
         pingNeighborsFuture.cancel(true)
         checkLostNodesFuture.cancel(true)

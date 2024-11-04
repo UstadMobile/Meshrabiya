@@ -17,5 +17,7 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Meshrabiya"
 include ':lib-meshrabiya'
+include ':lib-nearby'
 include ':test-app'
 include ':test-shared'
+include ':lib-meshrabiya-vpn'

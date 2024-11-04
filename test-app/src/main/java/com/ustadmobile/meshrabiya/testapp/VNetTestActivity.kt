@@ -1,12 +1,21 @@
 package com.ustadmobile.meshrabiya.testapp
 
+import android.Manifest
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ConnectWithoutContact
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
@@ -25,61 +34,115 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.testapp.appstate.AppUiState
+import com.ustadmobile.meshrabiya.testapp.domain.AddNearbyNetworkUseCase
 import com.ustadmobile.meshrabiya.testapp.screens.InfoScreen
 import com.ustadmobile.meshrabiya.testapp.screens.LocalVirtualNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.LogListScreen
+import com.ustadmobile.meshrabiya.testapp.screens.NearbyTestRoute
+import com.ustadmobile.meshrabiya.testapp.screens.NearbyTestScreen
 import com.ustadmobile.meshrabiya.testapp.screens.NeighborNodeListScreen
 import com.ustadmobile.meshrabiya.testapp.screens.OpenSourceLicensesScreen
 import com.ustadmobile.meshrabiya.testapp.screens.ReceiveScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SelectDestNodeScreen
 import com.ustadmobile.meshrabiya.testapp.screens.SendFileScreen
 import com.ustadmobile.meshrabiya.testapp.theme.HttpOverBluetoothTheme
+import com.ustadmobile.meshrabiya.testapp.viewmodel.NearbyTestViewModel
+import com.ustadmobile.meshrabiya.testapp.viewmodel.VpnTestViewModel
 import org.kodein.di.DI
 import org.kodein.di.DIAware
 import org.kodein.di.android.closestDI
 import org.kodein.di.compose.withDI
+import org.kodein.di.direct
+import org.kodein.di.instance
 import java.net.URLEncoder
-import java.util.UUID
 
 class VNetTestActivity : ComponentActivity(), DIAware {
-
     override val di by closestDI()
+    private val viewModel: VpnTestViewModel by instance()
+    private val VPN_REQUEST_CODE = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
             HttpOverBluetoothTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MeshrabiyaTestApp(di)
+//                    VpnTestScreen(viewModel = viewModel, onStartVpn = { startVpn() })
+                    MeshrabiyaTestApp(di = di)
                 }
             }
         }
     }
 
+    private fun startVpn() {
+        val intent = viewModel.prepareVpn()
+        if (intent != null) {
+            startActivityForResult(intent, VPN_REQUEST_CODE)
+        } else {
+            onActivityResult(VPN_REQUEST_CODE, RESULT_OK, null)
+        }
+    }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == VPN_REQUEST_CODE) {
+            if (resultCode == RESULT_OK) {
+                viewModel.startVpn()
+                Toast.makeText(this, "VPN permission granted", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeshrabiyaTestApp(
     di: DI
 ) = withDI(di) {
     val navController: NavHostController = rememberNavController()
+    val logger: MNetLogger = di.direct.instance()
+
+    val permissionRequest = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grantResult ->
+        if(grantResult.all { it.value }) {
+            //permissions were accepted
+            logger(Log.WARN, "Meshrabiya: Permissions granted")
+            val addNearbyUseCase: AddNearbyNetworkUseCase = di.direct.instance()
+            addNearbyUseCase()
+        }else {
+            logger(Log.WARN, "Meshrabiya: Permissions not granted")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        logger(Log.INFO, "Launching permission request")
+        permissionRequest.launch(
+            arrayOf(
+                NEARBY_WIFI_PERMISSION_NAME,
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN,
+            )
+        )
+    }
+
     var appUiState: AppUiState by remember {
         mutableStateOf(AppUiState())
     }
@@ -102,7 +165,7 @@ fun MeshrabiyaTestApp(
             })
         },
         floatingActionButton = {
-            if(appUiState.fabState.visible) {
+            if (appUiState.fabState.visible) {
                 ExtendedFloatingActionButton(
                     onClick = appUiState.fabState.onClick,
                     icon = {
@@ -134,7 +197,7 @@ fun MeshrabiyaTestApp(
                 )
 
                 NavigationBarItem(
-                    selected = navController.currentDestination?.route == "network" ,
+                    selected = navController.currentDestination?.route == "network",
                     label = { Text("Network") },
                     onClick = {
                         navController.navigate("neighbornodes")
@@ -147,8 +210,25 @@ fun MeshrabiyaTestApp(
                     }
                 )
 
+
                 NavigationBarItem(
-                    selected = selectedItem == "send" ,
+                    selected = navController.currentDestination?.route == "chat",
+                    label = { Text("Chat") },
+                    onClick = {
+                        navController.navigate("chat")
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Chat,
+                            contentDescription = null,
+                        )
+                    }
+                )
+
+
+
+                NavigationBarItem(
+                    selected = selectedItem == "send",
                     label = { Text("Send") },
                     onClick = {
                         navController.navigate("send")
@@ -162,7 +242,7 @@ fun MeshrabiyaTestApp(
                 )
 
                 NavigationBarItem(
-                    selected = selectedItem == "receive" ,
+                    selected = selectedItem == "receive",
                     label = { Text("Receive") },
                     onClick = {
                         navController.navigate("receive")
@@ -176,7 +256,7 @@ fun MeshrabiyaTestApp(
                 )
 
                 NavigationBarItem(
-                    selected = selectedItem == "info" ,
+                    selected = selectedItem == "info",
                     label = { Text("Info") },
                     onClick = {
                         navController.navigate("Info")
@@ -214,7 +294,7 @@ fun AppNavHost(
     startDestination: String = "localvirtualnode",
     onSetAppUiState: (AppUiState) -> Unit = { },
     snackbarHostState: SnackbarHostState,
-){
+) {
     NavHost(
         modifier = modifier,
         navController = navController,
@@ -233,10 +313,24 @@ fun AppNavHost(
             )
         }
 
+        composable("chat") {
+            NearbyTestRoute(
+                onSetAppUiState = onSetAppUiState
+            )
+        }
+
+
         composable("send") {
             SendFileScreen(
-                onNavigateToSelectReceiveNode = {uri ->
-                    navController.navigate("selectdestnode/${URLEncoder.encode(uri.toString(), "UTF-8")}")
+                onNavigateToSelectReceiveNode = { uri ->
+                    navController.navigate(
+                        "selectdestnode/${
+                            URLEncoder.encode(
+                                uri.toString(),
+                                "UTF-8"
+                            )
+                        }"
+                    )
                 },
                 onSetAppUiState = onSetAppUiState,
             )
@@ -250,7 +344,7 @@ fun AppNavHost(
                 navigateOnDone = {
                     navController.popBackStack()
                 },
-                onSetAppUiState =  onSetAppUiState,
+                onSetAppUiState = onSetAppUiState,
             )
         }
 

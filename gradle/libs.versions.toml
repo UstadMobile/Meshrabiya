@@ -1,0 +1,90 @@
+[versions]
+accompanistWebview = "0.34.0"
+acraHttp = "5.11.3"
+activityCompose = "1.8.2"
+androidx_core = "1.12.0"
+appcompat = "1.6.1"
+codeScanner = "2.3.2"
+coreKtx = "1.12.0"
+ipaddress = "5.4.0"
+junitVersion = "1.1.5"
+kodeinDiFrameworkAndroidX = "7.21.2"
+kotlinxCoroutinesTest = "1.7.3"
+lifecycleRuntimeKtx = "2.7.0"
+material = "1.12.0"
+mockitoCore = "5.1.0"
+mockitoCoreVersion = "5.1.1"
+nanohttpd = "2.3.1"
+navigationCompose = "2.7.7"
+okhttp = "4.10.0"
+okhttpVersion = "4.12.0"
+rawhttp = "2.6.0"
+kotlinx_serialization = "1.6.1"
+datastore = "1.0.0"
+bouncycastle = "1.75"
+android_desugaring = "2.0.4"
+junit = "4.13.2"
+kotlin_mockito = "5.1.0"
+turbine = "1.0.0"
+mockwebserver = "4.12.0"
+android_junit_runner = "1.5.2"
+androidx_test_rules = "1.5.0"
+android_test_ext_junit = "1.1.5"
+espresso_core = "3.5.1"
+play_services_nearby = "19.3.0"
+zxingAndroidEmbedded = "4.3.0"
+
+
+[libraries]
+accompanist-webview = { module = "com.google.accompanist:accompanist-webview", version.ref = "accompanistWebview" }
+acra-dialog = { module = "ch.acra:acra-dialog", version.ref = "acraHttp" }
+acra-http = { module = "ch.acra:acra-http", version.ref = "acraHttp" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-core = { group = "androidx.core", name = "core-ktx", version.ref = "androidx_core" }
+androidx-core-ktx-v1131 = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-junit = { module = "androidx.test.ext:junit", version.ref = "junitVersion" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
+androidx-material3 = { module = "androidx.compose.material3:material3" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+androidx-ui = { module = "androidx.compose.ui:ui" }
+androidx-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+androidx-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+androidx-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+code-scanner = { module = "com.github.yuriy-budiyev:code-scanner", version.ref = "codeScanner" }
+core = { module = "androidx.core:core", version.ref = "coreKtx" }
+google-material = { module = "com.google.android.material:material", version.ref = "material" }
+ipaddress = { module = "com.github.seancfoley:ipaddress", version.ref = "ipaddress" }
+kodein-di-framework-android-x = { module = "org.kodein.di:kodein-di-framework-android-x", version.ref = "kodeinDiFrameworkAndroidX" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
+material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
+material3 = { module = "androidx.compose.material3:material3" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoCoreVersion" }
+nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanohttpd" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+rawhttp = { group = "com.athaydes.rawhttp", name = "rawhttp-core", version.ref = "rawhttp" }
+kotlinx-serialization = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx_serialization" }
+datastore = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+bouncycastle-prov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
+desugaring = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "android_desugaring" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "kotlin_mockito" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver" }
+android-junit-runner = { group = "androidx.test", name = "runner", version.ref = "android_junit_runner" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidx_test_rules" }
+android-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "android_test_ext_junit" }
+mockito-android = { group = "org.mockito", name = "mockito-android", version.ref = "mockitoCore" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso_core" }
+google-play-services-nearby = { group = "com.google.android.gms", name = "play-services-nearby", version.ref = "play_services_nearby" }
+ui = { module = "androidx.compose.ui:ui" }
+ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingAndroidEmbedded" }
