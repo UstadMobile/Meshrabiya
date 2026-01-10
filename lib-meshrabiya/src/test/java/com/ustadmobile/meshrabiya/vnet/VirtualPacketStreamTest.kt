@@ -13,7 +13,7 @@ class VirtualPacketStreamTest {
     @Test
     fun givenVirtualPacketWrittenToOutputStream_whenReadFromInputStream_thenWillMatch() {
         val payloadSize = 1000
-        val data = Random.nextBytes(ByteArray(1000 + VirtualPacketHeader.HEADER_SIZE))
+        val data = Random.nextBytes(1000 + VirtualPacketHeader.HEADER_SIZE)
         val header = VirtualPacketHeader(
             toAddr = 1000,
             toPort = 8080,
@@ -22,6 +22,7 @@ class VirtualPacketStreamTest {
             lastHopAddr = 1002,
             hopCount = 1,
             maxHops = 4,
+            gatewayType = VirtualPacketHeader.GATEWAY_TYPE_NONE,
             payloadSize = payloadSize,
         )
 

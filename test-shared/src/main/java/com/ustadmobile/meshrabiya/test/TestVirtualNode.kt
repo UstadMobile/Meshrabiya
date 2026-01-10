@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.test
 
+import android.content.Context
 import com.ustadmobile.meshrabiya.ext.asInetAddress
 import com.ustadmobile.meshrabiya.log.MNetLogger
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
@@ -19,10 +20,16 @@ class TestVirtualNode(
     override val meshrabiyaWifiManager: MeshrabiyaWifiManager = mock { },
     json: Json,
     config: NodeConfig = NodeConfig(maxHops = 5),
+    private val mockContext: Context? = null,
 ) : VirtualNode(
     port = port,
     logger = logger,
     json = json,
     config = config,
     address = localNodeAddress.asInetAddress(),
-)
+) {
+    /**
+     * Provides mock context for testing. Returns null by default to avoid service initialization in tests.
+     */
+    override fun getContext(): Context? = mockContext
+}

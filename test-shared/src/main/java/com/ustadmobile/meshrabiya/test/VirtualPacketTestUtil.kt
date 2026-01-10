@@ -23,6 +23,7 @@ fun newVirtualPacketWithRandomPayload(
             lastHopAddr = lastHopAddr,
             hopCount = 0,
             maxHops = 8,
+            gatewayType = VirtualPacketHeader.GATEWAY_TYPE_NONE,
             payloadSize = payloadSize
         ),
         data = buffer,

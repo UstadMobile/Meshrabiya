@@ -8,6 +8,7 @@ class IntExtTest {
 
     @Test
     fun givenAddr_whenConvertedToFromInt_thenShouldMatch() {
+        println("[DEBUG] IntExtTest: Running test")
         val inetAddress = InetAddress.getByName("192.168.49.1")
         val addressToInt = inetAddress.address.ip4AddressToInt()
         val inetAddressFromInt = InetAddress.getByAddress(addressToInt.addressToByteArray())

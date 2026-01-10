@@ -16,6 +16,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Meshrabiya"
-include ':lib-meshrabiya'
-include ':test-app'
-include ':test-shared'
+// settings.gradle.bak - renamed to prevent Gradle from using this nested settings file

@@ -5,12 +5,12 @@ plugins {
 }
 
 android {
-    namespace 'com.ustadmobile.meshrabiya.test'
-    compileSdk 33
+    namespace = 'com.ustadmobile.meshrabiya.test'
+    compileSdk = 36
 
     defaultConfig {
-        minSdk 26
-        targetSdk 33
+    minSdk = 24
+    targetSdk = 36
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -18,19 +18,19 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
     compileOptions {
-        coreLibraryDesugaringEnabled true
+        coreLibraryDesugaringEnabled = false
 
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17
+        jvmTarget = "21"
     }
 }
 

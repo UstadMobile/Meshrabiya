@@ -1,5 +1,6 @@
 package com.ustadmobile.meshrabiya.vnet.datagram
 
+import android.content.Context
 import android.util.Log
 import androidx.core.util.Pools.SynchronizedPool
 import com.ustadmobile.meshrabiya.ext.addressToByteArray
@@ -10,6 +11,7 @@ import com.ustadmobile.meshrabiya.vnet.Protocol
 import com.ustadmobile.meshrabiya.vnet.VirtualPacket
 import com.ustadmobile.meshrabiya.vnet.VirtualPacketHeader
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
+import com.ustadmobile.meshrabiya.vnet.GatewayTypeResolver
 import java.net.DatagramPacket
 import java.net.DatagramSocketImpl
 import java.net.InetAddress
@@ -27,6 +29,7 @@ open class VirtualDatagramSocketImpl(
     private val router: VirtualRouter,
     private val localVirtualAddress: Int,
     private val logger: MNetLogger,
+    private val context: Context? = null,  //V3: Optional context for GatewayTypeResolver
 ): DatagramSocketImpl() {
     private val logPrefix: String
         get() = "[VirtualDatagramSocketImpl] "
@@ -38,6 +41,11 @@ open class VirtualDatagramSocketImpl(
     private val receiveBufferPool = SynchronizedPool<ByteArray>(RECEIVE_BUFFER_SIZE)
 
     private val sendBufferPool = SynchronizedPool<ByteArray>(SEND_BUFFER_SIZE)
+    
+    //V3: Gateway type resolver (lazy init when context available)
+    private val gatewayTypeResolver: GatewayTypeResolver? by lazy {
+        context?.let { GatewayTypeResolver(it) }
+    }
 
     val boundPort: Int
         get() = localPort
@@ -115,11 +123,22 @@ open class VirtualDatagramSocketImpl(
                     lastHopAddr = 0,
                     hopCount =  0,
                     maxHops = 5,
+                    gatewayType = VirtualPacketHeader.GATEWAY_TYPE_NONE, //V3: Default, will be set by routing layer
                     payloadSize = p.length
                 ),
                 data = buffer,
                 payloadOffset = VirtualPacketHeader.HEADER_SIZE,
             )
+            
+            //V3: Resolve gateway type before routing (if resolver available)
+            gatewayTypeResolver?.let { resolver ->
+                //TODO: Extract source package name from DatagramPacket if available
+                //For now, use null (will fallback to global preference)
+                val resolvedType = resolver.resolveGatewayType(virtualPacket, sourcePackageName = null)
+                //Update packet header in-place
+                virtualPacket.data[VirtualPacketHeader.HEADER_SIZE - 3] = resolvedType //gatewayType at offset 18
+            }
+            
             router.route(virtualPacket)
         }finally {
             sendBufferPool.release(buffer)

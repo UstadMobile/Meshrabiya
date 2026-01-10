@@ -7,6 +7,7 @@ class MmcpPongTest {
 
     @Test
     fun givenPongMessage_whenConvertedToFromBytes_thenShouldMatch() {
+        println("[DEBUG] MmcpPongTest: Running test")
         val pong = MmcpPong(42, 4042)
         val bytes = pong.toBytes()
         val fromBytes = MmcpPong.fromBytes(bytes)

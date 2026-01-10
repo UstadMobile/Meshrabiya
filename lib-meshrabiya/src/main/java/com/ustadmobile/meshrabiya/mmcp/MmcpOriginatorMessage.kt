@@ -1,119 +1,133 @@
 package com.ustadmobile.meshrabiya.mmcp
 
-import com.ustadmobile.meshrabiya.vnet.VirtualPacket
-import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
+import com.ustadmobile.meshrabiya.vnet.MeshRole
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * The originator message is used to track routes around the mesh, roughly similar to the BATMAN protocol.
- *
- * @param pingTimeSum the likely sum of the ping time along the journey this message has taken. When
- *                    the message reaches a node, the node at each hop adds to the ping time as it
- *                    is received based on the most recent known ping time of the node that last relayed
- *                    it.
+ * MMCP Originating Message - broadcasts node presence and routing information.
+ * 
+ * This is the canonical message type from the official design, enhanced with
+ * topology and centrality fields for distributed mesh intelligence.
+ * 
+ * Official fields (from OriginatingMessageManager_official.md):
+ * - messageId: Unique identifier
+ * - sentTime: Timestamp for message freshness
+ * - pingTimeSum: Cumulative latency across hops
+ * - connectConfig: WiFi connection configuration
+ * 
+ * Enhanced fields (for EmergentRoleManager integration):
+ * - neighbors: Direct neighbor addresses for topology building
+ * - centralityScore: BFS centrality from EmergentRoleManager
+ * - fitnessScore: Node capability assessment (0.0-1.0)
+ * - meshRoles: Currently assigned mesh roles
  */
 class MmcpOriginatorMessage(
     messageId: Int,
-    val pingTimeSum: Short,
-    val connectConfig: WifiConnectConfig?,
-    val sentTime: Long = System.currentTimeMillis(),
-): MmcpMessage(WHAT_ORIGINATOR, messageId) {
-    override fun toBytes(): ByteArray {
-        val connectConfigSize = connectConfig?.sizeInBytes ?: 0
-        //size will be : ping time sum (2 bytes) + sentTime (8 bytes) + connect config size (2 bytes) + connect config
-        val payloadSize = CONNECT_CONFIG_OFFSET + connectConfigSize
-        val payload = ByteArray(payloadSize)
-        ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN)
-            .putShort(pingTimeSum)
-            .putLong(sentTime)
-            .putShort(connectConfigSize.toShort())
-        connectConfig?.toBytes(payload, CONNECT_CONFIG_OFFSET)
+    
+    // === OFFICIAL FIELDS (from canonical design) ===
+    val sentTime: Long,
+    val pingTimeSum: Short = 0,
+    val connectConfig: Any? = null,  // WiFi ConnectConfig (platform-specific)
+    
+    // === ENHANCED FIELDS (for topology/centrality) ===
+    val neighbors: List<Int> = emptyList(),  // Direct neighbor virtual addresses
+    val centralityScore: Float = 0f,         // BFS centrality score
+    val fitnessScore: Float = 0f,            // Node fitness (0.0-1.0)
+    val meshRoles: Set<MeshRole> = emptySet(), // Current mesh roles
+    
+) : MmcpMessage(WHAT_ORIGINATOR, messageId) {
 
-        return headerAndPayloadToBytes(header, payload)
-    }
-
-    fun copyWithPingTimeIncrement(pingTimeIncrement: Short) : MmcpOriginatorMessage{
+    /**
+     * Create updated message with incremented ping time (called at each hop).
+     * This preserves the official behavior where pingTimeSum accumulates.
+     */
+    fun copyWithPingTimeIncrement(connectionPingTime: Long): MmcpOriginatorMessage {
+        val newPingTimeSum = (pingTimeSum + connectionPingTime.toInt())
+            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+            .toShort()
+        
         return MmcpOriginatorMessage(
-            messageId = this.messageId,
-            pingTimeSum = (this.pingTimeSum + pingTimeIncrement).toShort(),
-            connectConfig = connectConfig,
+            messageId = messageId,
             sentTime = sentTime,
+            pingTimeSum = newPingTimeSum,
+            connectConfig = connectConfig,
+            neighbors = neighbors,
+            centralityScore = centralityScore,
+            fitnessScore = fitnessScore,
+            meshRoles = meshRoles
         )
     }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is MmcpOriginatorMessage) return false
-        if (!super.equals(other)) return false
-
-        if (pingTimeSum != other.pingTimeSum) return false
-        if (connectConfig != other.connectConfig) return false
-        if (sentTime != other.sentTime) return false
-
-        return true
+    override fun toBytes(): ByteArray {
+        val baos = ByteArrayOutputStream()
+        val dos = DataOutputStream(baos)
+        
+        // Write official fields
+        dos.writeLong(sentTime)
+        dos.writeShort(pingTimeSum.toInt())
+        
+        // Write connectConfig (simplified - null for now)
+        dos.writeBoolean(connectConfig != null)
+        // TODO: Serialize connectConfig if present
+        
+        // Write enhanced fields
+        dos.writeInt(neighbors.size)
+        neighbors.forEach { dos.writeInt(it) }
+        
+        dos.writeFloat(centralityScore)
+        dos.writeFloat(fitnessScore)
+        
+        dos.writeInt(meshRoles.size)
+        meshRoles.forEach { dos.writeByte(it.ordinal) }
+        
+        return baos.toByteArray()
     }
-
-    override fun hashCode(): Int {
-        var result = super.hashCode()
-        result = 31 * result + pingTimeSum
-        result = 31 * result + (connectConfig?.hashCode() ?: 0)
-        result = 31 * result + sentTime.hashCode()
-        return result
-    }
-
 
     companion object {
-
-
-        //Offset from the start of the Mmcp payload to the start of the wifi connect config (if included)
-        // = ping time sum (2) + sentTime (8) + connect config size (2)
-        const val CONNECT_CONFIG_OFFSET = 12
-
-        /**
-         * When originator messages are being broadcasted the ping time is incremented.
-         */
-        fun incrementPingTimeSum(
-            packet: VirtualPacket,
-            pingTimeIncrement: Short,
-        ) {
-            //The MMCP what byte is always the first byte of an MMCP message -
-            // see MmcpHeader.fromBytes
-            val what = packet.data[packet.payloadOffset]
-            if(what != WHAT_ORIGINATOR)
-                throw IllegalArgumentException("This is NOT an originator message")
-
-            //The offset to the time is the payload offset plus the MMCP header
-            val timeOffset = packet.payloadOffset + MMCP_HEADER_LEN
-            val readBuf = ByteBuffer.wrap(packet.data, timeOffset, 2)
-                .order(ByteOrder.BIG_ENDIAN)
-            val setPingTime = readBuf.short
-            val writeBuf = ByteBuffer.wrap(packet.data, timeOffset, 2)
-                .order(ByteOrder.BIG_ENDIAN)
-            writeBuf.putShort((setPingTime + pingTimeIncrement).toShort())
-        }
-
         fun fromBytes(
             byteArray: ByteArray,
-            offset: Int,
+            offset: Int = 0,
             len: Int = byteArray.size
         ): MmcpOriginatorMessage {
-            val header = MmcpHeader.fromBytes(byteArray, offset)
-
-            val byteBuf = ByteBuffer
-                .wrap(byteArray, offset + MMCP_HEADER_LEN, byteArray.size - (offset + MMCP_HEADER_LEN))
-                .order(ByteOrder.BIG_ENDIAN)
-            val pingTimeSum = byteBuf.short
-            val sentTime = byteBuf.long
-            val connectConfigSize = byteBuf.short
-            val connectConfig = if(connectConfigSize > 0) {
-                WifiConnectConfig.fromBytes(byteArray, offset + MMCP_HEADER_LEN + CONNECT_CONFIG_OFFSET)
-            }else {
+            val buffer = ByteBuffer.wrap(byteArray, offset, len).order(ByteOrder.BIG_ENDIAN)
+            buffer.position(offset + 1) // Skip 'what' byte
+            
+            val messageId = buffer.int
+            val sentTime = buffer.long
+            val pingTimeSum = buffer.short
+            
+            // Read connectConfig
+            val hasConnectConfig = buffer.get() != 0.toByte()
+            val connectConfig = if (hasConnectConfig) {
+                // TODO: Deserialize connectConfig
                 null
-            }
-
-            return MmcpOriginatorMessage(header.messageId, pingTimeSum, connectConfig, sentTime)
+            } else null
+            
+            // Read enhanced fields
+            val neighborCount = buffer.int
+            val neighbors = List(neighborCount) { buffer.int }
+            
+            val centralityScore = buffer.float
+            val fitnessScore = buffer.float
+            
+            val meshRolesCount = buffer.int
+            val meshRoles = (0 until meshRolesCount).map {
+                MeshRole.values()[buffer.get().toInt()]
+            }.toSet()
+            
+            return MmcpOriginatorMessage(
+                messageId = messageId,
+                sentTime = sentTime,
+                pingTimeSum = pingTimeSum,
+                connectConfig = connectConfig,
+                neighbors = neighbors,
+                centralityScore = centralityScore,
+                fitnessScore = fitnessScore,
+                meshRoles = meshRoles
+            )
         }
-
     }
 }

@@ -5,6 +5,18 @@
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
+================================================================================
+
+Meshrabiya - Android Mesh Networking Library
+Copyright © 2023 UstadMobile FZ-LLC (Original Implementation)
+Copyright © 2025 Tyrone Thomas/BreakThrough Technologies (Fork Modifications)
+
+This is a highly modified fork of the original Meshrabiya library.
+For detailed information about modifications and original copyright,
+see the NOTICE file in this directory.
+
+================================================================================
+
 
   This version of the GNU Lesser General Public License incorporates
 the terms and conditions of version 3 of the GNU General Public

@@ -6,9 +6,9 @@ import com.ustadmobile.meshrabiya.ext.writeChainSocketInitResponse
 import com.ustadmobile.meshrabiya.log.MNetLoggerStdout
 import com.ustadmobile.meshrabiya.test.FileEchoSocketServer
 import com.ustadmobile.meshrabiya.test.assertFileContentsAreEqual
+import com.ustadmobile.meshrabiya.test.writeRandomData
 import com.ustadmobile.meshrabiya.vnet.VirtualRouter
 import com.ustadmobile.meshrabiya.vnet.randomApipaAddr
-import com.ustadmobile.meshrabiya.writeRandomData
 import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test

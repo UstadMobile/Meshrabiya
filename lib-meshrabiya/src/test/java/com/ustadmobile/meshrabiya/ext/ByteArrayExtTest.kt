@@ -7,6 +7,7 @@ class ByteArrayExtTest {
 
     @Test
     fun givenTwoAddresses_whenCheckPrefixMatches_thenShouldCalculateCorrectly() {
+        println("[DEBUG] ByteArrayExtTest: Running test")
         val addr1 = byteArrayOf(169.toByte(),  254.toByte(), 1.toByte(), 1.toByte())
         val addr2 = byteArrayOf(169.toByte(),  254.toByte(), 128.toByte(), 64.toByte())
 

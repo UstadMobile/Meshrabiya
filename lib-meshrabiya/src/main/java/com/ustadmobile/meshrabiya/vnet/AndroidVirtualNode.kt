@@ -25,6 +25,8 @@ import kotlinx.serialization.json.Json
 import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 
+
+
 class AndroidVirtualNode(
     val appContext: Context,
     port: Int = 0,
@@ -33,32 +35,32 @@ class AndroidVirtualNode(
     dataStore: DataStore<Preferences>,
     address: InetAddress = randomApipaInetAddr(),
     config: NodeConfig = NodeConfig.DEFAULT_CONFIG,
-): VirtualNode(
+) : VirtualNode(
     port = port,
     logger = logger,
     address = address,
     json = json,
     config = config,
 ) {
+    
+    /**
+     * Provides context for service initialization (EmergentRoleManager, IntelligentDistributedComputeService).
+     */
+    override fun getContext(): Context = appContext
 
     private val bluetoothManager: BluetoothManager by lazy {
         appContext.getSystemService(BluetoothManager::class.java)
     }
 
-
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         bluetoothManager.adapter
     }
 
-    /**
-     * Listen to the WifiManager for new wifi station connections being established.. When they are
-     * established call addNewNeighborConnection to initialize the exchange of originator messages.
-     */
     private val newWifiConnectionListener = MeshrabiyaWifiManagerAndroid.OnNewWifiConnectionListener {
         addNewNeighborConnection(
             address = it.neighborInetAddress,
             port = it.neighborPort,
-            neighborNodeVirtualAddr =  it.neighborVirtualAddress,
+            neighborNodeVirtualAddr = it.neighborVirtualAddress,
             socket = it.socket,
         )
     }
@@ -77,26 +79,25 @@ class AndroidVirtualNode(
 
     private val _bluetoothState = MutableStateFlow(MeshrabiyaBluetoothState())
 
+
     private fun updateBluetoothState() {
         try {
             val deviceName = bluetoothAdapter?.name
             _bluetoothState.takeIf { it.value.deviceName != deviceName }?.value =
                 MeshrabiyaBluetoothState(deviceName = deviceName)
-        }catch(e: SecurityException) {
+        } catch (e: SecurityException) {
             logger(Log.WARN, "Could not get device name", e)
         }
     }
 
-    private val bluetoothStateBroadcastReceiver: BroadcastReceiver = object: BroadcastReceiver() {
-
+    private val bluetoothStateBroadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if(intent != null && intent.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+            if (intent != null && intent.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
                 val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
-                when(state) {
+                when (state) {
                     BluetoothAdapter.STATE_ON -> {
                         updateBluetoothState()
                     }
-
                     BluetoothAdapter.STATE_OFF -> {
                         _bluetoothState.value = MeshrabiyaBluetoothState(
                             deviceName = null
@@ -108,8 +109,6 @@ class AndroidVirtualNode(
     }
 
     private val receiverRegistered = AtomicBoolean(false)
-
-
 
     init {
         appContext.registerReceiver(
@@ -136,13 +135,13 @@ class AndroidVirtualNode(
         }
     }
 
-
     override fun close() {
         super.close()
 
-        if(receiverRegistered.getAndSet(false)) {
+        if (receiverRegistered.getAndSet(false)) {
             appContext.unregisterReceiver(bluetoothStateBroadcastReceiver)
         }
+        // scheduledExecutorService.shutdown()  TODO find out where this goes
     }
 
     suspend fun connectAsStation(
@@ -159,12 +158,12 @@ class AndroidVirtualNode(
         enabled: Boolean,
         preferredBand: ConnectBand,
         hotspotType: HotspotType,
-    ) : LocalHotspotResponse?{
+    ): LocalHotspotResponse? {
         updateBluetoothState()
         return super.setWifiHotspotEnabled(enabled, preferredBand, hotspotType)
     }
 
-    suspend fun lookupStoredBssid(ssid: String) : String? {
+    suspend fun lookupStoredBssid(ssid: String): String? {
         return meshrabiyaWifiManager.lookupStoredBssid(ssid)
     }
 
@@ -174,14 +173,15 @@ class AndroidVirtualNode(
      * when reconnecting on Android 10+ if we want to avoid a confirmation dialog.
      */
     fun storeBssid(ssid: String, bssid: String?) {
-        logger(Log.DEBUG, "$logPrefix: storeBssid: Store BSSID for $ssid : $bssid")
-        if(bssid != null) {
+        logger(Log.DEBUG, "AndroidVirtualNode: storeBssid: Store BSSID for $ssid : $bssid")
+        if (bssid != null) {
             coroutineScope.launch {
                 meshrabiyaWifiManager.storeBssidForAddress(ssid, bssid)
             }
-        }else {
-            logger(Log.WARN, "$logPrefix : storeBssid: BSSID for $ssid is NULL, can't save to avoid prompts on reconnect")
+        } else {
+            logger(Log.WARN, "AndroidVirtualNode: storeBssid: BSSID for $ssid is NULL, can't save to avoid prompts on reconnect")
         }
     }
 
+    
 }

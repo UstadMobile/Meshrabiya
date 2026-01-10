@@ -9,7 +9,7 @@ class VirtualPacketTest {
     @Test
     fun givenVirtualPacket_whenConvertedToDatagramAndBackToVirtualPacket_thenShouldMatch() {
         val payloadSize = 1000
-        val payload = Random.nextBytes(ByteArray(payloadSize + VirtualPacketHeader.HEADER_SIZE))
+        val payload = Random.nextBytes(payloadSize + VirtualPacketHeader.HEADER_SIZE)
         val header = VirtualPacketHeader(
             toAddr = 1000,
             toPort = 8080,
@@ -18,6 +18,7 @@ class VirtualPacketTest {
             lastHopAddr = 1002,
             hopCount = 1,
             maxHops = 4,
+            gatewayType = VirtualPacketHeader.GATEWAY_TYPE_NONE,
             payloadSize = payloadSize,
         )
 
@@ -41,17 +42,18 @@ class VirtualPacketTest {
 
 
     @Test
-    fun givenVirtualPacket_whenLastHopAddrSet_whenConvertedToDatagramAndBackToVirtualPacket_thenShouldMatch() {
+    fun givenVirtualPacket_whenConvertedToDatagramAndBackToVirtualPacketWithDifferentLastHop_thenShouldMatch() {
         val payloadSize = 1000
-        val payload = Random.nextBytes(ByteArray(payloadSize + VirtualPacketHeader.HEADER_SIZE))
+        val payload = Random.nextBytes(payloadSize + VirtualPacketHeader.HEADER_SIZE)
         val header = VirtualPacketHeader(
             toAddr = 1000,
             toPort = 8080,
             fromAddr = 1002,
             fromPort = 8072,
-            lastHopAddr = 0,
+            lastHopAddr = 1002,
             hopCount = 1,
             maxHops = 4,
+            gatewayType = VirtualPacketHeader.GATEWAY_TYPE_NONE,
             payloadSize = payloadSize,
         )
 
@@ -60,6 +62,7 @@ class VirtualPacketTest {
             data = payload,
             payloadOffset = VirtualPacketHeader.HEADER_SIZE,
         )
+
         val lastHopAddr = 1042
         virtualPacket.updateLastHopAddrAndIncrementHopCountInData(lastHopAddr)
 
@@ -75,5 +78,4 @@ class VirtualPacketTest {
             )
         }
     }
-
 }

@@ -7,13 +7,9 @@ import com.ustadmobile.meshrabiya.ext.addressToDotNotation
 import com.ustadmobile.meshrabiya.ext.prefixMatches
 import com.ustadmobile.meshrabiya.ext.requireAddressAsInt
 import com.ustadmobile.meshrabiya.log.MNetLogger
-import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotRequest
-import com.ustadmobile.meshrabiya.mmcp.MmcpHotspotResponse
-import com.ustadmobile.meshrabiya.mmcp.MmcpMessage
-import com.ustadmobile.meshrabiya.mmcp.MmcpMessageAndPacketHeader
-import com.ustadmobile.meshrabiya.mmcp.MmcpOriginatorMessage
-import com.ustadmobile.meshrabiya.mmcp.MmcpPing
-import com.ustadmobile.meshrabiya.mmcp.MmcpPong
+import com.ustadmobile.meshrabiya.beta.BetaTestLogger
+import com.ustadmobile.meshrabiya.beta.LogLevel
+import com.ustadmobile.meshrabiya.mmcp.*
 import com.ustadmobile.meshrabiya.portforward.ForwardBindPoint
 import com.ustadmobile.meshrabiya.portforward.UdpForwardRule
 import com.ustadmobile.meshrabiya.util.findFreePort
@@ -21,55 +17,55 @@ import com.ustadmobile.meshrabiya.vnet.VirtualPacket.Companion.ADDR_BROADCAST
 import com.ustadmobile.meshrabiya.vnet.bluetooth.MeshrabiyaBluetoothState
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocket2
 import com.ustadmobile.meshrabiya.vnet.datagram.VirtualDatagramSocketImpl
-import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactory
-import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketFactoryImpl
-import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketNextHop
-import com.ustadmobile.meshrabiya.vnet.socket.ChainSocketServer
-import com.ustadmobile.meshrabiya.vnet.wifi.ConnectBand
-import com.ustadmobile.meshrabiya.vnet.wifi.HotspotType
-import com.ustadmobile.meshrabiya.vnet.wifi.WifiConnectConfig
-import com.ustadmobile.meshrabiya.vnet.wifi.MeshrabiyaWifiManager
-import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotRequest
-import com.ustadmobile.meshrabiya.vnet.wifi.LocalHotspotResponse
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
+import com.ustadmobile.meshrabiya.vnet.socket.*
+import com.ustadmobile.meshrabiya.vnet.wifi.*
+import com.ustadmobile.meshrabiya.vnet.wifi.state.MeshrabiyaWifiState
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
 import java.io.Closeable
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.ServerSocket
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
+import java.net.*
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.SocketFactory
 import kotlin.random.Random
+import com.ustadmobile.meshrabiya.service.MeshEcosystemListener
+import com.ustadmobile.meshrabiya.service.MeshGossipService
+import com.ustadmobile.meshrabiya.vnet.CoreGossipBroadcastService
+import com.ustadmobile.meshrabiya.storage.DistributedStorageManager
+// Removed: import com.ustadmobile.meshrabiya.service.compute.IntelligentDistributedComputeService (deprecated - replaced by DistributedComputeClient/Server)
+import com.ustadmobile.meshrabiya.service.compute.TaskManager
+import com.ustadmobile.meshrabiya.service.compute.DistributedComputeClient
+import com.ustadmobile.meshrabiya.service.compute.DistributedComputeServer
+// Removed: import com.ustadmobile.meshrabiya.role.EmergentRoleManager (old package)
+import com.ustadmobile.meshrabiya.vnet.OriginatingMessageManager
+// NEW: Import hardware capability classes for getCurrentNodeCapabilities()
+import com.ustadmobile.meshrabiya.vnet.hardware.ResourceCapabilities
+import com.ustadmobile.meshrabiya.vnet.hardware.BatteryInfo
+import com.ustadmobile.meshrabiya.vnet.hardware.BatteryHealth
+import com.ustadmobile.meshrabiya.vnet.hardware.PowerState
+import com.ustadmobile.meshrabiya.vnet.hardware.ThermalState  // Use hardware package version
+
+import com.ustadmobile.meshrabiya.service.MeshEcosystemMessage
+import com.ustadmobile.meshrabiya.MeshrabiyaConstants
 
 //Generate a random Automatic Private IP Address
 fun randomApipaAddr(): Int {
     //169.254
     val fixedSection = (169 shl 24).or(254 shl 16)
-
     val randomSection = Random.nextInt(Short.MAX_VALUE.toInt())
-
     return fixedSection.or(randomSection)
 }
 
 fun randomApipaInetAddr() = InetAddress.getByAddress(randomApipaAddr().addressToByteArray())
+
+
 
 /**
  * Mashrabiya Node
@@ -79,6 +75,10 @@ fun randomApipaInetAddr() = InetAddress.getByAddress(randomApipaAddr().addressTo
  *
  * Addresses are 32 bit integers in the APIPA range
  */
+interface HasNodeState {
+    val currentNodeState: LocalNodeState
+}
+
 abstract class VirtualNode(
     val port: Int = 0,
     val json: Json = Json,
@@ -86,9 +86,37 @@ abstract class VirtualNode(
     final override val address: InetAddress = randomApipaInetAddr(),
     override val networkPrefixLength: Int = 16,
     val config: NodeConfig = NodeConfig.DEFAULT_CONFIG,
-): VirtualRouter, Closeable {
+): VirtualRouter, Closeable, HasNodeState {
 
     val addressAsInt: Int = address.requireAddressAsInt()
+    fun getInetAddressFor(addr: Int) = InetAddress.getByAddress(addr.addressToByteArray())
+    /**
+     * Provides context for service initialization.
+     * Must be implemented by platform-specific subclasses (e.g., AndroidVirtualNode).
+     */
+    protected abstract fun getContext(): android.content.Context?
+
+    // --- Proxy connection info ---
+    @Volatile
+    private var proxyHost: String? = null
+    @Volatile
+    private var proxyPort: Int? = null
+    @Volatile
+    private var proxyActive: Boolean = false
+
+    // --- Set proxy connection info ---
+    fun setProxy(host: String, port: Int) {
+        proxyHost = host
+        proxyPort = port
+        logger(Log.INFO, "$logPrefix Proxy set to $host:$port", null)
+    }
+
+    // --- Set proxy active/inactive ---
+    fun setProxyActive(active: Boolean) {
+        proxyActive = active
+        logger(Log.INFO, "$logPrefix Proxy active set to $active", null)
+    }
+
 
     //This executor is used for direct I/O activities
     protected val connectionExecutor: ExecutorService = Executors.newCachedThreadPool()
@@ -98,11 +126,18 @@ abstract class VirtualNode(
 
     protected val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
 
-    private val mmcpMessageIdAtomic = AtomicInteger()
+    private val messageCounter = AtomicInteger(0)
 
-    protected val _state = MutableStateFlow(LocalNodeState())
+    protected open val _state = MutableStateFlow(LocalNodeState())
 
     val state: Flow<LocalNodeState> = _state.asStateFlow()
+
+    override val currentNodeState: LocalNodeState
+        get() = _state.value
+
+    protected fun updateNodeState(update: (LocalNodeState) -> LocalNodeState) {
+        _state.update(update)
+    }
 
     abstract val meshrabiyaWifiManager: MeshrabiyaWifiManager
 
@@ -114,33 +149,112 @@ abstract class VirtualNode(
 
     private val forwardingRules: MutableMap<ForwardBindPoint, UdpForwardRule> = ConcurrentHashMap()
 
-    /**
-     * @param originatorMessage the Originator message itself
-     * @param timeReceived the time this message was received
-     * @param lastHopAddr the recorded last hop address
-     */
+    // MeshConnectionPool: instantiate and initialize singleton
+    protected val meshConnectionPool: MeshConnectionPool = MeshConnectionPool(this)
+    init {
+        MeshConnectionPool.init(this)
+    }
+
     data class LastOriginatorMessage(
-        val originatorMessage: MmcpOriginatorMessage,
+        val originatorMessage: MmcpOriginatorMessage,  // Correct type
         val timeReceived: Long,
         val lastHopAddr: Int,
         val hopCount: Byte,
         val lastHopRealInetAddr: InetAddress,
         val receivedFromSocket: VirtualNodeDatagramSocket,
         val lastHopRealPort: Int,
+        val neighborAddr: InetAddress,
     )
 
-    @Suppress("unused") //Part of the API
+    @Suppress("unused")
     enum class Zone {
         VNET, REAL
     }
 
-    private val originatingMessageManager = OriginatingMessageManager(
+    /**
+     * Get current node capabilities. Default implementation returns a basic snapshot.
+     * Can be overridden by subclasses to provide real hardware metrics.
+     */
+    protected open fun getCurrentNodeCapabilities(): NodeCapabilitySnapshot {
+        return NodeCapabilitySnapshot(
+            nodeId = addressAsInt.toString(),
+            resources = ResourceCapabilities(
+                availableCPU = 0.5f,
+                availableRAM = Runtime.getRuntime().freeMemory(),
+                availableBandwidth = 10_000_000L,
+                storageOffered = 0L,
+                batteryLevel = 50,
+                thermalThrottling = false,
+                powerState = PowerState.BATTERY_MEDIUM,
+
+            
+                networkInterfaces = emptySet()
+            ),
+            batteryInfo = BatteryInfo(
+                level = 50,
+                isCharging = false,
+                estimatedTimeRemaining = null,
+                temperatureCelsius = 25,
+                health = BatteryHealth.GOOD,
+                chargingSource = null
+            ),
+            thermalState = ThermalState.COOL,
+            networkQuality = 0.5f,
+            stability = 0.8f
+        )
+    }
+
+    // === STEP 1: Create EmergentRoleManager with topology callback ===
+    open val emergentRoleManager: EmergentRoleManager = run {
+        val context = getContext() 
+            ?: throw IllegalStateException("Context required for EmergentRoleManager initialization")
+        EmergentRoleManager(
+            virtualNode = this,
+            context = context,
+            getTopologyMap = { originatingMessageManager.getTopologyMapInfo() },
+            getCurrentNodeCapabilities = { getCurrentNodeCapabilities() }
+        )
+    }
+
+    // === STEP 2: Create OriginatingMessageManager with EmergentRoleManager callbacks ===
+    open val originatingMessageManager = OriginatingMessageManager(
         localNodeInetAddr = address,
         logger = logger,
-        scheduledExecutorService = scheduledExecutor,
-        nextMmcpMessageId = this::nextMmcpMessageId,
-        getWifiState = { _state.value.wifiState },
+        scheduledExecutor = scheduledExecutor,
+        nextMmcpMessageId = { nextMmcpMessageId() },
+        getWifiState = { currentNodeState.wifiState },
+        
+        // === NEW: Callbacks to EmergentRoleManager ===
+        getCentralityScore = { emergentRoleManager.calculateCentralityScore() },
+        getMeshRoles = { emergentRoleManager.currentMeshRoles.value },
+        getFitnessScore = { 
+            emergentRoleManager.calculateNormalizedFitness(getCurrentNodeCapabilities()) 
+        },
+        
+        // === EXISTING PARAMS ===
+        pingTimeout = 15_000,
+        originatingMessageNodeLostThreshold = 10_000,
+        lostNodeCheckInterval = 1_000
     )
+
+    // === Gateway Selector and Router (Phase 4) ===
+    protected val gatewaySelector: GatewaySelector by lazy {
+        GatewaySelector(
+            originatingMessageManager = originatingMessageManager,
+            emergentRoleManager = emergentRoleManager,
+            logger = logger,
+            localNodeAddress = addressAsInt
+        )
+    }
+
+    protected val gatewayRouter: GatewayRouter by lazy {
+        GatewayRouter(
+            gatewaySelector = gatewaySelector,
+            virtualNode = this,
+            logger = logger,
+            localNodeAddress = addressAsInt
+        )
+    }
 
     private val localPort = findFreePort(0)
 
@@ -177,6 +291,94 @@ abstract class VirtualNode(
 
     private val activeSockets: MutableMap<Int, VirtualDatagramSocketImpl> = ConcurrentHashMap()
 
+    // === New Service Instantiations ===
+    
+    // Core mesh services instantiated with proper dependency injection
+    protected val meshGossipService: MeshGossipService = MeshGossipService.initialize(this)
+    
+    open val coreGossipBroadcastService: CoreGossipBroadcastService = 
+        CoreGossipBroadcastService.getInstance()
+    
+    
+    // MeshEcosystemListener depends on emergentRoleManager and meshGossipService
+    protected val meshEcosystemListener: MeshEcosystemListener by lazy {
+        val listener = MeshEcosystemListener(this)
+        // Register compute services when they're initialized
+        listener.registerComputeClient(distributedComputeClient)
+        listener.registerComputeServer(distributedComputeServer)
+        listener
+    }
+    
+    // DEPRECATED: IntelligentDistributedComputeService - replaced by DistributedComputeClient/Server in CANONICAL_WORKFLOW_v2
+    // Will be removed after Part 2 implementation completes
+    // protected val intelligentDistributedComputeService: IntelligentDistributedComputeService by lazy {
+    //     IntelligentDistributedComputeService(
+    //         virtualNode = this,
+    //         emergentRoleManager = emergentRoleManager,
+    //         betaLogger = BetaTestLogger.getInstance(
+    //             getContext() ?: throw IllegalStateException("Context required")
+    //         )
+    //     )
+    // }
+    
+    // Storage service requires additional dependencies (Context, etc.)
+    // Will be initialized later via initialize() method when dependencies are available
+    open var distributedStorageManager: DistributedStorageManager? = null
+    
+    // TaskManager: Orchestrates compute task lifecycle on compute node
+    protected val taskManager: TaskManager by lazy {
+        TaskManager(
+            context = getContext() ?: throw IllegalStateException("Context required for TaskManager"),
+            virtualNode = this,
+            distributedStorageClient = distributedStorageManager?.getDistributedStorageClient()
+                ?: throw IllegalStateException("DistributedStorageClient required for TaskManager"),
+            betaLogger = BetaTestLogger.getInstance(
+                getContext() ?: throw IllegalStateException("Context required")
+            )
+        )
+    }
+    
+    // DistributedComputeClient: Client-side distributed compute service
+    protected val distributedComputeClient: DistributedComputeClient by lazy {
+        DistributedComputeClient(
+            context = getContext() ?: throw IllegalStateException("Context required for DistributedComputeClient"),
+            virtualNode = this,
+            betaLogger = BetaTestLogger.getInstance(
+                getContext() ?: throw IllegalStateException("Context required")
+            )
+        )
+    }
+    
+    /**
+     * Public accessor for DistributedComputeClient (for MeshrabiyaApi)
+     * Added 2025-12-06 for API-level task submission
+     */
+    fun obtainDistributedComputeClient(): DistributedComputeClient = distributedComputeClient
+    
+    /**
+     * Public accessor for MeshEcosystemListener (for MeshrabiyaApi)
+     * Added 2025-12-06 for distributed storage enable/disable
+     */
+    fun obtainMeshEcosystemListener(): MeshEcosystemListener = meshEcosystemListener
+    
+    // DistributedComputeServer: Server-side distributed compute service
+    protected val distributedComputeServer: DistributedComputeServer by lazy {
+        DistributedComputeServer(
+            context = getContext() ?: throw IllegalStateException("Context required for DistributedComputeServer"),
+            virtualNode = this,
+            emergentRoleManager = emergentRoleManager,
+            taskManager = taskManager,
+            distributedStorageClient = distributedStorageManager?.getDistributedStorageClient()
+                ?: throw IllegalStateException("DistributedStorageClient required for DistributedComputeServer"),
+            betaLogger = BetaTestLogger.getInstance(
+                getContext() ?: throw IllegalStateException("Context required")
+            )
+        )
+    }
+    
+    // Deprecated: PythonExecutor and LiteRTEngine stubs removed. Canonical compute logic is implemented in IntelligentDistributedComputeService and PythonExecutor domain files.
+    
+
     init {
         _state.update { prev ->
             prev.copy(
@@ -186,18 +388,31 @@ abstract class VirtualNode(
         }
 
         coroutineScope.launch {
-            originatingMessageManager.state.collect {
-                _state.update { prev ->
-                    prev.copy(
-                        originatorMessages = it
-                    )
+            try {
+                originatingMessageManager.state.collect { state ->
+                    _state.update { prev ->
+                        prev.copy(
+                            originatorMessages = originatingMessageManager.getOriginatorMessages()
+                        )
+                    }
                 }
+            } catch (e: Exception) {
+                safeLog(
+                    LogLevel.ERROR,
+                    "VirtualNode",
+                    "Error in originatingMessageManager state collection",
+                    mapOf("address" to address.hostAddress),
+                    e
+                )
             }
         }
     }
 
-    override fun nextMmcpMessageId() = mmcpMessageIdAtomic.incrementAndGet()
+    override fun nextMmcpMessageId(): Int {
+        return messageCounter.incrementAndGet()
+    }
 
+    // Abstract methods removed - now using callbacks through OriginatingMessageManager and EmergentRoleManager
 
     override fun allocateUdpPortOrThrow(
         virtualDatagramSocketImpl: VirtualDatagramSocketImpl,
@@ -206,8 +421,6 @@ abstract class VirtualNode(
         if(portNum > 0) {
             if(activeSockets.containsKey(portNum))
                 throw IllegalStateException("VirtualNode: port $portNum already allocated!")
-
-            //requested port is not allocated, everything OK
             activeSockets[portNum] = virtualDatagramSocketImpl
             return portNum
         }
@@ -219,7 +432,6 @@ abstract class VirtualNode(
                 activeSockets[randomPort] = virtualDatagramSocketImpl
                 return randomPort
             }
-
             attemptCount++
         }while(attemptCount < 100)
 
@@ -240,9 +452,6 @@ abstract class VirtualNode(
         }
     }
 
-    /**
-     *
-     */
     fun forward(
         bindAddress: InetAddress,
         bindPort: Int,
@@ -310,10 +519,8 @@ abstract class VirtualNode(
         )
     }
 
-
     override val localDatagramPort: Int
         get() = datagramSocket.localPort
-
 
     protected fun generateConnectLink(
         hotspot: WifiConnectConfig?,
@@ -333,7 +540,6 @@ abstract class VirtualNode(
         datagramPacket: DatagramPacket?,
         datagramSocket: VirtualNodeDatagramSocket?,
     ) : Boolean {
-        //This is an Mmcp message
         try {
             val mmcpMessage = MmcpMessage.fromVirtualPacket(virtualPacket)
             val from = virtualPacket.header.fromAddr
@@ -355,7 +561,6 @@ abstract class VirtualNode(
                             "$logPrefix Received ping(id=${mmcpMessage.messageId}) from ${from.addressToDotNotation()}"
                         }
                     )
-                    //send pong
                     val pongMessage = MmcpPong(
                         messageId = nextMmcpMessageId(),
                         replyToMessageId = mmcpMessage.messageId
@@ -399,6 +604,7 @@ abstract class VirtualNode(
                     }
                 }
 
+                // Phase 3: Changed from MmcpNodeAnnouncement to MmcpOriginatorMessage
                 mmcpMessage is MmcpOriginatorMessage -> {
                     shouldRoute = originatingMessageManager.onReceiveOriginatingMessage(
                         mmcpMessage = mmcpMessage,
@@ -407,6 +613,13 @@ abstract class VirtualNode(
                         virtualPacket = virtualPacket,
                     )
                 }
+
+                // DEPRECATED: MmcpGatewayAnnouncement class moved to .md (commented out to fix compilation)
+                // mmcpMessage is MmcpGatewayAnnouncement -> {
+                //     logger(Log.INFO, "$logPrefix received gateway announcement from ${from.addressToDotNotation()}: ${mmcpMessage.gatewayType}", null)
+                //     onGatewayAnnouncementReceived(mmcpMessage, from)
+                //     shouldRoute = true
+                // }
 
                 else -> {
                     // do nothing
@@ -420,9 +633,11 @@ abstract class VirtualNode(
             e.printStackTrace()
             return false
         }
-
     }
 
+    // Deduplication cache for broadcast packets (moved to MeshEcosystemListener)
+    // private val seenBroadcasts = ConcurrentHashMap<String, Long>()
+    // private val broadcastTtlMs: Long = 60_000L
 
     override fun route(
         packet: VirtualPacket,
@@ -440,16 +655,42 @@ abstract class VirtualNode(
                 return
             }
 
+            // MMCP message handling (unchanged)
             if(packet.header.toPort == 0 && packet.header.fromAddr != addressAsInt){
-                //this is an MMCP message
                 if(!onIncomingMmcpMessage(packet, datagramPacket, virtualNodeDatagramSocket)){
-                    //It was determined that this packet should go no further by MMCP processing
                     logger(Log.DEBUG, "Drop mmcp packet from ${packet.header.fromAddr}", null)
                 }
             }
 
+            // Ecosystem message handling (UDP broadcast or direct)
+            // Route ALL Distributed Storage & Compute messages to MeshEcosystemListener
+            val ecosystemPort = MeshrabiyaConstants.getEcosystemGossipPort()
+            if(packet.header.toPort == ecosystemPort) {
+                val bytes = packet.data.copyOfRange(packet.payloadOffset, packet.payloadOffset + packet.header.payloadSize)
+                try {
+                    val message = MeshEcosystemMessage.fromBytes(bytes)
+                    val senderId = packet.header.fromAddr
+                    
+                    // MeshEcosystemListener is the global listener for all ecosystem messages
+                    meshEcosystemListener.routeMessage(senderId, message)
+                } catch (e: Exception) {
+                    logger(Log.WARN, "$logPrefix: Failed to deserialize or route MeshEcosystemMessage: ${e.message}", e)
+                }
+                return
+            }
+
+            // --- CONDITIONAL PROXY ROUTING ---
+            val currentRoles = emergentRoleManager.getCurrentMeshRoles()
+            if (proxyActive && currentRoles.contains(MeshRole.TOR_GATEWAY)) {
+                // Route internet traffic via proxy (Tor)
+                if (shouldRouteViaProxy(packet)) {
+                    routeViaProxy(packet)
+                    logger(Log.INFO, "$logPrefix Routed packet via proxy $proxyHost:$proxyPort", null)
+                    return
+                }
+            }
+
             if(packet.header.toAddr == addressAsInt) {
-                //this is an incoming packet - give to the destination virtual socket/forwarding
                 val listeningSocket = activeSockets[packet.header.toPort]
                 if(listeningSocket != null) {
                     listeningSocket.onIncomingPacket(packet)
@@ -457,30 +698,31 @@ abstract class VirtualNode(
                     logger(Log.DEBUG, "$logPrefix Incoming packet received, but no socket listening on: ${packet.header.toPort}")
                 }
             }else {
-                //packet needs to be sent to next hop / destination
                 val toAddr = packet.header.toAddr
-
                 packet.updateLastHopAddrAndIncrementHopCountInData(addressAsInt)
+                // Deduplication for broadcast packets moved to MeshEcosystemListener
                 if(toAddr == ADDR_BROADCAST) {
-                    originatingMessageManager.neighbors().filter {
-                        it.first != fromLastHop && it.first != packet.header.fromAddr
-                    }.forEach {
-                        logger(Log.VERBOSE,
-                            message = {
-                                "$logPrefix broadcast packet " +
-                                        "from=${packet.header.fromAddr.addressToDotNotation()} " +
-                                        "lasthop=${fromLastHop.addressToDotNotation()} " +
-                                        "send to ${it.first.addressToDotNotation()}"
-                            }
-                        )
-
-                        it.second.receivedFromSocket.send(
-                            nextHopAddress = it.second.lastHopRealInetAddr,
-                            nextHopPort = it.second.lastHopRealPort,
-                            virtualPacket = packet,
-                        )
-                    }
-
+                    // val broadcastId = computeBroadcastId(packet)
+                    // val now = System.currentTimeMillis()
+                    // val prev = seenBroadcasts.putIfAbsent(broadcastId, now)
+                    // if (prev == null) {
+                    //     val meshRoles = emergentRoleManager.getCurrentMeshRoles()
+                    //     if (meshRoles.contains(MeshRole.MESH_ROUTER)) {
+                    //         logger(Log.VERBOSE, "$logPrefix: Broadcast packet $broadcastId not seen before, forwarding to neighbors (role=MESH_ROUTER)")
+                    //         originatingMessageManager.neighbors().filter {
+                    //             it.first != fromLastHop && it.first != packet.header.fromAddr
+                    //         }.forEach {
+                    //             logger(Log.VERBOSE, "$logPrefix: Forwarding broadcast to neighbor ${it.first}")
+                    //             it.second.receivedFromSocket.send(
+                    //                 nextHopAddress = it.second.lastHopRealInetAddr,
+                    //                 nextHopPort = it.second.lastHopRealPort,
+                    //                 virtualPacket = packet,
+                    //             )
+                    //         }
+                    //     } else {
+                    //         logger(Log.VERBOSE, "$logPrefix: Broadcast packet $broadcastId not seen before, but node is not MESH_ROUTER, not forwarding")
+                    //     }
+                    // }
                 }else {
                     val originatorMessage = originatingMessageManager
                         .findOriginatingMessageFor(packet.header.toAddr)
@@ -491,8 +733,18 @@ abstract class VirtualNode(
                             virtualPacket = packet
                         )
                     }else {
-                        logger(Log.WARN, "$logPrefix route: Cannot route packet to " +
-                                "${packet.header.toAddr.addressToDotNotation()} : no known nexthop")
+                        // Phase 3A: Check if packet requires gateway routing
+                        if (packet.header.gatewayType != VirtualPacketHeader.GATEWAY_TYPE_NONE) {
+                            logger(Log.DEBUG,
+                                "$logPrefix Destination ${packet.header.toAddr.addressToDotNotation()} not on mesh, " +
+                                "attempting gateway routing (type=${packet.header.gatewayType})",
+                                null
+                            )
+                            routeViaGateway(packet, null)
+                        } else {
+                            logger(Log.WARN, "$logPrefix route: Cannot route packet to " +
+                                    "${packet.header.toAddr.addressToDotNotation()} : no known nexthop")
+                        }
                     }
                 }
             }
@@ -505,14 +757,268 @@ abstract class VirtualNode(
         }
     }
 
+    /**
+     * Routes packet to internet via mesh gateway.
+     * Phase 3A: Gateway Routing Core
+     * 
+     * Uses gateway type from packet header to select appropriate gateway.
+     * Implements failover if primary gateway type unavailable.
+     *
+     * @param packet Virtual packet with internet-bound destination
+     * @param datagramPacket Original datagram (for metadata)
+     */
+    private fun routeViaGateway(
+        packet: VirtualPacket,
+        datagramPacket: DatagramPacket?
+    ) {
+        val gatewayType = packet.header.gatewayType
+        
+        logger(Log.DEBUG,
+            "$logPrefix Routing internet-bound packet via gateway (type=$gatewayType)",
+            null
+        )
+        
+        // Get available gateways of requested type
+        val gateways = when (gatewayType) {
+            VirtualPacketHeader.GATEWAY_TYPE_TOR -> {
+                getAvailableTorGateways()
+            }
+            VirtualPacketHeader.GATEWAY_TYPE_CLEARNET -> {
+                getAvailableClearnetGateways()
+            }
+            else -> {
+                logger(Log.ERROR, "$logPrefix Invalid gateway type: $gatewayType", null)
+                return
+            }
+        }
+        
+        if (gateways.isEmpty()) {
+            handleNoGatewayAvailable(packet, gatewayType)
+            return
+        }
+        
+        // Select best gateway (closest, lowest load, etc.)
+        val selectedGateway = selectBestGateway(gateways, packet)
+        
+        if (selectedGateway == null) {
+            logger(Log.WARN, "$logPrefix No suitable gateway found for type=$gatewayType", null)
+            return
+        }
+        
+        // Phase 3C: Track gateway message for return path routing
+        originatingMessageManager.trackGatewayMessage(
+            fromAddr = packet.header.fromAddr,
+            fromPort = packet.header.fromPort,
+            toAddr = packet.header.toAddr,
+            toPort = packet.header.toPort,
+            gatewayType = packet.header.gatewayType,
+            gatewayAddr = selectedGateway.nodeAddress
+        )
+        
+        // Forward packet to gateway
+        forwardToGateway(packet, selectedGateway)
+    }
+
+    /**
+     * Gets list of available Tor gateways from mesh topology.
+     * 
+     * @return List of NodeTopologyInfo for nodes advertising TOR_GATEWAY role
+     */
+    private fun getAvailableTorGateways(): List<NodeTopologyInfo> {
+        return originatingMessageManager.getNodesWithRole(MeshRole.TOR_GATEWAY)
+            .filter { !it.isStale(GATEWAY_STALE_TIMEOUT_MS) }
+    }
+
+    /**
+     * Gets list of available clearnet gateways.
+     * 
+     * @return List of NodeTopologyInfo for nodes advertising CLEARNET_GATEWAY role
+     */
+    private fun getAvailableClearnetGateways(): List<NodeTopologyInfo> {
+        return originatingMessageManager.getNodesWithRole(MeshRole.CLEARNET_GATEWAY)
+            .filter { !it.isStale(GATEWAY_STALE_TIMEOUT_MS) }
+    }
+
+    /**
+     * Selects best gateway from available list.
+     * 
+     * Selection criteria:
+     * 1. Filter out stale gateways
+     * 2. Use gateway suitability score (centrality, fitness, latency)
+     * 3. Select highest scoring gateway
+     *
+     * @param gateways List of available gateway nodes
+     * @param packet Packet being routed
+     * @return Selected gateway NodeTopologyInfo, or null if none suitable
+     */
+    private fun selectBestGateway(
+        gateways: List<NodeTopologyInfo>,
+        packet: VirtualPacket
+    ): NodeTopologyInfo? {
+        if (gateways.isEmpty()) return null
+        
+        // Determine gateway role from packet header
+        val gatewayRole = when (packet.header.gatewayType) {
+            VirtualPacketHeader.GATEWAY_TYPE_TOR -> MeshRole.TOR_GATEWAY
+            VirtualPacketHeader.GATEWAY_TYPE_CLEARNET -> MeshRole.CLEARNET_GATEWAY
+            else -> return null
+        }
+        
+        // Calculate suitability scores and select best
+        return gateways
+            .map { gateway -> 
+                Pair(gateway, gateway.calculateGatewaySuitability(gatewayRole)) 
+            }
+            .filter { it.second > 0f }
+            .maxByOrNull { it.second }
+            ?.first
+    }
+
+    /**
+     * Internal test accessor for selectBestGateway.
+     * Allows testing of gateway selection algorithm without VirtualPacket dependency.
+     * 
+     * @param gateways List of available gateway nodes
+     * @param role Gateway role to filter by
+     * @return Selected gateway NodeTopologyInfo, or null if none suitable
+     */
+    internal fun testSelectBestGateway(
+        gateways: List<NodeTopologyInfo>,
+        role: MeshRole
+    ): NodeTopologyInfo? {
+        return gateways
+            .map { gateway -> 
+                Pair(gateway, gateway.calculateGatewaySuitability(role)) 
+            }
+            .filter { it.second > 0f }
+            .maxByOrNull { it.second }
+            ?.first
+    }
+
+    /**
+     * Forwards packet to selected gateway.
+     * 
+     * Updates packet header (toAddr, hopCount, lastHopAddr) and sends to gateway.
+     *
+     * @param packet Packet to forward
+     * @param gateway Target gateway node info
+     */
+    private fun forwardToGateway(
+        packet: VirtualPacket,
+        gateway: NodeTopologyInfo
+    ) {
+        logger(Log.DEBUG,
+            "$logPrefix Forwarding packet to gateway ${gateway.nodeAddress.addressToDotNotation()} " +
+                "(hop ${packet.header.hopCount + 1})",
+            null
+        )
+        
+        // Create new packet with updated header to route to gateway
+        val modifiedHeader = VirtualPacketHeader(
+            toAddr = gateway.nodeAddress,  // Route to gateway
+            toPort = packet.header.toPort,
+            fromAddr = packet.header.fromAddr,
+            fromPort = packet.header.fromPort,
+            lastHopAddr = addressAsInt,
+            hopCount = (packet.header.hopCount + 1).toByte(),
+            maxHops = packet.header.maxHops,
+            gatewayType = packet.header.gatewayType,  // Preserve gateway type
+            payloadSize = packet.header.payloadSize
+        )
+        
+        val forwardedPacket = VirtualPacket.fromHeaderAndPayloadData(
+            header = modifiedHeader,
+            data = packet.data,
+            payloadOffset = packet.payloadOffset
+        )
+        
+        // Find next hop to reach gateway
+        val originatorMessage = originatingMessageManager
+            .findOriginatingMessageFor(gateway.nodeAddress)
+        
+        if (originatorMessage != null) {
+            originatorMessage.receivedFromSocket.send(
+                nextHopAddress = originatorMessage.lastHopRealInetAddr,
+                nextHopPort = originatorMessage.lastHopRealPort,
+                virtualPacket = forwardedPacket
+            )
+        } else {
+            logger(Log.ERROR,
+                "$logPrefix Cannot forward to gateway ${gateway.nodeAddress.addressToDotNotation()}: no route",
+                null
+            )
+        }
+    }
+
+    /**
+     * Handles case where no gateway is available.
+     * 
+     * Behavior based on gateway preference (from GatewayPreference enum):
+     * - TOR_ONLY: Drop packet (no fallback)
+     * - CLEARNET_ONLY: Drop packet (no fallback)
+     * - EITHER: Try alternate gateway type
+     *
+     * @param packet Packet that couldn't be routed
+     * @param requestedType Gateway type that was requested
+     */
+    private fun handleNoGatewayAvailable(
+        packet: VirtualPacket,
+        requestedType: Byte
+    ) {
+        logger(Log.WARN, "$logPrefix No gateway available for type=$requestedType", null)
+        
+        // For EITHER preference, try alternate gateway type
+        // Note: Gateway preference is managed by GatewayTypeResolver at packet creation time
+        // Here we just attempt fallback for EITHER case
+        
+        val alternateType = if (requestedType == VirtualPacketHeader.GATEWAY_TYPE_TOR) {
+            VirtualPacketHeader.GATEWAY_TYPE_CLEARNET
+        } else {
+            VirtualPacketHeader.GATEWAY_TYPE_TOR
+        }
+        
+        val alternateGateways = when (alternateType) {
+            VirtualPacketHeader.GATEWAY_TYPE_TOR -> getAvailableTorGateways()
+            VirtualPacketHeader.GATEWAY_TYPE_CLEARNET -> getAvailableClearnetGateways()
+            else -> emptyList()
+        }
+        
+        if (alternateGateways.isNotEmpty()) {
+            logger(Log.INFO, "$logPrefix Attempting fallback to gateway type=$alternateType", null)
+            
+            // Create new packet with alternate gateway type
+            val fallbackHeader = VirtualPacketHeader(
+                toAddr = packet.header.toAddr,
+                toPort = packet.header.toPort,
+                fromAddr = packet.header.fromAddr,
+                fromPort = packet.header.fromPort,
+                lastHopAddr = packet.header.lastHopAddr,
+                hopCount = packet.header.hopCount,
+                maxHops = packet.header.maxHops,
+                gatewayType = alternateType,  // Updated to alternate type
+                payloadSize = packet.header.payloadSize
+            )
+            
+            val fallbackPacket = VirtualPacket.fromHeaderAndPayloadData(
+                header = fallbackHeader,
+                data = packet.data,
+                payloadOffset = packet.payloadOffset
+            )
+            
+            routeViaGateway(fallbackPacket, null)
+        } else {
+            // No fallback available - drop packet
+            logger(Log.WARN,
+                "$logPrefix Dropping packet: no gateway available (requested=$requestedType)",
+                null
+            )
+        }
+    }
+
     override fun lookupNextHopForChainSocket(address: InetAddress, port: Int): ChainSocketNextHop {
         return originatingMessageManager.lookupNextHopForChainSocket(address, port)
     }
 
-
-    /**
-     * Respond to a new
-     */
     fun addNewNeighborConnection(
         address: InetAddress,
         port: Int,
@@ -533,7 +1039,6 @@ abstract class VirtualNode(
                 socket =  socket,
             )
         }
-
     }
 
     fun addPongListener(listener: PongListener) {
@@ -568,13 +1073,188 @@ abstract class VirtualNode(
         }
     }
 
+    fun sendMessage(message: MmcpMessage) {
+        originatingMessageManager.sendMessage(message)
+    }
+
+    /**
+     * Send a direct ecosystem message to a specific node.
+     * Constructs VirtualPacket with ecosystem port and routes it.
+     * 
+     * @param targetAddress Destination node address
+     * @param messageBytes Serialized message bytes
+     * @param toPort Destination port (defaults to ecosystem gossip port)
+     */
+    fun sendEcosystemMessage(
+        targetAddress: Int,
+        messageBytes: ByteArray,
+        toPort: Int = MeshrabiyaConstants.getEcosystemGossipPort()
+    ) {
+        val packetData = ByteArray(VirtualPacketHeader.HEADER_SIZE + messageBytes.size)
+        val header = VirtualPacketHeader(
+            toAddr = targetAddress,
+            toPort = toPort,
+            fromAddr = addressAsInt,
+            fromPort = toPort,
+            lastHopAddr = addressAsInt,
+            hopCount = 0,
+            maxHops = 10,
+            gatewayType = VirtualPacketHeader.GATEWAY_TYPE_NONE, //V3: Mesh-local message
+            payloadSize = messageBytes.size
+        )
+        System.arraycopy(messageBytes, 0, packetData, VirtualPacketHeader.HEADER_SIZE, messageBytes.size)
+        val packet = VirtualPacket.fromHeaderAndPayloadData(
+            header = header,
+            data = packetData,
+            payloadOffset = VirtualPacketHeader.HEADER_SIZE
+        )
+        route(packet, null, null)
+    }
+
+    // DEPRECATED: MmcpGatewayAnnouncement class moved to .md (commented out to fix compilation)
+    // protected open fun onGatewayAnnouncementReceived(announcement: MmcpGatewayAnnouncement, fromNodeAddr: Int) {
+    //     logger(Log.INFO, "$logPrefix Gateway ${announcement.gatewayType} available from ${fromNodeAddr.addressToDotNotation()}")
+    //     try {
+    //         if (announcement.isActive && announcement.capacity.downloadMbps > 0) {
+    //             logger(Log.DEBUG, "$logPrefix Valid gateway: capacity=${announcement.capacity.downloadMbps}Mbps, latency=${announcement.latency.averageMs}ms")
+    //         }
+    //     } catch (e: Exception) {
+    //         logger(Log.WARN, "$logPrefix Error processing gateway announcement: ${e.message}")
+    //     }
+    // }
+
+    fun getCurrentState(): LocalNodeState {
+        return currentNodeState
+    }
+
+    fun neighbors() = originatingMessageManager.neighbors()
+
     override fun close() {
         datagramSocket.close(closeSocket = true)
         chainSocketServer.close(closeSocket = true)
         coroutineScope.cancel(message = "VirtualNode closed")
-
         connectionExecutor.shutdown()
         scheduledExecutor.shutdown()
     }
 
+    protected fun safeLog(
+        level: LogLevel,
+        category: String,
+        message: String,
+        metadata: Map<String, String?> = emptyMap(),
+        throwable: Throwable? = null
+    ) {
+        try {
+            val betaLogger = (logger as? BetaTestLogger)
+            if (betaLogger != null) {
+                val nonNullMetadata: Map<String, String> = if (metadata.isEmpty()) {
+                    emptyMap()
+                } else {
+                    metadata.mapValues { it.value ?: "" }
+                }
+                betaLogger.log(level, category, message, nonNullMetadata, throwable)
+            } else {
+                val formattedMessage = if (metadata.isNotEmpty()) {
+                    "$message [${metadata.map { "${it.key}=${it.value}" }.joinToString(", ")}]"
+                } else {
+                    message
+                }
+                when (level) {
+                    LogLevel.ERROR -> logger(Log.ERROR, "[$category] $formattedMessage", throwable as? Exception)
+                    LogLevel.WARN -> logger(Log.WARN, "[$category] $formattedMessage", throwable as? Exception)
+                    LogLevel.INFO -> logger(Log.INFO, "[$category] $formattedMessage", throwable as? Exception)
+                    LogLevel.DEBUG -> logger(Log.DEBUG, "[$category] $formattedMessage", throwable as? Exception)
+                    LogLevel.DETAILED -> logger(Log.DEBUG, "[$category] $formattedMessage", throwable as? Exception)
+                    LogLevel.FULL -> logger(Log.VERBOSE, "[$category] $formattedMessage", throwable as? Exception)
+                    LogLevel.BASIC -> logger(Log.INFO, "[$category] $formattedMessage", throwable as? Exception)
+                    LogLevel.DISABLED -> { }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("VirtualNode", "Logging failed: ${e.message}, original message: $message", e)
+        }
+    }
+
+    // --- Helper: Should route via proxy ---
+    private fun shouldRouteViaProxy(packet: VirtualPacket): Boolean {
+        // Define logic for which packets should go via proxy (Tor)
+        // Example: packets destined for Internet (not mesh addresses)
+        // Here, you may want to check packet.header.toAddr or other fields
+        // For now, route all non-mesh traffic if proxy is active and TOR_GATEWAY role is present
+        return true
+    }
+
+    // === Gateway Routing Methods (Phase 4) ===
+    
+    /**
+     * Check if this node is acting as a gateway of given type
+     */
+    fun isGatewayNode(gatewayType: MeshRole): Boolean {
+        return emergentRoleManager.currentMeshRoles.value.contains(gatewayType)
+    }
+
+    /**
+     * Route packet through gateway based on destination analysis
+     * CLIENT NODE: Select gateway from topology, route to gateway
+     * GATEWAY NODE: Route through proxy
+     */
+    fun routeThroughGateway(packet: VirtualPacket): Boolean {
+        // Determine gateway type needed based on destination
+        val gatewayType = determineGatewayType(packet)
+        
+        return if (gatewayType != null) {
+            gatewayRouter.routeToGateway(packet, gatewayType)
+        } else {
+            // No gateway needed, route directly (route() returns Unit, so wrap in true)
+            route(packet)
+            true
+        }
+    }
+
+    /**
+     * Determine which gateway type is needed for this packet
+     * @return Gateway type (TOR/CLEARNET/I2P) or null for direct routing
+     */
+    private fun determineGatewayType(packet: VirtualPacket): MeshRole? {
+        // TODO: Implement packet inspection logic
+        // Phase 1: Explicit tagging (application layer specifies gateway)
+        // Phase 2: Destination-based (.onion → TOR, .i2p → I2P, else CLEARNET)
+        // Phase 3: Port-based (443 → CLEARNET, 9150 → TOR, 7657 → I2P)
+        
+        // For now, return null (no gateway routing until classification implemented)
+        return null
+    }
+
+    /**
+     * Route packet through configured proxy (Tor/etc)
+     * GATEWAY NODE behavior - called by GatewayRouter
+     * Enhanced to return Boolean for success/failure
+     */
+    fun routeViaProxy(packet: VirtualPacket): Boolean {
+        val host = proxyHost ?: return false
+        val port = proxyPort ?: return false
+        
+        try {
+            val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress(host, port))
+            val socket = Socket(proxy)
+            socket.getOutputStream().write(packet.data)
+            socket.close()
+            return true
+        } catch (e: Exception) {
+            logger(Log.ERROR, "$logPrefix Failed to route via proxy: ${e.message}", e)
+            return false
+        }
+    }
+
+    companion object {
+        /**
+         * Timeout threshold for gateway staleness check.
+         * Gateways not seen within this period are considered stale.
+         * Phase 3A: Gateway Routing Core
+         */
+        const val GATEWAY_STALE_TIMEOUT_MS = 30_000L  // 30 seconds
+    }
+
+    // Removed explicit getter functions - Kotlin auto-generates them from protected val properties
+    // This eliminates "Platform declaration clash" errors from duplicate JVM signatures
 }

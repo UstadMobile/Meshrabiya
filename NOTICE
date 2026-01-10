@@ -1,0 +1,78 @@
+Meshrabiya - Android Mesh Networking Library
+Copyright © 2023 UstadMobile FZ-LLC (Original Implementation)
+Copyright © 2025 Tyrone Thomas/BreakThrough Technologies (Fork Modifications)
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 3 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+
+================================================================================
+
+FORK INFORMATION
+
+This is a highly modified fork of Meshrabiya originally developed by UstadMobile FZ-LLC.
+The original upstream project can be found at: https://github.com/UstadMobile/Meshrabiya
+
+MAJOR MODIFICATIONS IN THIS FORK:
+
+1. **Distributed Storage Integration**
+   - Added distributed storage layer for mesh network data persistence
+   - Implemented data replication across mesh nodes
+   - Added content routing and discovery mechanisms
+
+2. **Distributed Compute Framework** 
+   - Integrated distributed compute orchestration capabilities
+   - Added workflow coordination and task distribution
+   - Implemented compute service library for mesh processing
+
+3. **Enhanced Mesh Coordination**
+   - Added coordinator adapter requirements for mesh management
+   - Implemented EmergentRoleManager with power constraint awareness
+   - Enhanced VirtualNode with race condition fixes and coroutine improvements
+
+4. **Gateway Integration**
+   - Improved Gateway integration test framework
+   - Added Robolectric-based testing solutions
+   - Enhanced mesh-to-internet gateway functionality
+
+5. **Architecture Modernization**
+   - Updated build system and dependency management
+   - Resolved compilation issues for new architecture approach
+   - Enhanced error handling and debugging capabilities
+
+6. **Service Interoperability**
+   - Integrated compute+storage interoperability layer
+   - Enhanced service coordination between distributed components
+   - Improved mesh service lifecycle management
+
+All modifications maintain backward compatibility with the original Meshrabiya API
+where possible, while extending functionality for distributed computing use cases.
+
+UPSTREAM SYNCHRONIZATION:
+This fork tracks upstream changes selectively, incorporating security fixes
+and performance improvements while maintaining our architectural extensions.
+
+For detailed technical documentation of modifications, see:
+- README.md (Architecture section)
+- doc/ directory (Technical specifications)
+- Commit history for change tracking
+
+ORIGINAL COPYRIGHT NOTICE:
+The original Meshrabiya library was developed by UstadMobile FZ-LLC and is
+licensed under LGPL-3.0. All original copyright notices and attributions
+are preserved in their respective files.
+
+QUESTIONS AND CONTRIBUTIONS:
+- Fork Issues: https://github.com/dreadstar/orbot-abhaya-android/issues
+- Upstream Issues: https://github.com/UstadMobile/Meshrabiya/issues
+- License Questions: See parent repository THIRD_PARTY_LICENSES.md

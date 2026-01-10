@@ -8,6 +8,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.SocketAddress
+import java.net.SocketException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
@@ -99,6 +100,11 @@ class UdpForwardRule(
                 packet.port = destPort
 
                 returnSocket.returnPathSocket.send(packet)
+            }
+        }catch(e: SocketException) {
+            // Socket closed during shutdown is expected, don't log as error
+            if(!Thread.interrupted()) {
+                logger(Log.ERROR, "$logPrefix : exception running", e)
             }
         }catch(e: Exception) {
             logger(Log.ERROR, "$logPrefix : exception running", e)

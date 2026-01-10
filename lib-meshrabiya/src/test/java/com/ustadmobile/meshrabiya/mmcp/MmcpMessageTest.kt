@@ -8,6 +8,7 @@ class MmcpMessageTest {
 
     @Test
     fun givenPingMessage_whenConvertedToAndFromVirtualPacket_thenWillMatch() {
+        println("[DEBUG] MmcpMessageTest: Running test")
         val pingMessage = MmcpPing(Random.nextInt())
         val pingPacket = pingMessage.toVirtualPacket(
             toAddr = 1000,

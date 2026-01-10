@@ -1,5 +1,7 @@
-package com.ustadmobile.meshrabiya.vnet.wifi
 
+package com.ustadmobile.meshrabiya.vnet.wifi
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 import android.content.Context
 import android.net.MacAddress
 import android.net.wifi.ScanResult
@@ -34,7 +36,7 @@ class LocalOnlyHotspotManager(
     private val router: VirtualRouter,
     private val dataStore: DataStore<Preferences>,
 ) {
-
+    private val appContext = appContext
     private val logPrefix: String = "[LocalOnlyHotspotManager: $name]"
 
     private val _state = MutableStateFlow(LocalOnlyHotspotState())
@@ -136,7 +138,15 @@ class LocalOnlyHotspotManager(
                 )
             }
 
-            wifiManager.startLocalOnlyHotspot(localOnlyHotspotCallback, null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (ContextCompat.checkSelfPermission(appContext, android.Manifest.permission.CHANGE_WIFI_STATE) == PackageManager.PERMISSION_GRANTED) {
+                    wifiManager.startLocalOnlyHotspot(localOnlyHotspotCallback, null)
+                } else {
+                    logger(Log.ERROR, "$logPrefix Missing CHANGE_WIFI_STATE permission for startLocalOnlyHotspot", null)
+                }
+            } else {
+                logger(Log.ERROR, "$logPrefix startLocalOnlyHotspot requires API 26+", null)
+            }
         }
     }
 

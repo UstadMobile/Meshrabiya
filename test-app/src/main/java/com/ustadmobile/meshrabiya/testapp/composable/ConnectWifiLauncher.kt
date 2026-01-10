@@ -89,9 +89,12 @@ fun rememberMeshrabiyaConnectLauncher(
 
         onStatusChange?.invoke(ConnectWifiLauncherStatus.INACTIVE)
         if(result.resultCode == Activity.RESULT_OK) {
-            val scanResult: ScanResult? = result.data?.getParcelableExtra(
-                CompanionDeviceManager.EXTRA_DEVICE
-            )
+            val scanResult: ScanResult? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, ScanResult::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE)
+            }
 
             logger?.invoke(Log.INFO, "rememberConnectWifiLauncher: Got scan result: bssid = ${scanResult?.BSSID}")
             node.storeBssid(request.connectConfig.ssid, scanResult?.BSSID)

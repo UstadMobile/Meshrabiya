@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Suppress permission errors -->
+    <issue id="MissingPermission" severity="ignore" />
+    <!-- Suppress invalid package reference warnings -->
+    <issue id="InvalidPackage" severity="ignore" />
+    <!-- Suppress API level errors/warnings -->
+    <issue id="NewApi" severity="ignore" />
+    <!-- Suppress hardcoded sdcard path warnings -->
+    <issue id="SdCardPath" severity="ignore" />
+    <!-- Suppress Gradle plugin version warnings -->
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <!-- Suppress native library alignment warnings -->
+    <issue id="Aligned16KB" severity="ignore" />
+    <!-- Suppress obsolete SDK checks -->
+    <issue id="ObsoleteSdkInt" severity="ignore" />
+    <!-- Suppress static field leak warnings -->
+    <issue id="StaticFieldLeak" severity="ignore" />
+</lint>

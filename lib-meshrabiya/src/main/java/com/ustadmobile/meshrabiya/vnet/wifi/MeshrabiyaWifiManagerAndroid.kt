@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // WifiConfiguration needed for pre-API 30 device support
+
 package com.ustadmobile.meshrabiya.vnet.wifi
 
 import android.content.Context
@@ -363,6 +365,7 @@ class MeshrabiyaWifiManagerAndroid(
                 hiddenSSID = true
             }
             val configNetworkId = wifiManager.addOrLookupNetwork(wifiConfig, logger)
+            @Suppress("DEPRECATION")
             val currentlyConnectedNetworkId = wifiManager.connectionInfo.networkId
             logger(Log.DEBUG, "$logPrefix connectToHotspot: Currently connected to networkId: $currentlyConnectedNetworkId", null)
 

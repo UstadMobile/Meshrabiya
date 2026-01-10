@@ -17,6 +17,10 @@ import java.nio.ByteOrder
  *        is incremented on each hop.
  * @param maxHops the maximum number of hops that this packet should live for. If exceeded, packet is
  *        dropped
+ * @param gatewayType the type of gateway required for internet-bound packets (V3 addition):
+ *        0 = GATEWAY_TYPE_NONE (mesh-local traffic, no gateway needed)
+ *        1 = GATEWAY_TYPE_TOR (requires Tor gateway for privacy)
+ *        2 = GATEWAY_TYPE_CLEARNET (requires clearnet gateway for performance)
  * @param payloadSize the size of the payload data
  *
  * Packet size/structure:
@@ -27,6 +31,7 @@ import java.nio.ByteOrder
  * lastHopAddr (32 bit int)
  * hopCount (8bit byte)
  * maxHops (8bit byte)
+ * gatewayType (8bit byte) [NEW in V3]
  * payloadSize (16bit short)
  * payload (byte array where size = payloadSize)
  */
@@ -39,6 +44,7 @@ data class VirtualPacketHeader(
     val lastHopAddr: Int,
     val hopCount: Byte,
     val maxHops: Byte,
+    val gatewayType: Byte, //V3: Gateway type (0=none, 1=TOR, 2=CLEARNET)
     val payloadSize: Int, //Max size should be in line with MTU e.g. 1500. Stored as short
 ) {
 
@@ -59,6 +65,7 @@ data class VirtualPacketHeader(
         buf.putInt(lastHopAddr)
         buf.put(hopCount)
         buf.put(maxHops)
+        buf.put(gatewayType) //V3: Write gateway type
         buf.putShort(payloadSize.toShort())
     }
 
@@ -84,6 +91,7 @@ data class VirtualPacketHeader(
             val _lastHopAddr = buf.getInt()
             val _hopCount = buf.get()
             val _maxHops = buf.get()
+            val _gatewayType = buf.get() //V3: Read gateway type
             val _payloadSize = buf.getShort()
 
             return VirtualPacketHeader(
@@ -94,14 +102,20 @@ data class VirtualPacketHeader(
                 lastHopAddr = _lastHopAddr,
                 hopCount = _hopCount,
                 maxHops = _maxHops,
+                gatewayType = _gatewayType, //V3: Include in construction
                 payloadSize = _payloadSize.toInt(),
             )
         }
 
         //Size of all header fields in bytes (as above)
-        const val HEADER_SIZE = 20
+        const val HEADER_SIZE = 21 //V3: Updated from 20 to 21 bytes
 
         const val MAX_PAYLOAD = 2000
+
+        //V3: Gateway type constants
+        const val GATEWAY_TYPE_NONE: Byte = 0      // Mesh-local traffic, no gateway needed
+        const val GATEWAY_TYPE_TOR: Byte = 1       // Requires Tor gateway for privacy
+        const val GATEWAY_TYPE_CLEARNET: Byte = 2  // Requires clearnet gateway for performance
 
 
     }

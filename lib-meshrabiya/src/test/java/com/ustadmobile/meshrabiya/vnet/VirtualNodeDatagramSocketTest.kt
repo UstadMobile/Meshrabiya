@@ -22,8 +22,9 @@ class VirtualNodeDatagramSocketTest {
         val socket2VirtualNodeAddr = 43
 
         val socket1Router: VirtualRouter = mock { }
+        val loopback = InetAddress.getByName("127.0.0.1")
         val socket1 = VirtualNodeDatagramSocket(
-            socket = DatagramSocket(0),
+            socket = DatagramSocket(0, loopback),
             localNodeVirtualAddress = socket1VirtualNodeAddr,
             ioExecutorService = executorService,
             router = socket1Router,
@@ -32,7 +33,7 @@ class VirtualNodeDatagramSocketTest {
 
         val socket2Router: VirtualRouter = mock { }
         val socket2 = VirtualNodeDatagramSocket(
-            socket = DatagramSocket(0),
+            socket = DatagramSocket(0, loopback),
             localNodeVirtualAddress = socket2VirtualNodeAddr,
             ioExecutorService = executorService,
             router = socket2Router,
@@ -40,7 +41,7 @@ class VirtualNodeDatagramSocketTest {
         )
 
         try {
-            val data = Random.nextBytes(ByteArray(1000 + VirtualPacketHeader.HEADER_SIZE))
+            val data = Random.nextBytes(1000 + VirtualPacketHeader.HEADER_SIZE)
             val packetToSend = VirtualPacket.fromHeaderAndPayloadData(
                 header = VirtualPacketHeader(
                     toAddr = socket2VirtualNodeAddr,
@@ -50,18 +51,21 @@ class VirtualNodeDatagramSocketTest {
                     lastHopAddr = socket1VirtualNodeAddr,
                     hopCount = 1.toByte(),
                     maxHops = 8.toByte(),
+                    gatewayType = VirtualPacketHeader.GATEWAY_TYPE_NONE,
                     payloadSize = 1000
                 ),
                 data = data,
                 payloadOffset = VirtualPacketHeader.HEADER_SIZE,
             )
 
+            // Use the correct send method signature
             socket1.send(
                 nextHopAddress = InetAddress.getLoopbackAddress(),
                 nextHopPort = socket2.localPort,
                 virtualPacket = packetToSend,
             )
 
+            // Verify that the router.route method was called on socket2
             verify(socket2Router, timeout(5000)).route(
                 packet = argWhere {
                     it.header == packetToSend.header
@@ -69,11 +73,10 @@ class VirtualNodeDatagramSocketTest {
                 datagramPacket = any(),
                 virtualNodeDatagramSocket = eq(socket2),
             )
-        }finally {
+        } finally {
             executorService.shutdown()
             socket1.close()
             socket2.close()
         }
     }
-
 }

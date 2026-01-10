@@ -14,6 +14,7 @@ class MmcpHotspotResponseTest {
 
     @Test
     fun givenHotspotResponse_whenConvertedToFromBytes_thenShouldBeEqual() {
+        println("[DEBUG] MmcpHotspotResponseTest: Running test")
         val responseMessage = MmcpHotspotResponse(
             messageId = 42,
             result = LocalHotspotResponse(

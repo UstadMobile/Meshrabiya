@@ -67,9 +67,12 @@ fun rememberBluetoothConnectLauncher(
         contract = ActivityResultContracts.StartIntentSenderForResult(),
     )  { result ->
         if(result.resultCode == Activity.RESULT_OK) {
-            val device: BluetoothDevice? = result.data?.getParcelableExtra(
-                CompanionDeviceManager.EXTRA_DEVICE
-            )
+            val device: BluetoothDevice? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE, BluetoothDevice::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra(CompanionDeviceManager.EXTRA_DEVICE)
+            }
 
             onResult(ConnectBluetoothLauncherResult(device))
         }

@@ -8,6 +8,7 @@ class UuidMaskUtilTest {
 
     @Test
     fun givenUuidMaskAndPort_whenMaskedAndPortExtracted_thenShouldMatch() {
+        println("[DEBUG] UuidMaskUtilTest: Running test")
         val uuidMask = UUID.randomUUID()
         val port = 50000
         val uuidForMaskAndPort = uuidForMaskAndPort(uuidMask, port)

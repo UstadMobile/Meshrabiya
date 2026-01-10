@@ -12,6 +12,7 @@ class MeshrabiyaConnectLinkTest {
 
     @Test
     fun givenLinkFromComponents_whenParsed_thenShouldMatchOriginal(){
+        println("[DEBUG] MeshrabiyaConnectLinkTest: Starting test")
         val json = Json { encodeDefaults = true }
         val link = MeshrabiyaConnectLink.fromComponents(
             nodeAddr = randomApipaAddr(),
